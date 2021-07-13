@@ -10,6 +10,7 @@ use strict;
 use warnings;
 use Bio::SeqIO;
 use Getopt::Long;
+use File::Basename;
 
 ####### File IO ########
 

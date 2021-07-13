@@ -154,7 +154,7 @@ run_ingest() {
   gff_files="$(ls ${data_dir}/*.${gff_ext})"
   fasta_files="$(ls ${data_dir}/*.${fasta_ext})"
   n_fasta=`ls ${data_dir}/*.${fasta_ext} | wc -l`
-  echo "ingest -- combine data from ${n_fasta} ${gff_ext} and ${fasta_ext} files"
+  echo; echo "Ingest -- combine data from ${n_fasta} ${gff_ext} and ${fasta_ext} files"
   for path in $gff_files; do
     base=$(basename $path .${gff_ext})
     base_no_ann=$(echo $base | perl -pe 's/\.ann\d+\.\w+//')
@@ -181,7 +181,7 @@ run_mmseqs() {
   mm_clust_cov=$(get_value clust_cov)
   n_jobs=$(get_value max_main_jobs)
   fasta_ext=$(get_value fasta_ext)
-  echo "run mmseqs -- at ${mm_clust_iden} percent identity and minimum of ${mm_clust_cov}% coverage."
+  echo; echo "Run mmseqs -- at ${mm_clust_iden} percent identity and minimum of ${mm_clust_cov}% coverage."
   start_time=$(date +%s)
   #
   for qry_path in ${work_dir}/*.${fasta_ext}; do
@@ -197,7 +197,9 @@ run_mmseqs() {
            --cluster-reassign 2>/dev/null 1>/dev/null &  ## in background, for parallelization  
 
         # allow to execute up to $n_jobs in parallel
-        if [[ $(jobs -r -p | wc -l) -ge $n_jobs ]]; then wait -n; fi
+        if [[ $(jobs -r -p | wc -l) -ge $n_jobs ]]; then 
+          wait -n; 
+        fi
       fi
     done
   done
@@ -207,7 +209,7 @@ run_mmseqs() {
 }
 #
 run_filter() {
-  echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
+  echo; echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
   n_jobs=$(get_value max_main_jobs)
   chr_match_list=${data_dir}/expected_chr_matches.tsv
   if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
@@ -220,6 +222,7 @@ run_filter() {
       # allow to execute up to $n_jobs in parallel
       if [[ $(jobs -r -p | wc -l) -ge $n_jobs ]]; then wait -n; fi
     done
+    wait # wait for last jobs to finish
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
     echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
     for mmseqs_path in ${mmseqs_dir}/*_cluster.tsv; do
@@ -287,7 +290,7 @@ run_mcl() {
 }
 #
 run_consense() {
-  echo "Calculate a consensus sequence for each pan-gene set, using vsearch."
+  echo; echo "Calculate a consensus sequence for each pan-gene set, using vsearch."
   echo "Then add previously unclustered sequences into an \"augmented\" pan-gene set, by homology."
   fasta_ext=$(get_value fasta_ext)
   fasta_files="$(ls ${data_dir}/*.${fasta_ext})"
@@ -330,7 +333,8 @@ run_consense() {
   echo "  Search non-clustered genes against pan-gene consensus sequences"
   mmseqs easy-search ${work_dir}/genes_not_in_clusters.fna \
                      ${work_dir}/syn_pan_consen.fna \
-                     ${work_dir}/unclust.x.all_cons.m8 tmp --search-type 3 --cov-mode 5 -c 0.5
+                     ${work_dir}/unclust.x.all_cons.m8 tmp \
+                   --search-type 3 --cov-mode 5 -c 0.5 2>/dev/null 1>/dev/null
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
   top_line.awk ${work_dir}/unclust.x.all_cons.m8 | 
@@ -374,11 +378,12 @@ run_summarize() {
       mkdir -p $full_out_dir
   fi
 
-  cp ${work_dir}/synteny_blocks.tsv ${full_out_dir}/synteny_blocks.tsv
-  cp ${work_dir}/syn_pan.clust.tsv ${full_out_dir}/syn_pan.clust.tsv
-  cp ${work_dir}/syn_pan.hsh.tsv ${full_out_dir}/syn_pan.hsh.tsv
-  cp ${work_dir}/syn_pan_augmented.clust.tsv ${full_out_dir}/syn_pan_augmented.clust.tsv
-  cp ${work_dir}/syn_pan_augmented.hsh.tsv ${full_out_dir}/syn_pan_augmented.hsh.tsv
+  cp ${work_dir}/synteny_blocks.tsv ${full_out_dir}/
+  cp ${work_dir}/syn_pan.clust.tsv ${full_out_dir}/
+  cp ${work_dir}/syn_pan.hsh.tsv ${full_out_dir}/
+  cp ${work_dir}/syn_pan_augmented.clust.tsv ${full_out_dir}/
+  cp ${work_dir}/syn_pan_augmented.hsh.tsv ${full_out_dir}/
+  cp ${work_dir}/syn_pan_consen.fna ${full_out_dir}/
 
   printf "Run of program $scriptname, version $version\n\n" > ${stats_file}
 
@@ -508,13 +513,13 @@ clear_config() {
 #
 init() {
   # Initialize parameters required for run. Write these to files, for persistent access through the program.
-  echo "setting run configuration parameters"
+  echo; echo "Setting run configuration parameters"
   [ -z "$NPROC" ] && NPROC=$(nproc)
   set_value clust_iden "0.98"
   set_value clust_cov "0.75"
   set_value consen_iden "0.80"
   set_value max_main_jobs $(($NPROC/5))
-  set_value max_litejobs $(($NPROC/2))
+  set_value max_lite_jobs $(($NPROC/2))
   set_value mcl_inflation 2
   set_value mcl_threads $(($NPROC/5))
   set_value dagchainer_args ""

@@ -11,7 +11,7 @@ time pandagma.sh init
 # get info from matching GFF and FNA files
 time pandagma.sh run ingest
 
-# do mmseqs on all genome pairings
+# do mmseqs on all pairings of annotation sets
 time pandagma.sh run mmseqs
 
 # filter based on expected chromosome pairings
