@@ -46,13 +46,13 @@ additional pre- and post-refinement steps.
 Usage:
         ${pkg} SUBCOMMAND [SUBCOMMAND_OPTIONS]
 
-By default, name-matched assembly (fasta) and annotation (GFF) files are expected 
+By default, name-matched primary coding sequence (fasta) and annotation (GFF) files are expected 
 in the data/ directory, within the working directory from where this script is called.
 (To set a different data directory name, see discussion of environment variables below).
 Example of name-matched files within the data/ directory:
-  genome1.fna genome1.gff3   
-  genome2.fna genome2.gff3  
-  genomeXYZ.fna genomeXYZ.gff3
+  accession1.fna accession1.gff3   
+  accession2.fna accession2.gff3  
+  accessionXYZ.fna accessionXYZ.gff3
 
 Optionally, a file \"expected_chr_matches.tsv\" can be provided (also in the data/ directory),
 which provides anticipated chromosome pairings, e.g.
@@ -176,7 +176,7 @@ run_ingest() {
 }
 #
 run_mmseqs() {
-  # Do mmseqs clustering on all genome pairings
+  # Do mmseqs clustering on all pairings of annotation sets.
   mm_clust_iden=$(get_value clust_iden)
   mm_clust_cov=$(get_value clust_cov)
   n_jobs=$(get_value max_main_jobs)

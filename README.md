@@ -1,7 +1,7 @@
 # pandagma
-Generate pan-gene sets, given a collection of genome assemblies and corresponding gene models.
+Generate pan-gene sets, given coding sequences and corresponding gene models, from a set of related accessions or species.
 
-The pandagma.sh script generates pan-gene clusters, given input consisting of genome assemblies and
+The pandagma.sh script generates pan-gene clusters, given input consisting of coding sequences and
 gene models (GFFs) for a collection of accessions and/or closely related species.
 The script drives several programs that do the primary work of clustering, identifying synteny, and 
 additional searches and refinements. The other programs are: mmseqs, dagchainer, mcl, and vsearch. 
@@ -33,7 +33,7 @@ pandagma.sh init
 # get info from matching GFF and FNA files
 pandagma.sh run ingest
 
-# do mmseqs on all genome pairings
+# do mmseqs on all pairings of annotation sets
 pandagma.sh run mmseqs
 
 # filter based on expected chromosome pairings
@@ -55,13 +55,13 @@ pandagma.sh run summarize
 ~~~
 Usage: ${pkg} SUBCOMMAND [SUBCOMMAND_OPTIONS]
 
-By default, name-matched assembly (fasta) and annotation (GFF) files are expected
+By default, name-matched primary coding sequence (fasta) and annotation (GFF) files are expected
 in the data/ directory, within the working directory from where this script is called.
 (To set a different data directory name, see discussion of environment variables below).
 Example of name-matched files within the data/ directory:
-  genome1.fna genome1.gff3
-  genome2.fna genome2.gff3
-  genomeXYZ.fna genomeXYZ.gff3
+  accession1.fna accession1.gff3
+  accession2.fna accession2.gff3
+  accessionXYZ.fna accessionXYZ.gff3
 
 Optionally, a file \"expected_chr_matches.tsv\" can be provided (also in the data/ directory),
 which provides anticipated chromosome pairings, e.g.
