@@ -6,7 +6,7 @@
 # Authors: Steven Cannon, Joel Berendzen, 2020-2021
 #
 scriptname=`basename "$0"`
-version="0.9.0"
+version="0.9.1"
 set -e # stop on errors
 scriptstart=$(date +%s)
 pkg="pandagma"
@@ -18,22 +18,35 @@ if [ -z "${!PKG_DIR}" ]; then
 else
   root_dir="${!PKG_DIR}"
 fi
+
 if [ -z "${!PKG_WORK_DIR}" ]; then
   work_dir="/tmp/${pkg}-work"
 else
   work_dir="${!PKG_WORK_DIR}"
 fi
+
 if [ -z "${!PKG_DATA_DIR}" ]; then
   data_dir="$PWD/data"
 else
   data_dir="${!PKG_DATA_DIR}"
 fi
+
+if [ -z "${!PKG_DATA_EXTRA_DIR}" ]; then
+  data_extra_dir="$PWD/data_extra"
+else
+  data_extra_dir="${!PKG_DATA_EXTRA_DIR}"
+fi
+
 etc_dir="${root_dir}/etc"
 dag_dir="${work_dir}/dag"
 mmseqs_dir="${work_dir}/mmseqs"
+work_data_dir="${work_dir}/data"
+work_data_extra_dir="${work_dir}/data_extra"
+work_extra_out_dir="${work_dir}/extra_out_dir"
 pan_fasta_dir="${work_dir}/pan_fasta"
 pan_consen_dir="${work_dir}/pan_consen"
 leftovers_dir="${work_dir}/pan_leftovers"
+leftovers_extra_dir="${work_dir}/pan_leftovers_extra"
 error_exit() {
   echo >&2 "ERROR -- unexpected exit from ${BASH_SOURCE} script at line:"
   echo >&2 "   $BASH_COMMAND"
@@ -79,8 +92,10 @@ Subommands (in order they are usually run):
          run filter - Filter the synteny results for chromosome pairings, returning gene pairs.
      run dagchainer - Run DAGchainer to filter for syntenic blocks
             run mcl - Derive clusters, with Markov clustering
-       run consense - calculate a consensus sequences from each pan-gene set, 
-                       If possible add sequences missed in the first clustering round.
+       run consense - Calculate a consensus sequences from each pan-gene set, 
+                      adding sequences missed in the first clustering round.
+      run add_extra - Add other gene model sets to the primary clusters. Useful for adding
+                      annotation sets that may be of lower or uncertain quality.
       run summarize - Move results into output directory, and report summary statistics.
        clear_config - Clear all config variables
               clean - Delete work directory
@@ -95,7 +110,7 @@ Variables (accessed by \"config\" subcommand):
           fasta_ext - Extension of FASTA files
             gff_ext - Extension of GFF files
          pan_prefix - Prefix to use as a prefix for pangene clusters [default: pan]
-       out_dir_base - base name for the output directory [default: './${pkg}_out']
+       out_dir_base - base name for the output directory [default: './out']
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
         mcl_threads - Threads to use in Markov clustering [default: processors/5]
             version - version of this script at config time
@@ -105,8 +120,10 @@ Environmental variables (may be set externally):
                        \"${root_dir}\"
     ${PKG}_WORK_DIR - Location of working files, currently
                        \"${work_dir}\"
-    ${PKG}_DATA_DIR - Location of intput data files (assemblies and GFs), currently
+    ${PKG}_DATA_DIR - Location of intput data files (CDS fasta and GFFs), currently
                        \"$PWD/data\"
+${PKG}_DATA_EXTRA_DIR - Location of data files to be added after primary cluster construction
+                       \"$PWD/data_extra\"
               NPROC - Number of processors to use to set the max_main_jobs and max_lite_jobs
                        configuration variable. If not present, max_main_jobs is set
                        to a fifth of the number of processors on the system
@@ -148,31 +165,62 @@ perl_defs() {
 # run functions
 #
 run_ingest() {
+  now=$(date +"%T")
+  set_value start_time $now
   # Prepare the assembly and annotation files for analysis. Add positional info to gene IDs.
   gff_ext=$(get_value gff_ext)
   fasta_ext=$(get_value fasta_ext)
   gff_files="$(ls ${data_dir}/*.${gff_ext})"
   fasta_files="$(ls ${data_dir}/*.${fasta_ext})"
   n_fasta=`ls ${data_dir}/*.${fasta_ext} | wc -l`
-  echo; echo "Ingest -- combine data from ${n_fasta} ${gff_ext} and ${fasta_ext} files"
+  printf "\nIngest -- combine data from ${n_fasta} ${gff_ext} and ${fasta_ext} files\n"
+
+  if ! command -v hash_into_fasta_id.pl &> /dev/null ; then
+    echo >&2 "ERROR: hash_into_fasta_id.pl could not be found. "
+    echo >&2 "       Are the necessary computational tools available? The required tools are:"
+    echo >&2 "           perl-bioperl-core, mmseqs2, dagchainer, mcl, vsearch"
+    exit
+  fi
+
   for path in $gff_files; do
     base=$(basename $path .${gff_ext})
     base_no_ann=$(echo $base | perl -pe 's/\.ann\d+\.\w+//')
     cat $path | awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' |
-      perl -pe 's/ID=([^;]+);\S+/$1/' >${work_dir}/${base_no_ann}.bed
+      perl -pe 's/ID=([^;]+);\S+/$1/' >${work_data_dir}/${base_no_ann}.bed
   done
   # add positional information to FASTA ids
-  for path in ${work_dir}/*.bed; do
+  for path in ${work_data_dir}/*.bed; do
     base=$(basename $path .bed)
     cat $path | awk '{print $4 "\t" $1 "__" $4 "__" $2 "__" $3}' \
-      >${work_dir}/${base}.hsh
+      >${work_data_dir}/${base}.hsh
     hash_into_fasta_id.pl\
       -fasta ${data_dir}/${base}.${fasta_ext} \
-      -hash ${work_dir}/${base}.hsh \
+      -hash ${work_data_dir}/${base}.hsh \
       -suff_regex \
-      >${work_dir}/${base}.${fasta_ext}
+      >${work_data_dir}/${base}.${fasta_ext}
   done
-  echo
+
+  extra_gff_files="$(ls ${data_extra_dir}/*.${gff_ext})"
+  extra_fasta_files="$(ls ${data_extra_dir}/*.${fasta_ext})"
+  n_fasta=`ls ${data_extra_dir}/*.${fasta_ext} | wc -l`
+  printf "\nIf there are extra annotation sets (in data_extra), prepare those for analysis.\n"
+  for path in $extra_gff_files; do
+    base=$(basename $path .${gff_ext})
+    base_no_ann=$(echo $base | perl -pe 's/\.ann\d+\.\w+//')
+    cat $path | awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' |
+      perl -pe 's/ID=([^;]+);\S+/$1/' >${work_data_extra_dir}/${base_no_ann}.bed
+  done
+  # add positional information to FASTA ids
+  for path in ${work_data_extra_dir}/*.bed; do
+    base=$(basename $path .bed)
+    cat $path | awk '{print $4 "\t" $1 "__" $4 "__" $2 "__" $3}' \
+      >${work_data_extra_dir}/${base}.hsh
+    hash_into_fasta_id.pl\
+      -fasta ${data_extra_dir}/${base}.${fasta_ext} \
+      -hash ${work_data_extra_dir}/${base}.hsh \
+      -suff_regex \
+      >${work_data_extra_dir}/${base}.${fasta_ext}
+  done
 }
 #
 run_mmseqs() {
@@ -182,11 +230,10 @@ run_mmseqs() {
   n_jobs=$(get_value max_main_jobs)
   fasta_ext=$(get_value fasta_ext)
   echo; echo "Run mmseqs -- at ${mm_clust_iden} percent identity and minimum of ${mm_clust_cov}% coverage."
-  start_time=$(date +%s)
   #
-  for qry_path in ${work_dir}/*.${fasta_ext}; do
+  for qry_path in ${work_data_dir}/*.${fasta_ext}; do
     qry_base=$(basename $qry_path .${fasta_ext})
-    for sbj_path in ${work_dir}/*.${fasta_ext}; do
+    for sbj_path in ${work_data_dir}/*.${fasta_ext}; do
       sbj_base=$(basename $sbj_path .${fasta_ext})
       if [[ "$qry_base" > "$sbj_base" ]]; then
          echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
@@ -204,8 +251,6 @@ run_mmseqs() {
     done
   done
   wait # wait for last jobs to finish
-  end_time=$(date +%s)
-  set_value mmseqs_time_s $((end_time-start_time))
 }
 #
 run_filter() {
@@ -235,18 +280,16 @@ run_filter() {
 #
 run_dagchainer() {
   # Identify syntenic blocks, using DAGchainer
-  dag_args=$(get_value dagchainer_args)
+  #dag_args=$(get_value dagchainer_args)
+  dag_args="-g 10000 -M 50 -D 200000 -E 1e-5 -A 6 -s"
   echo; echo "Run DAGchainer, using args \"${dag_args}\""
-  start_time=$(date +%s)
   for match_path in ${dag_dir}/*_matches.tsv; do
     align_file=`basename $match_path _matches.tsv`
     echo "Running DAGchainer on comparison: $align_file"
-    run_DAG_chainer.pl $dag_args \
-      -i $match_path 2>/dev/null 1>/dev/null 
+    echo "  run_DAG_chainer.pl $dag_args -i $match_path"; echo
+    run_DAG_chainer.pl $dag_args -i $match_path 2>/dev/null 1>/dev/null 
   done
   wait
-  end_time=$(date +%s)
-  set_value dag_time_s $((end_time-start_time))
   #Extract single-linkage synteny anchors
   cat /dev/null > ${work_dir}/synteny_blocks.tsv
   printf "matches\tscore\trev\tid1\tid2\n" >${work_dir}/synteny_blocks.tsv
@@ -334,24 +377,24 @@ run_consense() {
   mmseqs easy-search ${work_dir}/genes_not_in_clusters.fna \
                      ${work_dir}/syn_pan_consen.fna \
                      ${work_dir}/unclust.x.all_cons.m8 tmp \
-                   --search-type 3 --cov-mode 5 -c 0.5 2>/dev/null 1>/dev/null
+                     --search-type 3 --cov-mode 5 -c 0.5 2>/dev/null 1>/dev/null
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
   top_line.awk ${work_dir}/unclust.x.all_cons.m8 | 
     awk -v IDEN=${mm_clust_iden} '$3>=IDEN {print $2 "\t" $1}' |
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  ${work_dir}/syn_pan_leftovers.clust.tsv
 
-  echo "  Retrieve sequences for the "leftover" genes"
+  echo "  Retrieve sequences for the leftover genes"
   get_fasta_from_family_file.pl ${fasta_files} \
-    -fam ${work_dir}/syn_pan_leftovers.clust.tsv -out ${leftovers_dir}
+    -fam ${work_dir}/syn_pan_leftovers.clust.tsv -out ${leftovers_extra_dir}
 
   echo "  Make augmented cluster sets"
   cat /dev/null > ${work_dir}/syn_pan_augmented.clust.tsv
   for path in ${work_dir}/pan_fasta/*; do
     file=`basename $path` 
-    if [[ -f ${leftovers_dir}/$file ]]; then
+    if [[ -f ${leftovers_extra_dir}/$file ]]; then
       cat <(awk -v ORS="" -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"}' $path) \
-          <(awk -v ORS="" '$1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' ${leftovers_dir}/$file)
+          <(awk -v ORS="" '$1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' ${leftovers_extra_dir}/$file)
     else
       awk -v ORS=""  -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' $path
     fi | sed 's/\t$//'
@@ -362,13 +405,58 @@ run_consense() {
     perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' > ${work_dir}/syn_pan_augmented.hsh.tsv
 }
 #
+run_add_extra() {
+  echo; echo "Add extra annotation sets to the augmented clusters, by homology"
+  fasta_ext=$(get_value fasta_ext)
+  fasta_files="$(ls ${data_extra_dir}/*.${fasta_ext})"
+  mm_clust_iden=$(get_value clust_iden)
+  n_jobs=$(get_value max_main_jobs)
+
+  echo "  Search non-clustered genes against pan-gene consensus sequences"
+  for path in ${data_extra_dir}/*.${fasta_ext}; do
+    fasta_file=`basename $path` 
+    echo "Extra: $fasta_file"
+
+    mmseqs easy-search ${path} \
+                       ${work_dir}/syn_pan_consen.fna \
+                       ${work_extra_out_dir}/${fasta_file}.x.all_cons.m8 tmp \
+                       --search-type 3 --cov-mode 5 -c 0.5 2>/dev/null 1>/dev/null &
+     # allow to execute up to $n_jobs in parallel
+     if [[ $(jobs -r -p | wc -l) -ge $n_jobs ]]; then wait -n; fi
+  done
+
+  echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
+  cat /dev/null > ${work_dir}/syn_pan_extra.clust.tsv
+  cat ${work_extra_out_dir}/*.x.all_cons.m8 | top_line.awk |
+    awk -v IDEN=${mm_clust_iden} '$3>=IDEN {print $2 "\t" $1}' |
+    sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  ${work_dir}/syn_pan_extra.clust.tsv
+
+  echo "  Retrieve sequences for the extra genes"
+  get_fasta_from_family_file.pl ${fasta_files} \
+    -fam ${work_dir}/syn_pan_extra.clust.tsv -out ${leftovers_extra_dir}
+
+  echo "  Make augmented cluster sets"
+  for path in ${work_dir}/pan_fasta/*; do
+    file=`basename $path` 
+    if [[ -f ${leftovers_extra_dir}/$file ]]; then
+      cat <(awk -v ORS="" -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"}' $path) \
+          <(awk -v ORS="" '$1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' ${leftovers_extra_dir}/$file)
+    else
+      awk -v ORS=""  -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' $path
+    fi | sed 's/\t$//'
+  done > ${work_dir}/syn_pan_aug_extra.clust.tsv
+
+  echo "  Reshape from mcl output form (clustered IDs on one line) to a hash format (clust_ID gene)"
+  cat ${work_dir}/syn_pan_aug_extra.clust.tsv | 
+    perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' > ${work_dir}/syn_pan_aug_extra.hsh.tsv
+}
+#
 run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
   mcl_I=$(get_value mcl_inflation)
   mm_clust_iden=$(get_value clust_iden)
   mm_clust_cov=$(get_value clust_cov)
-  mmseqs_time=$(get_value mmseqs_time_s)
-  dag_time=$(get_value dag_time_s)
+  start_t=$(get_value start_time)
   out_dir="$(get_value out_dir_base)"
   full_out_dir=`echo "$out_dir.id${mm_clust_iden}.cov${mm_clust_cov}.I${mcl_I}" | perl -pe 's/(\d)\.(\d+)/$1_$2/g'`
   stats_file=${full_out_dir}/stats.tsv
@@ -381,9 +469,8 @@ run_summarize() {
   cp ${work_dir}/synteny_blocks.tsv ${full_out_dir}/
   cp ${work_dir}/syn_pan.clust.tsv ${full_out_dir}/
   cp ${work_dir}/syn_pan.hsh.tsv ${full_out_dir}/
-  cp ${work_dir}/syn_pan_augmented.clust.tsv ${full_out_dir}/
-  cp ${work_dir}/syn_pan_augmented.hsh.tsv ${full_out_dir}/
   cp ${work_dir}/syn_pan_consen.fna ${full_out_dir}/
+  cp ${work_dir}/syn_pan_aug*.tsv ${full_out_dir}/
 
   printf "Run of program $scriptname, version $version\n\n" > ${stats_file}
 
@@ -418,35 +505,74 @@ run_summarize() {
     uniq -c | sort -n | tail -1 | awk '{print $1}')"
   printf '%-20s\t%s\n' "num_at_mode" $num_at_mode >> ${stats_file}
   
+  let "seqs_clustered=$(wc -l ${full_out_dir}/syn_pan.hsh.tsv | awk '{print $1}')"
+  printf '%-20s\t%s\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
+  
 #
-  printf "\n== Augmented clusters (unanchored sequences added to the initial clusters)\n" >> ${stats_file}
-  let "clustersA=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | wc -l)"
-  printf '%-20s\t%s\n' "num_of_clusters" $clustersA >> ${stats_file}
+  if [ -f ${full_out_dir}/syn_pan_augmented.clust.tsv ]; then
+    printf "\n== Augmented clusters (unanchored sequences added to the initial clusters)\n" >> ${stats_file}
+    let "clustersA=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | wc -l)"
+    printf '%-20s\t%s\n' "num_of_clusters" $clustersA >> ${stats_file}
 
-  let "largestA=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | awk "{print NF-1}" | sort -n | tail -1)"
-  printf '%-20s\t%s\n' "largest_cluster" $largestA >> ${stats_file}
+    let "largestA=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | awk "{print NF-1}" | sort -n | tail -1)"
+    printf '%-20s\t%s\n' "largest_cluster" $largestA >> ${stats_file}
 
-  let "modeA=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | awk "{print NF-1}" | \
-    uniq -c | sort -n | tail -1 | awk '{print $2}')"
-  printf '%-20s\t%s\n' "modal_clst_size" $modeA >> ${stats_file}
+    let "modeA=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | awk "{print NF-1}" | \
+      uniq -c | sort -n | tail -1 | awk '{print $2}')"
+    printf '%-20s\t%s\n' "modal_clst_size" $modeA >> ${stats_file}
 
-  let "numA_at_mode=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | awk "{print NF-1}" | \
-    sort -n | uniq -c | sort -n | tail -1 | awk '{print $1}')"
-  printf '%-20s\t%s\n' "num_at_mode" $numA_at_mode >> ${stats_file}
+    let "numA_at_mode=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | awk "{print NF-1}" | \
+      sort -n | uniq -c | sort -n | tail -1 | awk '{print $1}')"
+    printf '%-20s\t%s\n' "num_at_mode" $numA_at_mode >> ${stats_file}
+    
+    let "seqs_clustered=$(wc -l ${full_out_dir}/syn_pan_augmented.hsh.tsv | awk '{print $1}')"
+    printf '%-20s\t%s\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
+  fi
 
-  # # run times
-  # printf "\nRun times (seconds):" >> ${stats_file}
-  # printf "\nmmseqs\t${mmseqs_time}" >> ${stats_file}
-  # printf "\nDAGchainer\t${dag_time}\n" >> ${stats_file}
+#
+  if [ -f ${full_out_dir}/syn_pan_aug_extra.clust.tsv ]; then
+    printf "\n== Augmented-extra clusters (sequences from extra annotation sets have been added)\n" >> ${stats_file}
+    let "clustersB=$(cat ${full_out_dir}/syn_pan_aug_extra.clust.tsv | wc -l)"
+    printf '%-20s\t%s\n' "num_of_clusters" $clustersB >> ${stats_file}
+
+    let "largestB=$(cat ${full_out_dir}/syn_pan_aug_extra.clust.tsv | awk "{print NF-1}" | sort -n | tail -1)"
+    printf '%-20s\t%s\n' "largest_cluster" $largestB >> ${stats_file}
+
+    let "modeB=$(cat ${full_out_dir}/syn_pan_aug_extra.clust.tsv | awk "{print NF-1}" | \
+      uniq -c | sort -n | tail -1 | awk '{print $2}')"
+    printf '%-20s\t%s\n' "modal_clst_size" $modeB >> ${stats_file}
+
+    let "numB_at_mode=$(cat ${full_out_dir}/syn_pan_aug_extra.clust.tsv | awk "{print NF-1}" | \
+      sort -n | uniq -c | sort -n | tail -1 | awk '{print $1}')"
+    printf '%-20s\t%s\n' "num_at_mode" $numB_at_mode >> ${stats_file}
+    
+    let "seqs_clustered=$(wc -l ${full_out_dir}/syn_pan_aug_extra.hsh.tsv | awk '{print $1}')"
+    printf '%-20s\t%s\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
+  fi
+
+  # run times
+  end_t=$(date +"%T")
+  echo "Start time: $start_t"
+  echo "Current time: $end_t"
 
   # histograms
-  printf "\nCounts of initial clusters by cluster size:\n" >> ${stats_file}
-  cut -f1 ${full_out_dir}/syn_pan.hsh.tsv | sort | uniq -c |
-    awk '{print $1}' | uniq -c | awk '{print $2 "\t" $1}' | sort -k1n,1n >> ${stats_file}
+  if [ -f ${full_out_dir}/syn_pan.clust.tsv ]; then
+    printf "\nCounts of initial clusters by cluster size:\n" >> ${stats_file}
+    cat ${full_out_dir}/syn_pan.clust.tsv | awk '{print NF-1}' |
+      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
+  fi
 
-  printf "\nCounts of augmented clusters by cluster size:\n" >> ${stats_file}
-  cut -f1 ${full_out_dir}/syn_pan_augmented.hsh.tsv | sort | uniq -c |
-    awk '{print $1}' | sort -n | uniq -c | awk '{print $2 "\t" $1}' | sort -k1n,1n >> ${stats_file}
+  if [ -f ${full_out_dir}/syn_pan_augmented.clust.tsv ]; then
+    printf "\nCounts of augmented clusters by cluster size:\n" >> ${stats_file}
+    cat ${full_out_dir}/syn_pan_augmented.clust.tsv | awk '{print NF-1}' |
+      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
+  fi
+
+  if [ -f ${full_out_dir}/syn_pan_aug_extra.clust.tsv ]; then
+    printf "\nCounts of augmented-extra clusters by cluster size:\n" >> ${stats_file}
+    cat ${full_out_dir}/syn_pan_aug_extra.clust.tsv | awk '{print NF-1}' |
+      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
+  fi
 
   echo
   cat ${stats_file}
@@ -522,11 +648,11 @@ init() {
   set_value max_lite_jobs $(($NPROC/2))
   set_value mcl_inflation 2
   set_value mcl_threads $(($NPROC/5))
-  set_value dagchainer_args ""
+  set_value dagchainer_args '-g 10000 -M 50 -D 200000 -E 1e-5 -A 6 -s'
   set_value fasta_ext "fna"
   set_value gff_ext "gff3"
   set_value pan_prefix "pan"
-  set_value out_dir_base "${pkg}_out"
+  set_value out_dir_base "out"
   config all
 
   echo "Data directory (for assembly and GFF files): $data_dir"
@@ -549,10 +675,12 @@ Steps:
           dagchainer - compute Directed Acyclic Graphs
                  mcl - calculate Markov clusters
             consense - calculate a consensus sequences from each pan-gene set, 
-                         If possible add sequences missed in the first clustering round.
+                       adding sequences missed in the first clustering round.
+           add_extra - Add other gene model sets to the primary clusters. Useful for adding
+                       annotation sets that may be of lower or uncertain quality.
            summarize - compute synteny stats
 """
-  commandlist="init ingest mmseqs filter dagchainer mcl consense summarize"
+  commandlist="init ingest mmseqs filter dagchainer mcl consense add_extra summarize"
   if [ "$#" -eq 0 ]; then # run the whole list
     for package in $commandlist; do
       echo "RUNNING PACKAGE run_$package"
@@ -599,7 +727,9 @@ fi
 #
 #
 # Create directories if needed
-dirlist="root_dir work_dir etc_dir mmseqs_dir dag_dir pan_fasta_dir pan_consen_dir leftovers_dir"
+dirlist="root_dir work_dir etc_dir mmseqs_dir dag_dir pan_fasta_dir \
+         pan_consen_dir leftovers_dir work_data_dir \
+         work_data_extra_dir leftovers_extra_dir work_extra_out_dir"
 for dirvar in $dirlist; do
     dirname="${!dirvar}"
     if [ ! -d "$dirname" ]; then
