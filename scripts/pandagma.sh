@@ -327,7 +327,7 @@ run_mcl() {
   cat ${work_dir}/tmp.syn_pan.clust.tsv |
     awk -v PRE=$prefix '{padnum=sprintf("%05d", NR); print PRE padnum "\t" $0}' > ${work_dir}/syn_pan.clust.tsv
 
-  # Reshape from mcl output form (clustered IDs on one line) to a hash format (clust_ID gene)
+  # Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)
   cat ${work_dir}/syn_pan.clust.tsv | 
     perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' > ${work_dir}/syn_pan.hsh.tsv
 }
@@ -386,21 +386,21 @@ run_consense() {
 
   echo "  Retrieve sequences for the leftover genes"
   get_fasta_from_family_file.pl ${fasta_files} \
-    -fam ${work_dir}/syn_pan_leftovers.clust.tsv -out ${leftovers_extra_dir}
+    -fam ${work_dir}/syn_pan_leftovers.clust.tsv -out ${leftovers_dir}
 
   echo "  Make augmented cluster sets"
   cat /dev/null > ${work_dir}/syn_pan_augmented.clust.tsv
   for path in ${work_dir}/pan_fasta/*; do
     file=`basename $path` 
-    if [[ -f ${leftovers_extra_dir}/$file ]]; then
+    if [[ -f ${leftovers_dir}/$file ]]; then
       cat <(awk -v ORS="" -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"}' $path) \
-          <(awk -v ORS="" '$1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' ${leftovers_extra_dir}/$file)
+          <(awk -v ORS="" '$1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' ${leftovers_dir}/$file)
     else
       awk -v ORS=""  -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' $path
     fi | sed 's/\t$//'
   done > ${work_dir}/syn_pan_augmented.clust.tsv
 
-  echo "  Reshape from mcl output form (clustered IDs on one line) to a hash format (clust_ID gene)"
+  echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
   cat ${work_dir}/syn_pan_augmented.clust.tsv | 
     perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' > ${work_dir}/syn_pan_augmented.hsh.tsv
 }
@@ -446,7 +446,7 @@ run_add_extra() {
     fi | sed 's/\t$//'
   done > ${work_dir}/syn_pan_aug_extra.clust.tsv
 
-  echo "  Reshape from mcl output form (clustered IDs on one line) to a hash format (clust_ID gene)"
+  echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
   cat ${work_dir}/syn_pan_aug_extra.clust.tsv | 
     perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' > ${work_dir}/syn_pan_aug_extra.hsh.tsv
 }
