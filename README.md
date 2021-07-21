@@ -8,6 +8,16 @@ additional searches and refinements. The other programs are: mmseqs, dagchainer,
 These need to be installed and available in the script's environment.
 Authors: Steven Cannon, Joel Berendzen, 2020-2021
 
+The workflow is as follows:
+* Add positional information to the gene IDs
+* Find gene pairings (using mmseqs2 rather than BLAST)
+* Filter by synteny (DAGChainer) – and, optionally, by a list of allowed chromosome pairings.
+* Cluster (mcl)
+* Calculate consensus sequences from the initial clusters (vsearch)
+* Add back the genes that were excluded to this point (mmseqs2)
+* Add “extra” annotation sets by homology (mmseqs2)
+
+
 Create conda environment with required dependencies
 ~~~
   conda create -n pandagma
@@ -47,6 +57,10 @@ pandagma.sh run mcl
 
 # Calculate a consensus sequence for each pan-gene set, using vsearch.
 pandagma.sh run consense
+
+# Add other gene model sets to the primary clusters. Useful for adding
+# annotation sets that may be of lower or uncertain quality.
+pandagma.sh run add_extra
 
 # Move results into output directory, and report some summary statistics
 pandagma.sh run summarize
@@ -90,6 +104,8 @@ Subommands (in order they are usually run):
             run mcl - Derive clusters, with Markov clustering
        run consense - calculate a consensus sequences from each pan-gene set,
                        If possible add sequences missed in the first clustering round.
+          add_extra - Add other gene model sets to the primary clusters. Useful for adding
+                       annotation sets that may be of lower or uncertain quality.
       run summarize - Move results into output directory, and report summary statistics.
        clear_config - Clear all config variables
               clean - Delete work directory

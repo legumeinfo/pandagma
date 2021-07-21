@@ -459,7 +459,7 @@ run_summarize() {
   start_t=$(get_value start_time)
   out_dir="$(get_value out_dir_base)"
   full_out_dir=`echo "$out_dir.id${mm_clust_iden}.cov${mm_clust_cov}.I${mcl_I}" | perl -pe 's/(\d)\.(\d+)/$1_$2/g'`
-  stats_file=${full_out_dir}/stats.tsv
+  stats_file=${full_out_dir}/stats.txt
 
   if [ ! -d "$full_out_dir" ]; then
       echo "creating output directory \"${full_out_dir}/\""
