@@ -7,37 +7,13 @@
 #
 scriptname=`basename "$0"`
 version="0.9.1"
-set -e # stop on errors
-scriptstart=$(date +%s)
-pkg="pandagma"
-PKG="$(echo ${pkg} | tr /a-z/ /A-Z/)"
-PKG_DIR="${PKG}_DIR"
-PKG_WORK_DIR="${PKG}_WORK_DIR"
-if [ -z "${!PKG_DIR}" ]; then
-  root_dir=~/.local/share/${pkg}
-else
-  root_dir="${!PKG_DIR}"
-fi
+set -o errexit -o nounset
 
-if [ -z "${!PKG_WORK_DIR}" ]; then
-  work_dir="/tmp/${pkg}-work"
-else
-  work_dir="${!PKG_WORK_DIR}"
-fi
+readonly work_dir=${PANDAGMA_WORK_DIR:-${PWD}/work}
+readonly etc_dir=${PANDAGMA_DIR:-${PWD}/etc}
+readonly data_dir=${PANDAGMA_DATA_DIR:-${PWD}/data}
+readonly data_extra_dir=${PANDAGMA_DATA_EXTRA_DIR:-${PWD}/data_extra}
 
-if [ -z "${!PKG_DATA_DIR}" ]; then
-  data_dir="$PWD/data"
-else
-  data_dir="${!PKG_DATA_DIR}"
-fi
-
-if [ -z "${!PKG_DATA_EXTRA_DIR}" ]; then
-  data_extra_dir="$PWD/data_extra"
-else
-  data_extra_dir="${!PKG_DATA_EXTRA_DIR}"
-fi
-
-etc_dir="${root_dir}/etc"
 dag_dir="${work_dir}/dag"
 mmseqs_dir="${work_dir}/mmseqs"
 work_data_dir="${work_dir}/data"
@@ -57,7 +33,7 @@ TOP_DOC="""Compute pan-gene clusters using the programs mmseqs, dagchainer, and 
 additional pre- and post-refinement steps.
 
 Usage:
-        ${pkg} SUBCOMMAND [SUBCOMMAND_OPTIONS]
+        pandagma.sh SUBCOMMAND [SUBCOMMAND_OPTIONS]
 
 By default, name-matched primary coding sequence (fasta) and annotation (GFF) files are expected 
 in the data/ directory, within the working directory from where this script is called.
@@ -101,8 +77,6 @@ Subommands (in order they are usually run):
               clean - Delete work directory
 
 Variables (accessed by \"config\" subcommand):
-      max_main_jobs - max number of significant jobs to run concurrently [default: processors/5]
-      max_lite_jobs - max number of lightweight jobs to run concurrently [default: processors/2]
     dagchainer_args - Argument for DAGchainer command
          clust_iden - Minimum identity threshold for mmseqs clustering [0.98]
           clust_cov - Minimum coverage for mmseqs clustering [0.75]
@@ -112,22 +86,18 @@ Variables (accessed by \"config\" subcommand):
          pan_prefix - Prefix to use as a prefix for pangene clusters [default: pan]
        out_dir_base - base name for the output directory [default: './out']
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
-        mcl_threads - Threads to use in Markov clustering [default: processors/5]
             version - version of this script at config time
 
-Environmental variables (may be set externally):
-         ${PKG}_DIR - Location of the config directory, currently
-                       \"${root_dir}\"
-    ${PKG}_WORK_DIR - Location of working files, currently
+Environmental variables:
+         PANDAGMA_DIR - Location of the config directory, default:
+                       \"${etc_dir}\"
+    PANDAGMA_WORK_DIR - Location of working files, default:
                        \"${work_dir}\"
-    ${PKG}_DATA_DIR - Location of intput data files (CDS fasta and GFFs), currently
-                       \"$PWD/data\"
-${PKG}_DATA_EXTRA_DIR - Location of data files to be added after primary cluster construction
-                       \"$PWD/data_extra\"
-              NPROC - Number of processors to use to set the max_main_jobs and max_lite_jobs
-                       configuration variable. If not present, max_main_jobs is set
-                       to a fifth of the number of processors on the system
-                       and max_lite_jobs is set to half the number of processors.
+    PANDAGMA_DATA_DIR - Location of intput data files (CDS fasta and GFFs), default:
+                       \"${data_dir}\"
+PANDAGMA_DATA_EXTRA_DIR - Location of data files to be added after primary cluster construction, default:
+                       \"${data_extra_dir}\"
+              NPROC - Number of processors to use (required)
 """
 #
 # Helper functions begin here
@@ -147,19 +117,6 @@ get_value() {
     echo >&2 "ERROR -- value for $1 variable not found."
     exit 1
   fi
-}
-#
-perl_defs() {
-  #
-  # Perl local::lib settings, where Bioperl::SeqIO is installed
-  #
-  perlbase=${SYN_BIN}/perl5
-  PATH="${perlbase}/bin${PATH:+:${PATH}}"; export PATH
-  PERL5LIB="${perlbase}/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB
-  PERL_LOCAL_LIB_ROOT="${perlbase}${PERL_LOCAL_LIB_ROOT:+:${PERL_LOCAL_LIB_ROOT}}"
-  export PERL_LOCAL_LIB_ROOT
-  PERL_MB_OPT="--install_base \"${perlbase}\""; export PERL_MB_OPT
-  PERL_MM_OPT="INSTALL_BASE=${perlbase}"; export PERL_MM_OPT
 }
 #
 # run functions
@@ -227,7 +184,6 @@ run_mmseqs() {
   # Do mmseqs clustering on all pairings of annotation sets.
   mm_clust_iden=$(get_value clust_iden)
   mm_clust_cov=$(get_value clust_cov)
-  n_jobs=$(get_value max_main_jobs)
   fasta_ext=$(get_value fasta_ext)
   echo; echo "Run mmseqs -- at ${mm_clust_iden} percent identity and minimum of ${mm_clust_cov}% coverage."
   #
@@ -243,8 +199,8 @@ run_mmseqs() {
            --cov-mode 0 \
            --cluster-reassign 2>/dev/null 1>/dev/null &  ## in background, for parallelization  
 
-        # allow to execute up to $n_jobs in parallel
-        if [[ $(jobs -r -p | wc -l) -ge $n_jobs ]]; then 
+        # allow to execute up to $NPROC in parallel
+        if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then 
           wait -n; 
         fi
       fi
@@ -255,7 +211,6 @@ run_mmseqs() {
 #
 run_filter() {
   echo; echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
-  n_jobs=$(get_value max_main_jobs)
   chr_match_list=${data_dir}/expected_chr_matches.tsv
   if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
     echo "Filtering on chromosome patterns from file ${chr_match_list}"
@@ -264,8 +219,8 @@ run_filter() {
       cat $mmseqs_path |
         filter_mmseqs_by_chroms.pl -chr ${chr_match_list} > ${dag_dir}/${outfilebase}_matches.tsv &
 
-      # allow to execute up to $n_jobs in parallel
-      if [[ $(jobs -r -p | wc -l) -ge $n_jobs ]]; then wait -n; fi
+      # allow to execute up to $NPROC in parallel
+      if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
     done
     wait # wait for last jobs to finish
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
@@ -316,11 +271,10 @@ run_dagchainer() {
 run_mcl() {
   # Calculate clusters using Markov clustering
   mcl_I=$(get_value mcl_inflation)
-  mcl_te=$(get_value mcl_threads)
   prefix=$(get_value pan_prefix)
-  printf "\nCalculate clusters. use Markov clustering with inflation parameter $mcl_I and $mcl_te threads\n"
-  echo "MCL COMMAND: mcl ${work_dir}/synteny_pairs.tsv -I $mcl_I -te $mcl_te --abc -o ${work_dir}/tmp.syn_pan.clust.tsv"
-  mcl ${work_dir}/synteny_pairs.tsv -I $mcl_I -te $mcl_te --abc -o ${work_dir}/tmp.syn_pan.clust.tsv \
+  printf "\nCalculate clusters. use Markov clustering with inflation parameter $mcl_I and ${NPROC} threads\n"
+  echo "MCL COMMAND: mcl ${work_dir}/synteny_pairs.tsv -I $mcl_I -te ${NPROC} --abc -o ${work_dir}/tmp.syn_pan.clust.tsv"
+  mcl ${work_dir}/synteny_pairs.tsv -I $mcl_I -te ${NPROC} --abc -o ${work_dir}/tmp.syn_pan.clust.tsv \
     2>/dev/null 1>/dev/null
  
   # Add cluster IDs
@@ -339,13 +293,12 @@ run_consense() {
   fasta_files="$(ls ${data_dir}/*.${fasta_ext})"
   vs_consen_iden=$(get_value consen_iden)
   mm_clust_iden=$(get_value clust_iden)
-  n_jobs=$(get_value max_lite_jobs)
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
   get_fasta_from_family_file.pl ${fasta_files} -fam ${work_dir}/syn_pan.clust.tsv -out ${pan_fasta_dir} 
 
   echo "  Calculate consensus sequences for each pan-gene set."
-  ls ${pan_fasta_dir} | xargs -I{} -n 1 -P $n_jobs \
+  ls ${pan_fasta_dir} | xargs -I{} -n 1 -P ${NPROC} \
     vsearch --cluster_fast ${pan_fasta_dir}/{} --id ${vs_consen_iden} --fasta_width 0 \
             --consout ${pan_consen_dir}/{} 2>/dev/null 1>/dev/null 
 
@@ -410,7 +363,6 @@ run_add_extra() {
   fasta_ext=$(get_value fasta_ext)
   fasta_files="$(ls ${data_extra_dir}/*.${fasta_ext})"
   mm_clust_iden=$(get_value clust_iden)
-  n_jobs=$(get_value max_main_jobs)
 
   echo "  Search non-clustered genes against pan-gene consensus sequences"
   for path in ${data_extra_dir}/*.${fasta_ext}; do
@@ -421,8 +373,8 @@ run_add_extra() {
                        ${work_dir}/syn_pan_consen.fna \
                        ${work_extra_out_dir}/${fasta_file}.x.all_cons.m8 tmp \
                        --search-type 3 --cov-mode 5 -c 0.5 2>/dev/null 1>/dev/null &
-     # allow to execute up to $n_jobs in parallel
-     if [[ $(jobs -r -p | wc -l) -ge $n_jobs ]]; then wait -n; fi
+     # allow to execute up to $NPROC in parallel
+     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
@@ -581,7 +533,7 @@ run_summarize() {
 # top-level command functions
 #
 config() {
-  CONFIG_DOC="""Sets/displays key/value pairs for the $pkg build system.
+  CONFIG_DOC="""Sets/displays key/value pairs for the pandagma build system.
 
 Usage:
    $scriptname config [-h] [KEY] [VALUE | -d]
@@ -640,14 +592,10 @@ clear_config() {
 init() {
   # Initialize parameters required for run. Write these to files, for persistent access through the program.
   echo; echo "Setting run configuration parameters"
-  [ -z "$NPROC" ] && NPROC=$(nproc)
   set_value clust_iden "0.98"
   set_value clust_cov "0.75"
   set_value consen_iden "0.80"
-  set_value max_main_jobs $(($NPROC/5))
-  set_value max_lite_jobs $(($NPROC/2))
   set_value mcl_inflation 2
-  set_value mcl_threads $(($NPROC/5))
   set_value dagchainer_args '-g 10000 -M 50 -D 200000 -E 1e-5 -A 6 -s'
   set_value fasta_ext "fna"
   set_value gff_ext "gff3"
@@ -727,7 +675,7 @@ fi
 #
 #
 # Create directories if needed
-dirlist="root_dir work_dir etc_dir mmseqs_dir dag_dir pan_fasta_dir \
+dirlist="work_dir etc_dir mmseqs_dir dag_dir pan_fasta_dir \
          pan_consen_dir leftovers_dir work_data_dir \
          work_data_extra_dir leftovers_extra_dir work_extra_out_dir"
 for dirvar in $dirlist; do
