@@ -142,13 +142,13 @@ run_ingest() {
   for path in $gff_files; do
     base=$(basename $path .${gff_ext})
     base_no_ann=$(echo $base | perl -pe 's/\.ann\d+\.\w+//')
-    cat $path | awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' |
+    awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' "${path}" |
       perl -pe 's/ID=([^;]+);\S+/$1/' >${work_data_dir}/${base_no_ann}.bed
   done
   # add positional information to FASTA ids
   for path in ${work_data_dir}/*.bed; do
     base=$(basename $path .bed)
-    cat $path | awk '{print $4 "\t" $1 "__" $4 "__" $2 "__" $3}' \
+    awk '{print $4 "\t" $1 "__" $4 "__" $2 "__" $3}' "${path}" \
       >${work_data_dir}/${base}.hsh
     hash_into_fasta_id.pl\
       -fasta ${data_dir}/${base}.${fasta_ext} \
@@ -164,13 +164,13 @@ run_ingest() {
   for path in $extra_gff_files; do
     base=$(basename $path .${gff_ext})
     base_no_ann=$(echo $base | perl -pe 's/\.ann\d+\.\w+//')
-    cat $path | awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' |
+    awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' "${path}" |
       perl -pe 's/ID=([^;]+);\S+/$1/' >${work_data_extra_dir}/${base_no_ann}.bed
   done
   # add positional information to FASTA ids
   for path in ${work_data_extra_dir}/*.bed; do
     base=$(basename $path .bed)
-    cat $path | awk '{print $4 "\t" $1 "__" $4 "__" $2 "__" $3}' \
+    awk '{print $4 "\t" $1 "__" $4 "__" $2 "__" $3}' "${path}" \
       >${work_data_extra_dir}/${base}.hsh
     hash_into_fasta_id.pl\
       -fasta ${data_extra_dir}/${base}.${fasta_ext} \
@@ -216,8 +216,7 @@ run_filter() {
     echo "Filtering on chromosome patterns from file ${chr_match_list}"
     for mmseqs_path in ${mmseqs_dir}/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
-      cat $mmseqs_path |
-        filter_mmseqs_by_chroms.pl -chr ${chr_match_list} > ${dag_dir}/${outfilebase}_matches.tsv &
+      filter_mmseqs_by_chroms.pl -chr ${chr_match_list} > ${dag_dir}/${outfilebase}_matches.tsv < "${mmseqs_path}" &
 
       # allow to execute up to $NPROC in parallel
       if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
@@ -227,8 +226,7 @@ run_filter() {
     echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
     for mmseqs_path in ${mmseqs_dir}/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
-      cat $mmseqs_path |
-        perl -pe 's/__/\t/g' > ${dag_dir}/${outfilebase}_matches.tsv
+      perl -pe 's/__/\t/g' > ${dag_dir}/${outfilebase}_matches.tsv < "${mmseqs_path}"
     done
   fi
 }
@@ -246,23 +244,23 @@ run_dagchainer() {
   done
   wait
   #Extract single-linkage synteny anchors
-  cat /dev/null > ${work_dir}/synteny_blocks.tsv
+  > ${work_dir}/synteny_blocks.tsv
   printf "matches\tscore\trev\tid1\tid2\n" >${work_dir}/synteny_blocks.tsv
 
-  cat /dev/null > ${work_dir}/homology_pairs.tsv
+  > ${work_dir}/homology_pairs.tsv
   for path in ${dag_dir}/*_matches.tsv; do
-    cat $path | awk '$1!~/^#/ {print $2 "\t" $6}' \
+    awk '$1!~/^#/ {print $2 "\t" $6}' "${path}" \
       >>${work_dir}/homology_pairs.tsv
   done
 
-  cat /dev/null > ${work_dir}/synteny_pairs.tsv
+  > ${work_dir}/synteny_pairs.tsv
   for path in ${dag_dir}/*.aligncoords; do
-    cat $path | awk '$1!~/^#/ {print $2 "\t" $6}' \
+    awk '$1!~/^#/ {print $2 "\t" $6}' "${path}" \
       >>${work_dir}/synteny_pairs.tsv
-    cat $path | grep \#\# | grep -v reverse |
+    grep \#\# "${path}" | grep -v reverse |
       awk '{print substr($14,0,length($14)-2) "\t" $10 "\t" 1 "\t" $3 "\t" $5}' \
         >>${work_dir}/synteny_blocks.tsv
-    cat $path | grep \#\# | grep reverse |
+    grep \#\# "${path}" | grep reverse |
       awk '{print substr($15,0,length($15)-2) "\t" $11 "\t" 1 "\t" $3 "\t" $5}' \
         >>${work_dir}/synteny_blocks.tsv
   done
@@ -278,12 +276,10 @@ run_mcl() {
     2>/dev/null 1>/dev/null
  
   # Add cluster IDs
-  cat ${work_dir}/tmp.syn_pan.clust.tsv |
-    awk -v PRE=$prefix '{padnum=sprintf("%05d", NR); print PRE padnum "\t" $0}' > ${work_dir}/syn_pan.clust.tsv
+  awk -v PRE=$prefix '{padnum=sprintf("%05d", NR); print PRE padnum "\t" $0}' "${work_dir}"/tmp.syn_pan.clust.tsv > ${work_dir}/syn_pan.clust.tsv
 
   # Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)
-  cat ${work_dir}/syn_pan.clust.tsv | 
-    perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' > ${work_dir}/syn_pan.hsh.tsv
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' "${work_dir}"/syn_pan.clust.tsv > ${work_dir}/syn_pan.hsh.tsv
 }
 #
 run_consense() {
@@ -303,7 +299,7 @@ run_consense() {
             --consout ${pan_consen_dir}/{} 2>/dev/null 1>/dev/null 
 
   echo "  Combine consensus sequnces into one multifasta file"
-  cat /dev/null > ${work_dir}/syn_pan_consen.fna
+  > ${work_dir}/syn_pan_consen.fna
   for path in ${pan_consen_dir}/*; do
     file=`basename $path`;
     awk -v FN=$file '$1~/^>/ {print ">" FN " " substr($1,2)} 
@@ -312,10 +308,10 @@ run_consense() {
   rm ${pan_consen_dir}/*
 
   echo "  Get sorted list of all genes, from the original fasta files"
-  cat ${fasta_files} | awk '$1~/^>/ {print $1}' | sed 's/>//' | sort > ${work_dir}/lis.all_genes
+  awk '$1~/^>/ {print $1}' "${fasta_files}" | sed 's/>//' | sort > ${work_dir}/lis.all_genes
 
   echo "  Get sorted list of all clustered genes"
-  cat ${pan_fasta_dir}/* | awk '$1~/^>/ {print $1}' | sed 's/>//' | sort > ${work_dir}/lis.all_clustered_genes
+  awk '$1~/^>/ {print $1}' "${pan_fasta_dir}"/* | sed 's/>//' | sort > ${work_dir}/lis.all_clustered_genes
 
   echo "  Get list of genes not in clusters"
   comm -13 ${work_dir}/lis.all_clustered_genes ${work_dir}/lis.all_genes > ${work_dir}/lis.genes_not_in_clusters
@@ -342,20 +338,19 @@ run_consense() {
     -fam ${work_dir}/syn_pan_leftovers.clust.tsv -out ${leftovers_dir}
 
   echo "  Make augmented cluster sets"
-  cat /dev/null > ${work_dir}/syn_pan_augmented.clust.tsv
+  > ${work_dir}/syn_pan_augmented.clust.tsv
   for path in ${work_dir}/pan_fasta/*; do
     file=`basename $path` 
     if [[ -f ${leftovers_dir}/$file ]]; then
-      cat <(awk -v ORS="" -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"}' $path) \
-          <(awk -v ORS="" '$1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' ${leftovers_dir}/$file)
+      awk -v ORS="" -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"}' $path
+      awk -v ORS="" '$1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' ${leftovers_dir}/$file
     else
       awk -v ORS=""  -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' $path
     fi | sed 's/\t$//'
   done > ${work_dir}/syn_pan_augmented.clust.tsv
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
-  cat ${work_dir}/syn_pan_augmented.clust.tsv | 
-    perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' > ${work_dir}/syn_pan_augmented.hsh.tsv
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' ${work_dir}/syn_pan_augmented.clust.tsv > ${work_dir}/syn_pan_augmented.hsh.tsv
 }
 #
 run_add_extra() {
@@ -378,8 +373,8 @@ run_add_extra() {
   done
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
-  cat /dev/null > ${work_dir}/syn_pan_extra.clust.tsv
-  cat ${work_extra_out_dir}/*.x.all_cons.m8 | top_line.awk |
+  > ${work_dir}/syn_pan_extra.clust.tsv
+  top_line.awk "${work_extra_out_dir}"/*.x.all_cons.m8 |
     awk -v IDEN=${mm_clust_iden} '$3>=IDEN {print $2 "\t" $1}' |
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  ${work_dir}/syn_pan_extra.clust.tsv
 
@@ -391,16 +386,15 @@ run_add_extra() {
   for path in ${work_dir}/pan_fasta/*; do
     file=`basename $path` 
     if [[ -f ${leftovers_extra_dir}/$file ]]; then
-      cat <(awk -v ORS="" -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"}' $path) \
-          <(awk -v ORS="" '$1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' ${leftovers_extra_dir}/$file)
+      awk -v ORS="" -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"}' $path
+      awk -v ORS="" '$1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' ${leftovers_extra_dir}/$file
     else
       awk -v ORS=""  -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' $path
     fi | sed 's/\t$//'
   done > ${work_dir}/syn_pan_aug_extra.clust.tsv
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
-  cat ${work_dir}/syn_pan_aug_extra.clust.tsv | 
-    perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' > ${work_dir}/syn_pan_aug_extra.hsh.tsv
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' ${work_dir}/syn_pan_aug_extra.clust.tsv > ${work_dir}/syn_pan_aug_extra.hsh.tsv
 }
 #
 run_summarize() {
@@ -438,22 +432,22 @@ run_summarize() {
 
   printf '%-20s\t%s\n' "Statistic" "value" >> ${stats_file}
 
-  let "n_blocks=$(cat ${full_out_dir}/synteny_blocks.tsv | wc -l)-1"
+  let "n_blocks=$(wc -l < ${full_out_dir}/synteny_blocks.tsv)-1"
   printf '%-20s\t%s\n' $synteny_blocks $n_blocks >> ${stats_file}
 
 #
   printf "\n== Initial clusters (containing only genes within synteny blocks)\n" >> ${stats_file}
-  let "clusters=$(cat ${full_out_dir}/syn_pan.clust.tsv | wc -l)"
+  let "clusters=$(wc -l < ${full_out_dir}/syn_pan.clust.tsv)"
   printf '%-20s\t%s\n' "num_of_clusters" $clusters >> ${stats_file}
 
-  let "largest=$(cat ${full_out_dir}/syn_pan.clust.tsv | awk "{print NF-1}" | head -1)"
+  let "largest=$(awk "{print NF-1}" ${full_out_dir}/syn_pan.clust.tsv | head -1)"
   printf '%-20s\t%s\n' "largest_cluster" $largest >> ${stats_file}
 
-  let "mode=$(cat ${full_out_dir}/syn_pan.clust.tsv | awk "{print NF-1}" | \
+  let "mode=$(awk "{print NF-1}" ${full_out_dir}/syn_pan.clust.tsv | \
     uniq -c | sort -n | tail -1 | awk '{print $2}')"
   printf '%-20s\t%s\n' "modal_clst_size" $mode >> ${stats_file}
 
-  let "num_at_mode=$(cat ${full_out_dir}/syn_pan.clust.tsv | awk "{print NF-1}" | \
+  let "num_at_mode=$(awk "{print NF-1}" ${full_out_dir}/syn_pan.clust.tsv | \
     uniq -c | sort -n | tail -1 | awk '{print $1}')"
   printf '%-20s\t%s\n' "num_at_mode" $num_at_mode >> ${stats_file}
   
@@ -463,17 +457,17 @@ run_summarize() {
 #
   if [ -f ${full_out_dir}/syn_pan_augmented.clust.tsv ]; then
     printf "\n== Augmented clusters (unanchored sequences added to the initial clusters)\n" >> ${stats_file}
-    let "clustersA=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | wc -l)"
+    let "clustersA=$(wc -l < ${full_out_dir}/syn_pan_augmented.clust.tsv)"
     printf '%-20s\t%s\n' "num_of_clusters" $clustersA >> ${stats_file}
 
-    let "largestA=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | awk "{print NF-1}" | sort -n | tail -1)"
+    let "largestA=$(awk "{print NF-1}" ${full_out_dir}/syn_pan_augmented.clust.tsv | sort -n | tail -1)"
     printf '%-20s\t%s\n' "largest_cluster" $largestA >> ${stats_file}
 
-    let "modeA=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | awk "{print NF-1}" | \
+    let "modeA=$(awk "{print NF-1}" ${full_out_dir}/syn_pan_augmented.clust.tsv | \
       uniq -c | sort -n | tail -1 | awk '{print $2}')"
     printf '%-20s\t%s\n' "modal_clst_size" $modeA >> ${stats_file}
 
-    let "numA_at_mode=$(cat ${full_out_dir}/syn_pan_augmented.clust.tsv | awk "{print NF-1}" | \
+    let "numA_at_mode=$(awk "{print NF-1}" ${full_out_dir}/syn_pan_augmented.clust.tsv | \
       sort -n | uniq -c | sort -n | tail -1 | awk '{print $1}')"
     printf '%-20s\t%s\n' "num_at_mode" $numA_at_mode >> ${stats_file}
     
@@ -484,17 +478,17 @@ run_summarize() {
 #
   if [ -f ${full_out_dir}/syn_pan_aug_extra.clust.tsv ]; then
     printf "\n== Augmented-extra clusters (sequences from extra annotation sets have been added)\n" >> ${stats_file}
-    let "clustersB=$(cat ${full_out_dir}/syn_pan_aug_extra.clust.tsv | wc -l)"
+    let "clustersB=$(wc -l < ${full_out_dir}/syn_pan_aug_extra.clust.tsv)"
     printf '%-20s\t%s\n' "num_of_clusters" $clustersB >> ${stats_file}
 
-    let "largestB=$(cat ${full_out_dir}/syn_pan_aug_extra.clust.tsv | awk "{print NF-1}" | sort -n | tail -1)"
+    let "largestB=$(awk "{print NF-1}" ${full_out_dir}/syn_pan_aug_extra.clust.tsv | sort -n | tail -1)"
     printf '%-20s\t%s\n' "largest_cluster" $largestB >> ${stats_file}
 
-    let "modeB=$(cat ${full_out_dir}/syn_pan_aug_extra.clust.tsv | awk "{print NF-1}" | \
+    let "modeB=$(awk "{print NF-1}" ${full_out_dir}/syn_pan_aug_extra.clust.tsv | \
       uniq -c | sort -n | tail -1 | awk '{print $2}')"
     printf '%-20s\t%s\n' "modal_clst_size" $modeB >> ${stats_file}
 
-    let "numB_at_mode=$(cat ${full_out_dir}/syn_pan_aug_extra.clust.tsv | awk "{print NF-1}" | \
+    let "numB_at_mode=$(awk "{print NF-1}" ${full_out_dir}/syn_pan_aug_extra.clust.tsv | \
       sort -n | uniq -c | sort -n | tail -1 | awk '{print $1}')"
     printf '%-20s\t%s\n' "num_at_mode" $numB_at_mode >> ${stats_file}
     
@@ -510,19 +504,19 @@ run_summarize() {
   # histograms
   if [ -f ${full_out_dir}/syn_pan.clust.tsv ]; then
     printf "\nCounts of initial clusters by cluster size:\n" >> ${stats_file}
-    cat ${full_out_dir}/syn_pan.clust.tsv | awk '{print NF-1}' |
+    awk '{print NF-1}' ${full_out_dir}/syn_pan.clust.tsv |
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
   fi
 
   if [ -f ${full_out_dir}/syn_pan_augmented.clust.tsv ]; then
     printf "\nCounts of augmented clusters by cluster size:\n" >> ${stats_file}
-    cat ${full_out_dir}/syn_pan_augmented.clust.tsv | awk '{print NF-1}' |
+    awk '{print NF-1}' ${full_out_dir}/syn_pan_augmented.clust.tsv |
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
   fi
 
   if [ -f ${full_out_dir}/syn_pan_aug_extra.clust.tsv ]; then
     printf "\nCounts of augmented-extra clusters by cluster size:\n" >> ${stats_file}
-    cat ${full_out_dir}/syn_pan_aug_extra.clust.tsv | awk '{print NF-1}' |
+    awk '{print NF-1}' ${full_out_dir}/syn_pan_aug_extra.clust.tsv |
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
   fi
 
