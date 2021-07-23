@@ -555,7 +555,7 @@ Arguments:
       for key in $(ls ${etc_dir}); do
         value="$(get_value ${key})"
         if [[ ${key} != +(dag|mmseqs)_time_s ]]; then
-          printf '%-20s\t%s\n' ${key} ${value} >&1
+          printf '%-20s\t%s\n' ${key} "${value}" >&1
         fi
       done
       exit 0
