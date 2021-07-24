@@ -4,8 +4,7 @@ Generate pan-gene sets, given coding sequences and corresponding gene models, fr
 The pandagma.sh script generates pan-gene clusters, given input consisting of coding sequences and
 gene models (GFFs) for a collection of accessions and/or closely related species.
 The script drives several programs that do the primary work of clustering, identifying synteny, and 
-additional searches and refinements. The other programs are: mmseqs, dagchainer, mcl, and vsearch. 
-These need to be installed and available in the script's environment.
+additional searches and refinements. 
 Authors: Steven Cannon, Joel Berendzen, 2020-2021
 
 The workflow is as follows:
@@ -17,8 +16,18 @@ The workflow is as follows:
 * Add back the genes that were excluded to this point (mmseqs2)
 * Add “extra” annotation sets by homology (mmseqs2)
 
+## Installation of scripts and dependencies
 
-Create conda environment with required dependencies
+The scripts should be added to your path - either by copying them to a directory that is in your path 
+(e.g. ~/bin/), or by adding the script directory to your path 
+(e.g. "export PATH=$PATH:~/src/pandagma/scripts" ... if that is where you have them).
+
+Also, these dependencies are required: 
+  bioperl, mmseqs, dagchainer, mcl, and vsearch. 
+These need to be installed and available in the script's environment.
+
+Installing the dependencies is up to you. They can be installed via a suitable package manager. 
+For example, using conda: 
 ~~~
   conda create -n pandagma
   conda install -n pandagma -c conda-forge -c bioconda perl-bioperl-core
@@ -29,10 +38,14 @@ Create conda environment with required dependencies
   conda activate pandagama
 ~~~
 
-The pandagma.sh has several "run commands," which are run in a particular order to do the clustering
-and refinement. The several commands are best called via an additional calling script. 
-The following commands should produce a reasonable collection of pan-genes, given suitably
-named assembly and gene-model files:
+## Running the pipeline, with suitable pandagma "run commands"
+
+The pandagma.sh has several "run commands," which are run in a particular order to do the 
+clustering and refinement. The several commands are best called via an additional calling script. 
+In the provided example, this is called run_pandagma.sh .
+
+The following commands, in run_pandagma.sh, should produce a reasonable collection of pan-genes, 
+given suitably named assembly and gene-model files:
 
 ~~~
 pandagma.sh version
@@ -65,6 +78,8 @@ pandagma.sh run add_extra
 # Move results into output directory, and report some summary statistics
 pandagma.sh run summarize
 ~~~
+
+## Usage for the main pandagma.sh
 
 ~~~
 Usage: ${pkg} SUBCOMMAND [SUBCOMMAND_OPTIONS]
