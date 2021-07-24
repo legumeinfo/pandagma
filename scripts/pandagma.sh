@@ -205,7 +205,7 @@ run_mmseqs() {
            --min-seq-id $mm_clust_iden \
            -c $mm_clust_cov \
            --cov-mode 0 \
-           --cluster-reassign 2>/dev/null 1>/dev/null &  ## in background, for parallelization  
+           --cluster-reassign 1>/dev/null &  ## in background, for parallelization  
 
         # allow to execute up to $NPROC in parallel
         if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then 
@@ -248,7 +248,7 @@ run_dagchainer() {
     align_file=`basename $match_path _matches.tsv`
     echo "Running DAGchainer on comparison: $align_file"
     echo "  run_DAG_chainer.pl $dag_args -i $match_path"; echo
-    run_DAG_chainer.pl $dag_args -i $match_path 2>/dev/null 1>/dev/null 
+    run_DAG_chainer.pl $dag_args -i $match_path 1>/dev/null 
   done
   wait
   #Extract single-linkage synteny anchors
@@ -281,7 +281,7 @@ run_mcl() {
   printf "\nCalculate clusters. use Markov clustering with inflation parameter $mcl_I and ${NPROC} threads\n"
   echo "MCL COMMAND: mcl ${work_dir}/synteny_pairs.tsv -I $mcl_I -te ${NPROC} --abc -o ${work_dir}/tmp.syn_pan.clust.tsv"
   mcl ${work_dir}/synteny_pairs.tsv -I $mcl_I -te ${NPROC} --abc -o ${work_dir}/tmp.syn_pan.clust.tsv \
-    2>/dev/null 1>/dev/null
+    1>/dev/null
  
   # Add cluster IDs
   awk -v PRE=$prefix '{padnum=sprintf("%05d", NR); print PRE padnum "\t" $0}' "${work_dir}"/tmp.syn_pan.clust.tsv > ${work_dir}/syn_pan.clust.tsv
@@ -304,7 +304,7 @@ run_consense() {
   echo "  Calculate consensus sequences for each pan-gene set."
   ls ${pan_fasta_dir} | xargs -I{} -n 1 -P ${NPROC} \
     vsearch --cluster_fast ${pan_fasta_dir}/{} --id ${vs_consen_iden} --fasta_width 0 \
-            --consout ${pan_consen_dir}/{} 2>/dev/null 1>/dev/null 
+            --consout ${pan_consen_dir}/{} 1>/dev/null 
 
   echo "  Combine consensus sequnces into one multifasta file"
   > ${work_dir}/syn_pan_consen.fna
@@ -334,7 +334,7 @@ run_consense() {
   mmseqs easy-search ${work_dir}/genes_not_in_clusters.fna \
                      ${work_dir}/syn_pan_consen.fna \
                      ${work_dir}/unclust.x.all_cons.m8 tmp \
-                     --search-type 3 --cov-mode 5 -c 0.5 2>/dev/null 1>/dev/null
+                     --search-type 3 --cov-mode 5 -c 0.5 1>/dev/null
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
   top_line.awk ${work_dir}/unclust.x.all_cons.m8 | 
@@ -375,7 +375,7 @@ run_add_extra() {
     mmseqs easy-search ${path} \
                        ${work_dir}/syn_pan_consen.fna \
                        ${work_extra_out_dir}/${fasta_file}.x.all_cons.m8 tmp \
-                       --search-type 3 --cov-mode 5 -c 0.5 2>/dev/null 1>/dev/null &
+                       --search-type 3 --cov-mode 5 -c 0.5 1>/dev/null &
      # allow to execute up to $NPROC in parallel
      if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
