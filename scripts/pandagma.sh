@@ -118,6 +118,12 @@ get_value() {
     exit 1
   fi
 }
+cat_or_zcat() {
+  case ${1} in
+    *.gz) gzip -dc "${1}" ;;
+       *) cat "${1}" ;;
+  esac
+}
 #
 # run functions
 #
@@ -142,8 +148,9 @@ run_ingest() {
   for path in $gff_files; do
     base=$(basename $path .${gff_ext})
     base_no_ann=$(echo $base | perl -pe 's/\.ann\d+\.\w+//')
-    awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' "${path}" |
-      perl -pe 's/ID=([^;]+);\S+/$1/' >${work_data_dir}/${base_no_ann}.bed
+    cat_or_zcat "${path}" |
+      awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' |
+        perl -pe 's/ID=([^;]+);\S+/$1/' >${work_data_dir}/${base_no_ann}.bed
   done
   # add positional information to FASTA ids
   for path in ${work_data_dir}/*.bed; do
@@ -164,8 +171,9 @@ run_ingest() {
   for path in $extra_gff_files; do
     base=$(basename $path .${gff_ext})
     base_no_ann=$(echo $base | perl -pe 's/\.ann\d+\.\w+//')
-    awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' "${path}" |
-      perl -pe 's/ID=([^;]+);\S+/$1/' >${work_data_extra_dir}/${base_no_ann}.bed
+    cat_or_zcat "${path}" |
+      awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' |
+        perl -pe 's/ID=([^;]+);\S+/$1/' >${work_data_extra_dir}/${base_no_ann}.bed
   done
   # add positional information to FASTA ids
   for path in ${work_data_extra_dir}/*.bed; do
