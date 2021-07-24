@@ -298,15 +298,16 @@ run_consense() {
   echo "  Calculate consensus sequences for each pan-gene set."
   ls ${pan_fasta_dir} | xargs -I{} -n 1 -P ${NPROC} \
     vsearch --cluster_fast ${pan_fasta_dir}/{} --id ${vs_consen_iden} --fasta_width 0 \
-            --consout ${pan_consen_dir}/{} 1>/dev/null 
+            --consout ${pan_consen_dir}/{} \
+            --quiet \
+            --threads 1
 
   echo "  Combine consensus sequences into one multifasta file"
-  
-  for path in ${pan_consen_dir}/*; do
-    file=`basename $path`;
-    awk -v FN=$file '$1~/^>/ {print ">" FN " " substr($1,2)} 
-                     $1!~/^>/ {print $1}' $path
-  done > ${work_dir}/syn_pan_consen.fna
+
+  awk 'FNR==1 { nf=split(FILENAME, FN, "/") }
+         /^>/ { print ">" FN " " substr($1,2); next }
+              { print }' ${pan_consen_dir}/* > ${work_dir}/syn_pan_consen.fna
+      
   rm ${pan_consen_dir}/*
 
   echo "  Get sorted list of all genes, from the original fasta files"
