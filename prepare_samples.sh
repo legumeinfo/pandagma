@@ -11,8 +11,11 @@ for path in data_extra/*gz; do gunzip $path &
 done
 wait
 
-rename 's{(\w+\.\w+\.gnm\d+\.ann\d+)\..+\.fna}{$1.fna}' data*/*fna
-rename 's{(\w+\.\w+\.gnm\d+\.ann\d+)\..+\.gff3}{$1.gff3}' data*/*gff3
+# normalize file names so corresponding .gff3 & .fna have same prefix
+for path in data*/*.gnm[0-9].ann[0-9].*.[gf][fn][af]*
+do
+  mv "${path}" "${path%.*.*.*}.${path##*.}"
+done
 
 echo
 echo "Files should now be ready for analysis with pandagma."
