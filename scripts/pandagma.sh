@@ -244,29 +244,27 @@ run_dagchainer() {
     align_file=`basename $match_path _matches.tsv`
     echo "Running DAGchainer on comparison: $align_file"
     echo "  run_DAG_chainer.pl $dag_args -i $match_path"; echo
-    run_DAG_chainer.pl $dag_args -i $match_path 1>/dev/null 
+    # run_DAG_chainer.pl writes temp files to cwd;
+    # use per-process temp directory to avoid any data race
+    (
+      tmpdir=$(mktemp -d)
+      cd "${tmpdir}"
+      run_DAG_chainer.pl $dag_args -i "${match_path}" 1>/dev/null
+      rmdir ${tmpdir}
+    ) &
+    # allow to execute up to $NPROC in parallel
+    [ $(jobs -r -p | wc -l) -ge ${NPROC} ] && wait -n
   done
-  wait
+  wait # wait for last jobs to finish
   #Extract single-linkage synteny anchors
-  > ${work_dir}/synteny_blocks.tsv
   printf "matches\tscore\trev\tid1\tid2\n" >${work_dir}/synteny_blocks.tsv
 
-  > ${work_dir}/homology_pairs.tsv
-  for path in ${dag_dir}/*_matches.tsv; do
-    awk '$1!~/^#/ {print $2 "\t" $6}' "${path}" \
-      >>${work_dir}/homology_pairs.tsv
-  done
+  awk '$1!~/^#/ {print $2 "\t" $6}' ${dag_dir}/*_matches.tsv > ${work_dir}/homology_pairs.tsv
+  awk '$1!~/^#/ {print $2 "\t" $6}' ${dag_dir}/*.aligncoords > ${work_dir}/synteny_pairs.tsv
 
-  > ${work_dir}/synteny_pairs.tsv
   for path in ${dag_dir}/*.aligncoords; do
-    awk '$1!~/^#/ {print $2 "\t" $6}' "${path}" \
-      >>${work_dir}/synteny_pairs.tsv
-    grep \#\# "${path}" | grep -v reverse |
-      awk '{print substr($14,0,length($14)-2) "\t" $10 "\t" 1 "\t" $3 "\t" $5}' \
-        >>${work_dir}/synteny_blocks.tsv
-    grep \#\# "${path}" | grep reverse |
-      awk '{print substr($15,0,length($15)-2) "\t" $11 "\t" 1 "\t" $3 "\t" $5}' \
-        >>${work_dir}/synteny_blocks.tsv
+    awk '/##/ && !/reverse/ {print substr($14,0,length($14)-2) "\t" $10 "\t" 1 "\t" $3 "\t" $5}' "${path}" >> ${work_dir}/synteny_blocks.tsv
+    awk '/##/ &&  /reverse/ {print substr($15,0,length($15)-2) "\t" $11 "\t" 1 "\t" $3 "\t" $5}' "${path}" >> ${work_dir}/synteny_blocks.tsv
   done
 }
 #
@@ -302,17 +300,17 @@ run_consense() {
     vsearch --cluster_fast ${pan_fasta_dir}/{} --id ${vs_consen_iden} --fasta_width 0 \
             --consout ${pan_consen_dir}/{} 1>/dev/null 
 
-  echo "  Combine consensus sequnces into one multifasta file"
-  > ${work_dir}/syn_pan_consen.fna
+  echo "  Combine consensus sequences into one multifasta file"
+  
   for path in ${pan_consen_dir}/*; do
     file=`basename $path`;
     awk -v FN=$file '$1~/^>/ {print ">" FN " " substr($1,2)} 
-                     $1!~/^>/ {print $1}' $path >> ${work_dir}/syn_pan_consen.fna
-  done 
+                     $1!~/^>/ {print $1}' $path
+  done > ${work_dir}/syn_pan_consen.fna
   rm ${pan_consen_dir}/*
 
   echo "  Get sorted list of all genes, from the original fasta files"
-  awk '$1~/^>/ {print $1}' "${fasta_files}" | sed 's/>//' | sort > ${work_dir}/lis.all_genes
+  awk '$1~/^>/ {print $1}' ${fasta_files} | sed 's/>//' | sort > ${work_dir}/lis.all_genes
 
   echo "  Get sorted list of all clustered genes"
   awk '$1~/^>/ {print $1}' "${pan_fasta_dir}"/* | sed 's/>//' | sort > ${work_dir}/lis.all_clustered_genes
@@ -343,7 +341,7 @@ run_consense() {
 
   echo "  Make augmented cluster sets"
   > ${work_dir}/syn_pan_augmented.clust.tsv
-  for path in ${work_dir}/pan_fasta/*; do
+  for path in ${pan_fasta_dir}/*; do
     file=`basename $path` 
     if [[ -f ${leftovers_dir}/$file ]]; then
       awk -v ORS="" -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"}' $path
