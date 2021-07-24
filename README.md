@@ -19,8 +19,8 @@ The workflow is as follows:
 ## Installation of scripts and dependencies
 
 The scripts should be added to your path - either by copying them to a directory that is in your path 
-(e.g. ~/bin/), or by adding the script directory to your path 
-(e.g. "export PATH=$PATH:~/src/pandagma/scripts" ... if that is where you have them).
+(e.g. `cp scripts/* ~/bin/`), or by adding the script directory to your path 
+(e.g. `export PATH=$PATH:~/src/pandagma/scripts` ... if that is where you have them).
 
 Also, these dependencies are required: 
   bioperl, mmseqs, dagchainer, mcl, and vsearch. 
