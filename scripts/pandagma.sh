@@ -18,6 +18,7 @@ readonly data_extra_dir=${PANDAGMA_DATA_EXTRA_DIR:-${PWD}/data_extra}
 
 dag_dir="${work_dir}/dag"
 mmseqs_dir="${work_dir}/mmseqs"
+mmseqs_tmp_dir="${work_dir}/mmseqs_tmp"
 work_data_dir="${work_dir}/data"
 work_data_extra_dir="${work_dir}/data_extra"
 work_extra_out_dir="${work_dir}/extra_out_dir"
@@ -216,7 +217,7 @@ run_mmseqs() {
       sbj_base=$(basename $sbj_path .fna)
       if [[ "$qry_base" > "$sbj_base" ]]; then
          echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
-         mmseqs easy-cluster $qry_path $sbj_path ${mmseqs_dir}/${qry_base}.x.${sbj_base} tmp \
+         mmseqs easy-cluster $qry_path $sbj_path ${mmseqs_dir}/${qry_base}.x.${sbj_base} ${mmseqs_tmp_dir} \
            --min-seq-id $mm_clust_iden \
            -c $mm_clust_cov \
            --cov-mode 0 \
@@ -341,7 +342,7 @@ run_consense() {
   echo "  Search non-clustered genes against pan-gene consensus sequences"
   mmseqs easy-search ${work_dir}/genes_not_in_clusters.fna \
                      ${work_dir}/syn_pan_consen.fna \
-                     ${work_dir}/unclust.x.all_cons.m8 tmp \
+                     ${work_dir}/unclust.x.all_cons.m8 ${mmseqs_tmp_dir} \
                      --search-type 3 --cov-mode 5 -c 0.5 1>/dev/null
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
@@ -373,7 +374,7 @@ run_add_extra() {
 
     mmseqs easy-search ${path} \
                        ${work_dir}/syn_pan_consen.fna \
-                       ${work_extra_out_dir}/${fasta_file}.x.all_cons.m8 tmp \
+                       ${work_extra_out_dir}/${fasta_file}.x.all_cons.m8 ${mmseqs_tmp_dir} \
                        --search-type 3 --cov-mode 5 -c 0.5 1>/dev/null
   done
 
@@ -665,7 +666,7 @@ fi
 #
 #
 # Create directories if needed
-dirlist="work_dir etc_dir mmseqs_dir dag_dir pan_fasta_dir \
+dirlist="work_dir etc_dir mmseqs_dir mmseqs_tmp_dir dag_dir pan_fasta_dir \
          pan_consen_dir leftovers_dir work_data_dir \
          work_data_extra_dir leftovers_extra_dir work_extra_out_dir"
 for dirvar in $dirlist; do
