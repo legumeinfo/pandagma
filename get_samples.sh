@@ -31,7 +31,7 @@ cd $base_dir/data/
   curl -O $url_base/max/annotations/Zh13.gnm1.ann1.8VV3/glyma.Zh13.gnm1.ann1.8VV3.gene_models_main.gff3.gz
 
   curl -O $url_base/max/annotations/Wm82.gnm2.ann2.BG1Q/glyma.Wm82.gnm2.ann2.BG1Q.cds_primaryTranscript.fna.gz
-  curl -O $url_base/max/annotations/Wm82.gnm2.ann2.BG1Q/glyma.Wm82.gnm2.ann2.gene_models_gmap_match.gff3.gz
+  curl -O $url_base/max/annotations/Wm82.gnm2.ann2.BG1Q/glyma.Wm82.gnm2.ann2.BG1Q.gene_models_gmap_match.gff3.gz
 
   curl -O $url_base/soja/annotations/PI483463.gnm1.ann1.3Q3Q/glyso.PI483463.gnm1.ann1.3Q3Q.cds_primaryTranscript.fna.gz
   curl -O $url_base/soja/annotations/PI483463.gnm1.ann1.3Q3Q/glyso.PI483463.gnm1.ann1.3Q3Q.gene_models_main.gff3.gz
