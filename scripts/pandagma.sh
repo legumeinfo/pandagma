@@ -434,7 +434,7 @@ run_summarize() {
   printf '%-20s\t%s\n' "Statistic" "value" >> ${stats_file}
 
   let "n_blocks=$(wc -l < ${full_out_dir}/synteny_blocks.tsv)-1"
-  printf '%-20s\t%s\n' $synteny_blocks $n_blocks >> ${stats_file}
+  printf '%-20s\t%s\n' synteny_blocks $n_blocks >> ${stats_file}
 
 #
   printf "\n== Initial clusters (containing only genes within synteny blocks)\n" >> ${stats_file}
