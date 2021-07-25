@@ -126,6 +126,23 @@ cat_or_zcat() {
        *) cat "${1}" ;;
   esac
 }
+# usage: make_augmented_cluster_sets leftovers_dir=${leftovers_dir} ${pan_fasta_dir}/* > syn_pan_augmented.clust.tsv
+make_augmented_cluster_sets() {
+  awk 'function add_leftovers() {
+        leftovers_file = leftovers_dir "/" path[nf]
+        while(getline fasta_line < leftovers_file == 1)
+            if (fasta_line ~ /^>/) printf("\t%s", substr(fasta_line,2))
+        close(leftovers_file)
+        printf("\n")
+    }
+    FNR == 1 {
+        if (NR != 1) add_leftovers() # previous pan cluster
+        nf = split(FILENAME, path, "/")
+        printf("%s", path[nf])
+    }
+    /^>/ { printf("\t%s", substr($1,2)) }
+    END { add_leftovers() }' "$@"
+}
 #
 # run functions
 #
@@ -305,7 +322,7 @@ run_consense() {
   echo "  Combine consensus sequences into one multifasta file"
 
   awk 'FNR==1 { nf=split(FILENAME, FN, "/") }
-         /^>/ { print ">" FN " " substr($1,2); next }
+         /^>/ { print ">" FN[nf] " " substr($1,2); next }
               { print }' ${pan_consen_dir}/* > ${work_dir}/syn_pan_consen.fna
       
   rm ${pan_consen_dir}/*
@@ -341,16 +358,7 @@ run_consense() {
     -fam ${work_dir}/syn_pan_leftovers.clust.tsv -out ${leftovers_dir}
 
   echo "  Make augmented cluster sets"
-  > ${work_dir}/syn_pan_augmented.clust.tsv
-  for path in ${pan_fasta_dir}/*; do
-    file=`basename $path` 
-    if [[ -f ${leftovers_dir}/$file ]]; then
-      awk -v ORS="" -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"}' $path
-      awk -v ORS="" '$1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' ${leftovers_dir}/$file
-    else
-      awk -v ORS=""  -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' $path
-    fi | sed 's/\t$//'
-  done > ${work_dir}/syn_pan_augmented.clust.tsv
+  make_augmented_cluster_sets leftovers_dir=${leftovers_dir} ${pan_fasta_dir}/* > ${work_dir}/syn_pan_augmented.clust.tsv
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
   perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' ${work_dir}/syn_pan_augmented.clust.tsv > ${work_dir}/syn_pan_augmented.hsh.tsv
@@ -384,15 +392,7 @@ run_add_extra() {
     -fam ${work_dir}/syn_pan_extra.clust.tsv -out ${leftovers_extra_dir}
 
   echo "  Make augmented cluster sets"
-  for path in ${work_dir}/pan_fasta/*; do
-    file=`basename $path` 
-    if [[ -f ${leftovers_extra_dir}/$file ]]; then
-      awk -v ORS="" -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"}' $path
-      awk -v ORS="" '$1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' ${leftovers_extra_dir}/$file
-    else
-      awk -v ORS=""  -v ID=$file 'BEGIN{print ID "\t"} $1~/^>/ {print substr($1,2) "\t"} END{print "\n"}' $path
-    fi | sed 's/\t$//'
-  done > ${work_dir}/syn_pan_aug_extra.clust.tsv
+  make_augmented_cluster_sets leftovers_dir=${leftovers_dir} ${pan_fasta_dir}/* > ${work_dir}/syn_pan_aug_extra.clust.tsv
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
   perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' ${work_dir}/syn_pan_aug_extra.clust.tsv > ${work_dir}/syn_pan_aug_extra.hsh.tsv
