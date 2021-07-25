@@ -56,7 +56,13 @@ while (<$HSH>) {
 }
 
 # Read in the sequence using the Bioperl SeqIO;
-my $in  = Bio::SeqIO->new(-file => $fasta_file , '-format' => 'Fasta');
+my $in;
+if ($fasta_file =~ /.gz$/) {
+  open my $fh, "gzip -dc $fasta_file |" or die $!;
+  $in = Bio::SeqIO->new(-fh => $fh, -format => 'Fasta');
+} else {
+  $in = Bio::SeqIO->new(-file => $fasta_file, -format => 'Fasta');
+}
 
 my $OUT;
 if (defined($out_file)){

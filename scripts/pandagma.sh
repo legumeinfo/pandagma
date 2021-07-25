@@ -7,7 +7,7 @@
 #
 scriptname=`basename "$0"`
 version="0.9.1"
-set -o errexit -o nounset
+set -o errexit -o nounset -o pipefail
 
 export MMSEQS_NUM_THREADS=${NPROC} # mmmseqs otherwise uses all cores by default
 
@@ -122,8 +122,8 @@ get_value() {
 }
 cat_or_zcat() {
   case ${1} in
-    *.gz) gzip -dc "${1}" ;;
-       *) cat "${1}" ;;
+    *.gz) gzip -dc "$@" ;;
+       *) cat "$@" ;;
   esac
 }
 # usage: make_augmented_cluster_sets leftovers_dir=${leftovers_dir} ${pan_fasta_dir}/* > syn_pan_augmented.clust.tsv
@@ -153,7 +153,6 @@ run_ingest() {
   gff_ext=$(get_value gff_ext)
   fasta_ext=$(get_value fasta_ext)
   gff_files="$(ls ${data_dir}/*.${gff_ext})"
-  fasta_files="$(ls ${data_dir}/*.${fasta_ext})"
   n_fasta=`ls ${data_dir}/*.${fasta_ext} | wc -l`
   printf "\nIngest -- combine data from ${n_fasta} ${gff_ext} and ${fasta_ext} files\n"
 
@@ -180,12 +179,10 @@ run_ingest() {
       -fasta ${data_dir}/${base}.${fasta_ext} \
       -hash ${work_data_dir}/${base}.hsh \
       -suff_regex \
-      >${work_data_dir}/${base}.${fasta_ext}
+      >${work_data_dir}/${base}.fna
   done
 
   extra_gff_files="$(ls ${data_extra_dir}/*.${gff_ext})"
-  extra_fasta_files="$(ls ${data_extra_dir}/*.${fasta_ext})"
-  n_fasta=`ls ${data_extra_dir}/*.${fasta_ext} | wc -l`
   printf "\nIf there are extra annotation sets (in data_extra), prepare those for analysis.\n"
   for path in $extra_gff_files; do
     base=$(basename $path .${gff_ext})
@@ -203,7 +200,7 @@ run_ingest() {
       -fasta ${data_extra_dir}/${base}.${fasta_ext} \
       -hash ${work_data_extra_dir}/${base}.hsh \
       -suff_regex \
-      >${work_data_extra_dir}/${base}.${fasta_ext}
+      >${work_data_extra_dir}/${base}.fna
   done
 }
 #
@@ -211,13 +208,12 @@ run_mmseqs() {
   # Do mmseqs clustering on all pairings of annotation sets.
   mm_clust_iden=$(get_value clust_iden)
   mm_clust_cov=$(get_value clust_cov)
-  fasta_ext=$(get_value fasta_ext)
   echo; echo "Run mmseqs -- at ${mm_clust_iden} percent identity and minimum of ${mm_clust_cov}% coverage."
   #
-  for qry_path in ${work_data_dir}/*.${fasta_ext}; do
-    qry_base=$(basename $qry_path .${fasta_ext})
-    for sbj_path in ${work_data_dir}/*.${fasta_ext}; do
-      sbj_base=$(basename $sbj_path .${fasta_ext})
+  for qry_path in ${work_data_dir}/*.fna; do
+    qry_base=$(basename $qry_path .fna})
+    for sbj_path in ${work_data_dir}/*.fna; do
+      sbj_base=$(basename $sbj_path .fna)
       if [[ "$qry_base" > "$sbj_base" ]]; then
          echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
          mmseqs easy-cluster $qry_path $sbj_path ${mmseqs_dir}/${qry_base}.x.${sbj_base} tmp \
@@ -328,7 +324,7 @@ run_consense() {
   rm ${pan_consen_dir}/*
 
   echo "  Get sorted list of all genes, from the original fasta files"
-  awk '$1~/^>/ {print $1}' ${fasta_files} | sed 's/>//' | sort > ${work_dir}/lis.all_genes
+  cat_or_zcat ${fasta_files} | awk '/^>/ {print substr($1,2)}' | sort > ${work_dir}/lis.all_genes
 
   echo "  Get sorted list of all clustered genes"
   awk '$1~/^>/ {print $1}' "${pan_fasta_dir}"/* | sed 's/>//' | sort > ${work_dir}/lis.all_clustered_genes
@@ -337,7 +333,7 @@ run_consense() {
   comm -13 ${work_dir}/lis.all_clustered_genes ${work_dir}/lis.all_genes > ${work_dir}/lis.genes_not_in_clusters
 
   echo "  Retrieve the non-clustered genes"
-  cat ${fasta_files} |
+  cat_or_zcat ${fasta_files} |
     get_fasta_subset.pl -in /dev/stdin \
                         -out ${work_dir}/genes_not_in_clusters.fna \
                         -lis ${work_dir}/lis.genes_not_in_clusters -clobber
@@ -404,7 +400,6 @@ run_summarize() {
   mm_clust_iden=$(get_value clust_iden)
   mm_clust_cov=$(get_value clust_cov)
   start_t=$(get_value start_time)
-  out_dir="$(get_value out_dir_base)"
   full_out_dir=`echo "$out_dir.id${mm_clust_iden}.cov${mm_clust_cov}.I${mcl_I}" | perl -pe 's/(\d)\.(\d+)/$1_$2/g'`
   stats_file=${full_out_dir}/stats.txt
 
