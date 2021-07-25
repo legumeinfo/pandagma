@@ -337,10 +337,10 @@ run_consense() {
   comm -13 ${work_dir}/lis.all_clustered_genes ${work_dir}/lis.all_genes > ${work_dir}/lis.genes_not_in_clusters
 
   echo "  Retrieve the non-clustered genes"
-  cat ${fasta_files} > ${work_dir}/all_genes.fna
-  get_fasta_subset.pl -in ${work_dir}/all_genes.fna \
-                      -out ${work_dir}/genes_not_in_clusters.fna \
-                      -lis ${work_dir}/lis.genes_not_in_clusters -clobber
+  cat ${fasta_files} |
+    get_fasta_subset.pl -in /dev/stdin \
+                        -out ${work_dir}/genes_not_in_clusters.fna \
+                        -lis ${work_dir}/lis.genes_not_in_clusters -clobber
 
   echo "  Search non-clustered genes against pan-gene consensus sequences"
   mmseqs easy-search ${work_dir}/genes_not_in_clusters.fna \
