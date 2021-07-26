@@ -2,6 +2,9 @@
 # LegumeInfo/SoyBase Data Store, for genus Glycine. Run this script after running get_samples.sh .
 # Call both scripts from where these scripts sit, along with the data and data_extra directories.
 
+set -o errexit
+set -o nounset
+
 echo "Uncompress files"
 for path in data/*gz; do gunzip $path &
 done
