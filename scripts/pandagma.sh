@@ -9,10 +9,11 @@ scriptname=`basename "$0"`
 version="0.9.1"
 set -o errexit -o nounset -o pipefail
 
-export MMSEQS_NUM_THREADS=${NPROC} # mmmseqs otherwise uses all cores by default
+export NPROC=${NPROC:-1}
+export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
+export PANDAGMA_CONF=${PANDAGMA_CONF:-${PWD}/pandagma.conf}
 
 readonly work_dir=${PANDAGMA_WORK_DIR:-${PWD}/work}
-readonly etc_dir=${PANDAGMA_DIR:-${PWD}/etc}
 readonly data_dir=${PANDAGMA_DATA_DIR:-${PWD}/data}
 readonly data_extra_dir=${PANDAGMA_DATA_EXTRA_DIR:-${PWD}/data_extra}
 
@@ -26,6 +27,9 @@ pan_fasta_dir="${work_dir}/pan_fasta"
 pan_consen_dir="${work_dir}/pan_consen"
 leftovers_dir="${work_dir}/pan_leftovers"
 leftovers_extra_dir="${work_dir}/pan_leftovers_extra"
+
+pandagma_conf_params='clust_iden clust_cov consen_iden mcl_inflation dagchainer_args fasta_ext gff_ext pan_prefix out_dir_base'
+
 error_exit() {
   echo >&2 "ERROR -- unexpected exit from ${BASH_SOURCE} script at line:"
   echo >&2 "   $BASH_COMMAND"
@@ -65,7 +69,6 @@ synteny blocks and so not making it into the synteny-based clusters.
 Subommands (in order they are usually run):
             version - Get installed package version
                init - Initialize parameters required for run
-             config - View/set run parameters, '-h' for help
          run ingest - Prepare the assembly and annotation files for analysis
          run mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
          run filter - Filter the synteny results for chromosome pairings, returning gene pairs.
@@ -76,10 +79,9 @@ Subommands (in order they are usually run):
       run add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
       run summarize - Move results into output directory, and report summary statistics.
-       clear_config - Clear all config variables
               clean - Delete work directory
 
-Variables (accessed by \"config\" subcommand):
+Variables in pandagma config file:
     dagchainer_args - Argument for DAGchainer command
          clust_iden - Minimum identity threshold for mmseqs clustering [0.98]
           clust_cov - Minimum coverage for mmseqs clustering [0.75]
@@ -89,38 +91,21 @@ Variables (accessed by \"config\" subcommand):
          pan_prefix - Prefix to use as a prefix for pangene clusters [default: pan]
        out_dir_base - base name for the output directory [default: './out']
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
-            version - version of this script at config time
 
-Environmental variables:
-         PANDAGMA_DIR - Location of the config directory, default:
-                       \"${etc_dir}\"
+Environment variables:
+         PANDAGMA_CONF - Path of the pandagma config file, default:
+                       \"${PANDAGMA_CONF}\"
     PANDAGMA_WORK_DIR - Location of working files, default:
                        \"${work_dir}\"
     PANDAGMA_DATA_DIR - Location of intput data files (CDS fasta and GFFs), default:
                        \"${data_dir}\"
 PANDAGMA_DATA_EXTRA_DIR - Location of data files to be added after primary cluster construction, default:
                        \"${data_extra_dir}\"
-              NPROC - Number of processors to use (required)
+              NPROC - Number of processors to use (default 1)
 """
 #
 # Helper functions begin here
 #
-set_value() {
-  if [ "$2" == "-d" ]; then
-    rm -f "${etc_dir}/${1}"
-  else
-    echo "$2" >"${etc_dir}/${1}"
-  fi
-}
-get_value() {
-  if [ -e ${etc_dir}/${1} ]; then
-    cat ${etc_dir}/${1}
-  else
-    trap - EXIT
-    echo >&2 "ERROR -- value for $1 variable not found."
-    exit 1
-  fi
-}
 cat_or_zcat() {
   case ${1} in
     *.gz) gzip -dc "$@" ;;
@@ -148,11 +133,8 @@ make_augmented_cluster_sets() {
 # run functions
 #
 run_ingest() {
-  now=$(date +"%T")
-  set_value start_time $now
   # Prepare the assembly and annotation files for analysis. Add positional info to gene IDs.
-  gff_ext=$(get_value gff_ext)
-  fasta_ext=$(get_value fasta_ext)
+  . "${PANDAGMA_CONF}"
   gff_files="$(ls ${data_dir}/*.${gff_ext})"
   n_fasta=`ls ${data_dir}/*.${fasta_ext} | wc -l`
   printf "\nIngest -- combine data from ${n_fasta} ${gff_ext} and ${fasta_ext} files\n"
@@ -207,9 +189,8 @@ run_ingest() {
 #
 run_mmseqs() {
   # Do mmseqs clustering on all pairings of annotation sets.
-  mm_clust_iden=$(get_value clust_iden)
-  mm_clust_cov=$(get_value clust_cov)
-  echo; echo "Run mmseqs -- at ${mm_clust_iden} percent identity and minimum of ${mm_clust_cov}% coverage."
+  . "${PANDAGMA_CONF}"
+  echo; echo "Run mmseqs -- at ${clust_iden} percent identity and minimum of ${clust_cov}% coverage."
   #
   for qry_path in ${work_data_dir}/*.fna; do
     qry_base=$(basename $qry_path .fna})
@@ -218,8 +199,8 @@ run_mmseqs() {
       if [[ "$qry_base" > "$sbj_base" ]]; then
          echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
          mmseqs easy-cluster $qry_path $sbj_path ${mmseqs_dir}/${qry_base}.x.${sbj_base} ${mmseqs_tmp_dir} \
-           --min-seq-id $mm_clust_iden \
-           -c $mm_clust_cov \
+           --min-seq-id $clust_iden \
+           -c $clust_cov \
            --cov-mode 0 \
            --cluster-reassign 1>/dev/null
       fi
@@ -251,8 +232,7 @@ run_filter() {
 #
 run_dagchainer() {
   # Identify syntenic blocks, using DAGchainer
-  #dag_args=$(get_value dagchainer_args)
-  dag_args="-g 10000 -M 50 -D 200000 -E 1e-5 -A 6 -s"
+  . "${PANDAGMA_CONF}"
   echo; echo "Run DAGchainer, using args \"${dag_args}\""
   for match_path in ${dag_dir}/*_matches.tsv; do
     align_file=`basename $match_path _matches.tsv`
@@ -284,15 +264,14 @@ run_dagchainer() {
 #
 run_mcl() {
   # Calculate clusters using Markov clustering
-  mcl_I=$(get_value mcl_inflation)
-  prefix=$(get_value pan_prefix)
-  printf "\nCalculate clusters. use Markov clustering with inflation parameter $mcl_I and ${NPROC} threads\n"
-  echo "MCL COMMAND: mcl ${work_dir}/synteny_pairs.tsv -I $mcl_I -te ${NPROC} --abc -o ${work_dir}/tmp.syn_pan.clust.tsv"
-  mcl ${work_dir}/synteny_pairs.tsv -I $mcl_I -te ${NPROC} --abc -o ${work_dir}/tmp.syn_pan.clust.tsv \
+  . "${PANDAGMA_CONF}"
+  printf "\nCalculate clusters. use Markov clustering with inflation parameter $mcl_inflation and ${NPROC} threads\n"
+  echo "MCL COMMAND: mcl ${work_dir}/synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o ${work_dir}/tmp.syn_pan.clust.tsv"
+  mcl ${work_dir}/synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o ${work_dir}/tmp.syn_pan.clust.tsv \
     1>/dev/null
  
   # Add cluster IDs
-  awk -v PRE=$prefix '{padnum=sprintf("%05d", NR); print PRE padnum "\t" $0}' "${work_dir}"/tmp.syn_pan.clust.tsv > ${work_dir}/syn_pan.clust.tsv
+  awk -v PRE=${pan_prefix} '{padnum=sprintf("%05d", NR); print PRE padnum "\t" $0}' "${work_dir}"/tmp.syn_pan.clust.tsv > ${work_dir}/syn_pan.clust.tsv
 
   # Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)
   perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' "${work_dir}"/syn_pan.clust.tsv > ${work_dir}/syn_pan.hsh.tsv
@@ -301,17 +280,15 @@ run_mcl() {
 run_consense() {
   echo; echo "Calculate a consensus sequence for each pan-gene set, using vsearch."
   echo "Then add previously unclustered sequences into an \"augmented\" pan-gene set, by homology."
-  fasta_ext=$(get_value fasta_ext)
+  . "${PANDAGMA_CONF}"
   fasta_files="$(ls ${data_dir}/*.${fasta_ext})"
-  vs_consen_iden=$(get_value consen_iden)
-  mm_clust_iden=$(get_value clust_iden)
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
   get_fasta_from_family_file.pl ${fasta_files} -fam ${work_dir}/syn_pan.clust.tsv -out ${pan_fasta_dir} 
 
   echo "  Calculate consensus sequences for each pan-gene set."
   ls ${pan_fasta_dir} | xargs -I{} -n 1 -P ${NPROC} \
-    vsearch --cluster_fast ${pan_fasta_dir}/{} --id ${vs_consen_iden} --fasta_width 0 \
+    vsearch --cluster_fast ${pan_fasta_dir}/{} --id ${consen_iden} --fasta_width 0 \
             --consout ${pan_consen_dir}/{} \
             --quiet \
             --threads 1
@@ -347,7 +324,7 @@ run_consense() {
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
   top_line.awk ${work_dir}/unclust.x.all_cons.m8 | 
-    awk -v IDEN=${mm_clust_iden} '$3>=IDEN {print $2 "\t" $1}' |
+    awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' |
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  ${work_dir}/syn_pan_leftovers.clust.tsv
 
   echo "  Retrieve sequences for the leftover genes"
@@ -363,9 +340,8 @@ run_consense() {
 #
 run_add_extra() {
   echo; echo "Add extra annotation sets to the augmented clusters, by homology"
-  fasta_ext=$(get_value fasta_ext)
+  . "${PANDAGMA_CONF}"
   fasta_files="$(ls ${data_extra_dir}/*.${fasta_ext})"
-  mm_clust_iden=$(get_value clust_iden)
 
   echo "  Search non-clustered genes against pan-gene consensus sequences"
   for path in ${data_extra_dir}/*.${fasta_ext}; do
@@ -381,7 +357,7 @@ run_add_extra() {
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
   > ${work_dir}/syn_pan_extra.clust.tsv
   top_line.awk "${work_extra_out_dir}"/*.x.all_cons.m8 |
-    awk -v IDEN=${mm_clust_iden} '$3>=IDEN {print $2 "\t" $1}' |
+    awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' |
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  ${work_dir}/syn_pan_extra.clust.tsv
 
   echo "  Retrieve sequences for the extra genes"
@@ -396,12 +372,9 @@ run_add_extra() {
 }
 #
 run_summarize() {
+  . "${PANDAGMA_CONF}"
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
-  mcl_I=$(get_value mcl_inflation)
-  mm_clust_iden=$(get_value clust_iden)
-  mm_clust_cov=$(get_value clust_cov)
-  start_t=$(get_value start_time)
-  full_out_dir=`echo "$out_dir.id${mm_clust_iden}.cov${mm_clust_cov}.I${mcl_I}" | perl -pe 's/(\d)\.(\d+)/$1_$2/g'`
+  full_out_dir=`echo "$out_dir_base.id${clust_iden}.cov${clust_cov}.I${mcl_inflation}" | perl -pe 's/(\d)\.(\d+)/$1_$2/g'`
   stats_file=${full_out_dir}/stats.txt
 
   if [ ! -d "$full_out_dir" ]; then
@@ -418,10 +391,9 @@ run_summarize() {
   printf "Run of program $scriptname, version $version\n\n" > ${stats_file}
 
   printf "Parameter  \tvalue\n" >> ${stats_file}
-  for key in $(ls ${etc_dir}); do
-    value="$(get_value ${key})"
+  for key in ${pandagma_conf_params}; do
     if [[ ${key} != +(dag|mmseqs)_time_s ]]; then
-      printf '%-15s\t%s\n' ${key} ${value} >> ${stats_file}
+      printf '%-15s\t%s\n' ${key} "${!key}" >> ${stats_file}
     fi
   done
 
@@ -493,11 +465,6 @@ run_summarize() {
     printf '%-20s\t%s\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
   fi
 
-  # run times
-  end_t=$(date +"%T")
-  echo "Start time: $start_t"
-  echo "Current time: $end_t"
-
   # histograms
   if [ -f ${full_out_dir}/syn_pan.clust.tsv ]; then
     printf "\nCounts of initial clusters by cluster size:\n" >> ${stats_file}
@@ -523,76 +490,20 @@ run_summarize() {
 #
 # top-level command functions
 #
-config() {
-  CONFIG_DOC="""Sets/displays key/value pairs for the pandagma build system.
-
-Usage:
-   $scriptname config [-h] [KEY] [VALUE | -d]
-
-Options:
-   -h   Prints this help message and exits
-   -d   Deletes the setting of KEY
-
-Arguments:
-   If KEY is absent, all values will be displayed
-   If KEY is present but VALUE is absent, the value will be displayed
-   If KEY and VALUE are present, the value will be set
-"""
-  if [ "$#" -eq 0 ]; then
-    echo >&2 "$CONFIG_DOC"
-    param="all"
-  elif [ "$1" == "-h" ]; then
-    echo >&2 "$CONFIG_DOC"
-    param=all
-  else
-    param="$1"
-  fi
-  if [ "$param" == "all" ]; then
-      trap - EXIT
-      for key in $(ls ${etc_dir}); do
-        value="$(get_value ${key})"
-        if [[ ${key} != +(dag|mmseqs)_time_s ]]; then
-          printf '%-20s\t%s\n' ${key} "${value}" >&1
-        fi
-      done
-      exit 0
-  fi
-  if [ "$#" -eq 1 ]; then
-    if [ -e ${etc_dir}/${param} ]; then
-      echo "$(get_value $param)"
-    else
-      trap - EXIT
-      echo >&2 "ERROR -- \"${1}\" has not been set"
-      exit 1
-    fi
-  elif [ "$#" -eq 2 ]; then # set
-    set_value $param $2
-  else
-    trap - EXIT
-    echo >&2 "$CONFIG_DOC"
-    echo >&2 "ERROR -- too many arguments (${#})."
-    exit 1
-  fi
-}
-#
-clear_config() {
-  echo "clearing configuration directory"
-  rm -f ${etc_dir}/*
-}
-#
 init() {
   # Initialize parameters required for run. Write these to files, for persistent access through the program.
-  echo; echo "Setting run configuration parameters"
-  set_value clust_iden "0.98"
-  set_value clust_cov "0.75"
-  set_value consen_iden "0.80"
-  set_value mcl_inflation 2
-  set_value dagchainer_args '-g 10000 -M 50 -D 200000 -E 1e-5 -A 6 -s'
-  set_value fasta_ext "fna"
-  set_value gff_ext "gff3"
-  set_value pan_prefix "pan"
-  set_value out_dir_base "out"
-  config all
+  echo; echo "Setting run configuration parameters in ${PANDAGMA_CONF}"
+  cat <<END > "${PANDAGMA_CONF}"
+clust_iden='0.98'
+clust_cov='0.75'
+consen_iden='0.80'
+mcl_inflation='2'
+dagchainer_args='-g 10000 -M 50 -D 200000 -E 1e-5 -A 6 -s'
+fasta_ext='fna'
+gff_ext='gff3'
+pan_prefix='pan'
+out_dir_base='out'
+END
 
   echo "Data directory (for assembly and GFF files): $data_dir"
   echo "Work directory (for temporary files): $work_dir"; echo
@@ -666,7 +577,7 @@ fi
 #
 #
 # Create directories if needed
-dirlist="work_dir etc_dir mmseqs_dir mmseqs_tmp_dir dag_dir pan_fasta_dir \
+dirlist="work_dir mmseqs_dir mmseqs_tmp_dir dag_dir pan_fasta_dir \
          pan_consen_dir leftovers_dir work_data_dir \
          work_data_extra_dir leftovers_extra_dir work_extra_out_dir"
 for dirvar in $dirlist; do
@@ -680,14 +591,8 @@ done
 command="$1"
 shift 1
 case $command in
-"config")
-  config $@
-  ;;
 "clean")
   clean $@
-  ;;
-"clear_config")
-  clear_config $@
   ;;
 "init")
   init $@
