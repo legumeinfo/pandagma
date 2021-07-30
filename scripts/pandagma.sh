@@ -12,23 +12,9 @@ set -o errexit -o nounset -o pipefail
 export NPROC=${NPROC:-1}
 export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 export PANDAGMA_CONF=${PANDAGMA_CONF:-${PWD}/pandagma.conf}
+export PANDAGMA_WORK_DIR=${PANDAGMA_WORK_DIR:-${PWD}/work}
 
-readonly work_dir=${PANDAGMA_WORK_DIR:-${PWD}/work}
-readonly data_dir=${PANDAGMA_DATA_DIR:-${PWD}/data}
-readonly data_extra_dir=${PANDAGMA_DATA_EXTRA_DIR:-${PWD}/data_extra}
-
-dag_dir="${work_dir}/dag"
-mmseqs_dir="${work_dir}/mmseqs"
-mmseqs_tmp_dir="${work_dir}/mmseqs_tmp"
-work_data_dir="${work_dir}/data"
-work_data_extra_dir="${work_dir}/data_extra"
-work_extra_out_dir="${work_dir}/extra_out_dir"
-pan_fasta_dir="${work_dir}/pan_fasta"
-pan_consen_dir="${work_dir}/pan_consen"
-leftovers_dir="${work_dir}/pan_leftovers"
-leftovers_extra_dir="${work_dir}/pan_leftovers_extra"
-
-pandagma_conf_params='clust_iden clust_cov consen_iden mcl_inflation dagchainer_args fasta_ext gff_ext pan_prefix out_dir_base'
+pandagma_conf_params='clust_iden clust_cov consen_iden mcl_inflation dagchainer_args pan_prefix out_dir_base'
 
 error_exit() {
   echo >&2 "ERROR -- unexpected exit from ${BASH_SOURCE} script at line:"
@@ -42,15 +28,11 @@ additional pre- and post-refinement steps.
 Usage:
         pandagma.sh SUBCOMMAND [SUBCOMMAND_OPTIONS]
 
-By default, name-matched primary coding sequence (fasta) and annotation (GFF) files are expected 
-in the data/ directory, within the working directory from where this script is called.
-(To set a different data directory name, see discussion of environment variables below).
-Example of name-matched files within the data/ directory:
-  accession1.fna accession1.gff3   
-  accession2.fna accession2.gff3  
-  accessionXYZ.fna accessionXYZ.gff3
+Primary coding sequence (fasta) and annotation (GFF) files must be listed in the
+fasta_files and gff_files variables defined in pandagma.conf, which by default must exist
+within the working directory from where this script is called.
 
-Optionally, a file \"expected_chr_matches.tsv\" can be provided (also in the data/ directory),
+Optionally, a file specified in the expected_chr_matches variable can be specified in pandagma.conf,
 which provides anticipated chromosome pairings, e.g.
   01 01
   02 02
@@ -69,7 +51,6 @@ synteny blocks and so not making it into the synteny-based clusters.
 Subommands (in order they are usually run):
             version - Get installed package version
                init - Initialize parameters required for run
-         run ingest - Prepare the assembly and annotation files for analysis
          run mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
          run filter - Filter the synteny results for chromosome pairings, returning gene pairs.
      run dagchainer - Run DAGchainer to filter for syntenic blocks
@@ -86,8 +67,6 @@ Variables in pandagma config file:
          clust_iden - Minimum identity threshold for mmseqs clustering [0.98]
           clust_cov - Minimum coverage for mmseqs clustering [0.75]
         consen_iden - Minimum identity threshold for vsearch consensus generation [0.80]
-          fasta_ext - Extension of FASTA files
-            gff_ext - Extension of GFF files
          pan_prefix - Prefix to use as a prefix for pangene clusters [default: pan]
        out_dir_base - base name for the output directory [default: './out']
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
@@ -96,16 +75,21 @@ Environment variables:
          PANDAGMA_CONF - Path of the pandagma config file, default:
                        \"${PANDAGMA_CONF}\"
     PANDAGMA_WORK_DIR - Location of working files, default:
-                       \"${work_dir}\"
-    PANDAGMA_DATA_DIR - Location of intput data files (CDS fasta and GFFs), default:
-                       \"${data_dir}\"
-PANDAGMA_DATA_EXTRA_DIR - Location of data files to be added after primary cluster construction, default:
-                       \"${data_extra_dir}\"
+                       \"${PANDAGMA_WORK_DIR}\"
               NPROC - Number of processors to use (default 1)
 """
 #
 # Helper functions begin here
 #
+canonicalize_paths() {
+  fasta_files=$(realpath --canonicalize-existing ${fasta_files})
+  gff_files=$(realpath --canonicalize-existing ${gff_files})
+  fasta_files_extra=${fasta_files_extra:+$(realpath --canonicalize-existing ${fasta_files_extra})}
+  if [ "${fasta_files_extra}" ]
+  then
+    gff_files_extra=$(realpath --canonicalize-existing ${gff_files_extra})
+  fi
+}
 cat_or_zcat() {
   case ${1} in
     *.gz) gzip -dc "$@" ;;
@@ -129,76 +113,38 @@ make_augmented_cluster_sets() {
     /^>/ { printf("\t%s", substr($1,2)) }
     END { add_leftovers() }' "$@"
 }
+# add positional information to FASTA ids
+ingest_fasta() {
+  cat_or_zcat "${1}" |
+    awk -F '\t' -v OFS="\t" '
+    $3 == "mRNA" {
+        match($9, /ID=[^;]+/)
+        ID=substr($9, RSTART+3, RLENGTH-3)
+       print ID "\t" $1 "__" ID "__" $4 "__" $5
+    }' |
+      hash_into_fasta_id.pl\
+        -fasta "${1}" \
+        -hash /dev/stdin \
+        -suff_regex
+}
 #
 # run functions
-#
-run_ingest() {
-  # Prepare the assembly and annotation files for analysis. Add positional info to gene IDs.
-  . "${PANDAGMA_CONF}"
-  gff_files="$(ls ${data_dir}/*.${gff_ext})"
-  n_fasta=`ls ${data_dir}/*.${fasta_ext} | wc -l`
-  printf "\nIngest -- combine data from ${n_fasta} ${gff_ext} and ${fasta_ext} files\n"
-
-  if ! command -v hash_into_fasta_id.pl &> /dev/null ; then
-    echo >&2 "ERROR: hash_into_fasta_id.pl could not be found. "
-    echo >&2 "       Are the necessary computational tools available? The required tools are:"
-    echo >&2 "           perl-bioperl-core, mmseqs2, dagchainer, mcl, vsearch"
-    exit
-  fi
-
-  for path in $gff_files; do
-    base=$(basename $path .${gff_ext})
-    base_no_ann=$(echo $base | perl -pe 's/\.ann\d+\.\w+//')
-    cat_or_zcat "${path}" |
-      awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' |
-        perl -pe 's/ID=([^;]+);\S+/$1/' >${work_data_dir}/${base_no_ann}.bed
-  done
-  # add positional information to FASTA ids
-  for path in ${work_data_dir}/*.bed; do
-    base=$(basename $path .bed)
-    awk '{print $4 "\t" $1 "__" $4 "__" $2 "__" $3}' "${path}" \
-      >${work_data_dir}/${base}.hsh
-    hash_into_fasta_id.pl\
-      -fasta ${data_dir}/${base}.${fasta_ext} \
-      -hash ${work_data_dir}/${base}.hsh \
-      -suff_regex \
-      >${work_data_dir}/${base}.fna
-  done
-
-  extra_gff_files="$(ls ${data_extra_dir}/*.${gff_ext})"
-  printf "\nIf there are extra annotation sets (in data_extra), prepare those for analysis.\n"
-  for path in $extra_gff_files; do
-    base=$(basename $path .${gff_ext})
-    base_no_ann=$(echo $base | perl -pe 's/\.ann\d+\.\w+//')
-    cat_or_zcat "${path}" |
-      awk -v OFS="\t" '$3=="mRNA" {print $1, $4, $5, $9}' |
-        perl -pe 's/ID=([^;]+);\S+/$1/' >${work_data_extra_dir}/${base_no_ann}.bed
-  done
-  # add positional information to FASTA ids
-  for path in ${work_data_extra_dir}/*.bed; do
-    base=$(basename $path .bed)
-    awk '{print $4 "\t" $1 "__" $4 "__" $2 "__" $3}' "${path}" \
-      >${work_data_extra_dir}/${base}.hsh
-    hash_into_fasta_id.pl\
-      -fasta ${data_extra_dir}/${base}.${fasta_ext} \
-      -hash ${work_data_extra_dir}/${base}.hsh \
-      -suff_regex \
-      >${work_data_extra_dir}/${base}.fna
-  done
-}
 #
 run_mmseqs() {
   # Do mmseqs clustering on all pairings of annotation sets.
   . "${PANDAGMA_CONF}"
+  canonicalize_paths
+  cd "${PANDAGMA_WORK_DIR}"
   echo; echo "Run mmseqs -- at ${clust_iden} percent identity and minimum of ${clust_cov}% coverage."
   #
-  for qry_path in ${work_data_dir}/*.fna; do
-    qry_base=$(basename $qry_path .fna})
-    for sbj_path in ${work_data_dir}/*.fna; do
-      sbj_base=$(basename $sbj_path .fna)
+  mkdir -p mmseqs mmseqs_tmp
+  for qry_path in ${fasta_files}/*; do
+    qry_base=$(basename ${qry_path%.*})
+    for sbj_path in ${fasta_files}/*; do
+      sbj_base=$(basename ${sbj_path%.*})
       if [[ "$qry_base" > "$sbj_base" ]]; then
          echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
-         mmseqs easy-cluster $qry_path $sbj_path ${mmseqs_dir}/${qry_base}.x.${sbj_base} ${mmseqs_tmp_dir} \
+         mmseqs easy-cluster <(ingest_fasta ${qry_path}) <(ingest_fasta ${sbj_path}) mmseqs/${qry_base}.x.${sbj_base} mmseqs_tmp \
            --min-seq-id $clust_iden \
            -c $clust_cov \
            --cov-mode 0 \
@@ -210,12 +156,14 @@ run_mmseqs() {
 #
 run_filter() {
   echo; echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
-  chr_match_list=${data_dir}/expected_chr_matches.tsv
+  readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
+  cd "${PANDAGMA_WORK_DIR}"
+  mkdir -p dag
   if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
     echo "Filtering on chromosome patterns from file ${chr_match_list}"
-    for mmseqs_path in ${mmseqs_dir}/*_cluster.tsv; do
+    for mmseqs_path in mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
-      filter_mmseqs_by_chroms.pl -chr ${chr_match_list} > ${dag_dir}/${outfilebase}_matches.tsv < "${mmseqs_path}" &
+      filter_mmseqs_by_chroms.pl -chr ${chr_match_list} > dag/${outfilebase}_matches.tsv < ${mmseqs_path} &
 
       # allow to execute up to $NPROC in parallel
       if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
@@ -223,9 +171,9 @@ run_filter() {
     wait # wait for last jobs to finish
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
     echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
-    for mmseqs_path in ${mmseqs_dir}/*_cluster.tsv; do
+    for mmseqs_path in mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
-      perl -pe 's/__/\t/g' > ${dag_dir}/${outfilebase}_matches.tsv < "${mmseqs_path}"
+      perl -pe 's/__/\t/g' > dag/${outfilebase}_matches.tsv < "${mmseqs_path}"
     done
   fi
 }
@@ -233,63 +181,67 @@ run_filter() {
 run_dagchainer() {
   # Identify syntenic blocks, using DAGchainer
   . "${PANDAGMA_CONF}"
-  echo; echo "Run DAGchainer, using args \"${dag_args}\""
-  for match_path in ${dag_dir}/*_matches.tsv; do
+  cd "${PANDAGMA_WORK_DIR}"
+  echo; echo "Run DAGchainer, using args \"${dagchainer_args}\""
+  for match_path in dag/*_matches.tsv; do
     align_file=`basename $match_path _matches.tsv`
     echo "Running DAGchainer on comparison: $align_file"
-    echo "  run_DAG_chainer.pl $dag_args -i $match_path"; echo
+    echo "  run_DAG_chainer.pl $dagchainer_args -i $match_path"; echo
     # run_DAG_chainer.pl writes temp files to cwd;
     # use per-process temp directory to avoid any data race
     (
       tmpdir=$(mktemp -d)
       cd "${tmpdir}"
-      run_DAG_chainer.pl $dag_args -i "${match_path}" 1>/dev/null
+      run_DAG_chainer.pl $dagchainer_args -i "${OLDPWD}/${match_path}" 1>/dev/null
       rmdir ${tmpdir}
     ) &
     # allow to execute up to $NPROC in parallel
     [ $(jobs -r -p | wc -l) -ge ${NPROC} ] && wait -n
   done
   wait # wait for last jobs to finish
+
+  awk '$1!~/^#/ {print $2 "\t" $6}' dag/*_matches.tsv > homology_pairs.tsv
+  awk '$1!~/^#/ {print $2 "\t" $6}' dag/*.aligncoords > synteny_pairs.tsv
+
   #Extract single-linkage synteny anchors
-  printf "matches\tscore\trev\tid1\tid2\n" >${work_dir}/synteny_blocks.tsv
-
-  awk '$1!~/^#/ {print $2 "\t" $6}' ${dag_dir}/*_matches.tsv > ${work_dir}/homology_pairs.tsv
-  awk '$1!~/^#/ {print $2 "\t" $6}' ${dag_dir}/*.aligncoords > ${work_dir}/synteny_pairs.tsv
-
-  for path in ${dag_dir}/*.aligncoords; do
-    awk '/##/ && !/reverse/ {print substr($14,0,length($14)-2) "\t" $10 "\t" 1 "\t" $3 "\t" $5}' "${path}" >> ${work_dir}/synteny_blocks.tsv
-    awk '/##/ &&  /reverse/ {print substr($15,0,length($15)-2) "\t" $11 "\t" 1 "\t" $3 "\t" $5}' "${path}" >> ${work_dir}/synteny_blocks.tsv
-  done
+  printf "matches\tscore\trev\tid1\tid2\n" > synteny_blocks.tsv
+  for path in dag/*.aligncoords; do
+    awk '/##/ && !/reverse/ {print substr($14,0,length($14)-2) "\t" $10 "\t" 1 "\t" $3 "\t" $5}' "${path}"
+    awk '/##/ &&  /reverse/ {print substr($15,0,length($15)-2) "\t" $11 "\t" 1 "\t" $3 "\t" $5}' "${path}"
+  done >> synteny_blocks.tsv
 }
 #
 run_mcl() {
   # Calculate clusters using Markov clustering
   . "${PANDAGMA_CONF}"
+  cd "${PANDAGMA_WORK_DIR}"
   printf "\nCalculate clusters. use Markov clustering with inflation parameter $mcl_inflation and ${NPROC} threads\n"
-  echo "MCL COMMAND: mcl ${work_dir}/synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o ${work_dir}/tmp.syn_pan.clust.tsv"
-  mcl ${work_dir}/synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o ${work_dir}/tmp.syn_pan.clust.tsv \
+  echo "MCL COMMAND: mcl synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv"
+  mcl synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv \
     1>/dev/null
  
   # Add cluster IDs
-  awk -v PRE=${pan_prefix} '{padnum=sprintf("%05d", NR); print PRE padnum "\t" $0}' "${work_dir}"/tmp.syn_pan.clust.tsv > ${work_dir}/syn_pan.clust.tsv
+  awk -v PRE=${pan_prefix} '{padnum=sprintf("%05d", NR); print PRE padnum "\t" $0}' tmp.syn_pan.clust.tsv > syn_pan.clust.tsv
 
   # Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)
-  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' "${work_dir}"/syn_pan.clust.tsv > ${work_dir}/syn_pan.hsh.tsv
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' syn_pan.clust.tsv > syn_pan.hsh.tsv
 }
 #
 run_consense() {
   echo; echo "Calculate a consensus sequence for each pan-gene set, using vsearch."
   echo "Then add previously unclustered sequences into an \"augmented\" pan-gene set, by homology."
   . "${PANDAGMA_CONF}"
-  fasta_files="$(ls ${data_dir}/*.${fasta_ext})"
+  canonicalize_paths
+  cd "${PANDAGMA_WORK_DIR}"
+  mkdir -p pan_consen pan_fasta
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-  get_fasta_from_family_file.pl ${fasta_files} -fam ${work_dir}/syn_pan.clust.tsv -out ${pan_fasta_dir} 
+  get_fasta_from_family_file.pl ${fasta_files} -fam syn_pan.clust.tsv -out pan_fasta
 
   echo "  Calculate consensus sequences for each pan-gene set."
-  ls ${pan_fasta_dir} | xargs -I{} -n 1 -P ${NPROC} \
-    vsearch --cluster_fast ${pan_fasta_dir}/{} --id ${consen_iden} --fasta_width 0 \
-            --consout ${pan_consen_dir}/{} \
+  ls pan_fasta/ | xargs -I{} -n 1 -P ${NPROC} \
+    vsearch --cluster_fast pan_fasta/{} --id ${consen_iden} --fasta_width 0 \
+            --consout pan_consen/{} \
             --quiet \
             --threads 1
 
@@ -297,78 +249,84 @@ run_consense() {
 
   awk 'FNR==1 { nf=split(FILENAME, FN, "/") }
          /^>/ { print ">" FN[nf] " " substr($1,2); next }
-              { print }' ${pan_consen_dir}/* > ${work_dir}/syn_pan_consen.fna
+              { print }' pan_consen/* > syn_pan_consen.fna
       
-  rm ${pan_consen_dir}/*
+  rm pan_consen/*
 
   echo "  Get sorted list of all genes, from the original fasta files"
-  cat_or_zcat ${fasta_files} | awk '/^>/ {print substr($1,2)}' | sort > ${work_dir}/lis.all_genes
+  cat_or_zcat ${fasta_files} | awk '/^>/ {print substr($1,2)}' | sort > lis.all_genes
 
   echo "  Get sorted list of all clustered genes"
-  awk '$1~/^>/ {print $1}' "${pan_fasta_dir}"/* | sed 's/>//' | sort > ${work_dir}/lis.all_clustered_genes
+  awk '$1~/^>/ {print $1}' pan_fasta/* | sed 's/>//' | sort > lis.all_clustered_genes
 
   echo "  Get list of genes not in clusters"
-  comm -13 ${work_dir}/lis.all_clustered_genes ${work_dir}/lis.all_genes > ${work_dir}/lis.genes_not_in_clusters
+  comm -13 lis.all_clustered_genes lis.all_genes > lis.genes_not_in_clusters
 
   echo "  Retrieve the non-clustered genes"
   cat_or_zcat ${fasta_files} |
     get_fasta_subset.pl -in /dev/stdin \
-                        -out ${work_dir}/genes_not_in_clusters.fna \
-                        -lis ${work_dir}/lis.genes_not_in_clusters -clobber
+                        -out genes_not_in_clusters.fna \
+                        -lis lis.genes_not_in_clusters -clobber
 
   echo "  Search non-clustered genes against pan-gene consensus sequences"
-  mmseqs easy-search ${work_dir}/genes_not_in_clusters.fna \
-                     ${work_dir}/syn_pan_consen.fna \
-                     ${work_dir}/unclust.x.all_cons.m8 ${mmseqs_tmp_dir} \
+  mmseqs easy-search genes_not_in_clusters.fna \
+                     syn_pan_consen.fna \
+                     unclust.x.all_cons.m8 mmseqs_tmp \
                      --search-type 3 --cov-mode 5 -c 0.5 1>/dev/null
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
-  top_line.awk ${work_dir}/unclust.x.all_cons.m8 | 
+  top_line.awk unclust.x.all_cons.m8 | 
     awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' |
-    sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  ${work_dir}/syn_pan_leftovers.clust.tsv
+    sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  syn_pan_leftovers.clust.tsv
 
   echo "  Retrieve sequences for the leftover genes"
+  mkdir -p pan_leftovers
   get_fasta_from_family_file.pl ${fasta_files} \
-    -fam ${work_dir}/syn_pan_leftovers.clust.tsv -out ${leftovers_dir}
+    -fam syn_pan_leftovers.clust.tsv -out pan_leftovers/
 
+  cd "${PANDAGMA_WORK_DIR}"
   echo "  Make augmented cluster sets"
-  make_augmented_cluster_sets leftovers_dir=${leftovers_dir} ${pan_fasta_dir}/* > ${work_dir}/syn_pan_augmented.clust.tsv
+  make_augmented_cluster_sets leftovers_dir=pan_leftovers pan_fasta/* > syn_pan_augmented.clust.tsv
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
-  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' ${work_dir}/syn_pan_augmented.clust.tsv > ${work_dir}/syn_pan_augmented.hsh.tsv
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' syn_pan_augmented.clust.tsv > syn_pan_augmented.hsh.tsv
 }
 #
 run_add_extra() {
   echo; echo "Add extra annotation sets to the augmented clusters, by homology"
   . "${PANDAGMA_CONF}"
-  fasta_files="$(ls ${data_extra_dir}/*.${fasta_ext})"
+  canonicalize_paths
 
   echo "  Search non-clustered genes against pan-gene consensus sequences"
-  for path in ${data_extra_dir}/*.${fasta_ext}; do
+  cd "${PANDAGMA_WORK_DIR}"
+  mkdir -p extra_out_dir
+  for path in ${fasta_files_extra}
+  do
     fasta_file=`basename $path` 
     echo "Extra: $fasta_file"
 
-    mmseqs easy-search ${path} \
-                       ${work_dir}/syn_pan_consen.fna \
-                       ${work_extra_out_dir}/${fasta_file}.x.all_cons.m8 ${mmseqs_tmp_dir} \
-                       --search-type 3 --cov-mode 5 -c 0.5 1>/dev/null
+    ingest_fasta "${path}" |
+      mmseqs easy-search /dev/stdin \
+                         syn_pan_consen.fna \
+                         extra_out_dir/${fasta_file}.x.all_cons.m8 mmseqs_tmp/ \
+                         --search-type 3 --cov-mode 5 -c 0.5 1>/dev/null
   done
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
-  > ${work_dir}/syn_pan_extra.clust.tsv
-  top_line.awk "${work_extra_out_dir}"/*.x.all_cons.m8 |
+  top_line.awk extra_out_dir/*.x.all_cons.m8 |
     awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' |
-    sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  ${work_dir}/syn_pan_extra.clust.tsv
+    sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > syn_pan_extra.clust.tsv
 
   echo "  Retrieve sequences for the extra genes"
+  mkdir -p pan_leftovers_extra
   get_fasta_from_family_file.pl ${fasta_files} \
-    -fam ${work_dir}/syn_pan_extra.clust.tsv -out ${leftovers_extra_dir}
+    -fam syn_pan_extra.clust.tsv -out pan_leftovers_extra/
 
   echo "  Make augmented cluster sets"
-  make_augmented_cluster_sets leftovers_dir=${leftovers_dir} ${pan_fasta_dir}/* > ${work_dir}/syn_pan_aug_extra.clust.tsv
+  make_augmented_cluster_sets leftovers_dir=pan_leftovers_extra pan_fasta/* > syn_pan_aug_extra.clust.tsv
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
-  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' ${work_dir}/syn_pan_aug_extra.clust.tsv > ${work_dir}/syn_pan_aug_extra.hsh.tsv
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' syn_pan_aug_extra.clust.tsv > syn_pan_aug_extra.hsh.tsv
 }
 #
 run_summarize() {
@@ -382,11 +340,11 @@ run_summarize() {
       mkdir -p $full_out_dir
   fi
 
-  cp ${work_dir}/synteny_blocks.tsv ${full_out_dir}/
-  cp ${work_dir}/syn_pan.clust.tsv ${full_out_dir}/
-  cp ${work_dir}/syn_pan.hsh.tsv ${full_out_dir}/
-  cp ${work_dir}/syn_pan_consen.fna ${full_out_dir}/
-  cp ${work_dir}/syn_pan_aug*.tsv ${full_out_dir}/
+  cp ${PANDAGMA_WORK_DIR}/synteny_blocks.tsv ${full_out_dir}/
+  cp ${PANDAGMA_WORK_DIR}/syn_pan.clust.tsv ${full_out_dir}/
+  cp ${PANDAGMA_WORK_DIR}/syn_pan.hsh.tsv ${full_out_dir}/
+  cp ${PANDAGMA_WORK_DIR}/syn_pan_consen.fna ${full_out_dir}/
+  cp ${PANDAGMA_WORK_DIR}/syn_pan_aug*.tsv ${full_out_dir}/
 
   printf "Run of program $scriptname, version $version\n\n" > ${stats_file}
 
@@ -499,14 +457,30 @@ clust_cov='0.75'
 consen_iden='0.80'
 mcl_inflation='2'
 dagchainer_args='-g 10000 -M 50 -D 200000 -E 1e-5 -A 6 -s'
-fasta_ext='fna'
-gff_ext='gff3'
 pan_prefix='pan'
 out_dir_base='out'
+
+# space-separated list of GFF & FASTA file paths.
+# The nth listed GFF file corresponds to the nth listed FASTA file.
+
+gff_files='
+# file1.gff.gz
+# file2.gff.gz
+'
+fasta_files='
+# file1.fna.gz
+# file2.fna.gz
+'
+
+# (optional) Extra GFF & FASTA files
+gff_files_extra=''
+fasta_files_extra=''
+
+# (optional) expected_chr_matches file path
+expected_chr_matches=''
 END
 
-  echo "Data directory (for assembly and GFF files): $data_dir"
-  echo "Work directory (for temporary files): $work_dir"; echo
+  echo "Work directory (for temporary files): ${PANDAGMA_WORK_DIR}"; echo
 }
 #
 run() {
@@ -519,7 +493,6 @@ Steps:
    If STEP is not set, the following steps will be run in order,
    otherwise the step is run by itself:
                 init - initialize parameters required for run
-              ingest - get info from matching GFF and FNA files
               mmseqs - run mmseqs for all gene sets
               filter - select gene matches from indicated chromosome pairings
           dagchainer - compute Directed Acyclic Graphs
@@ -530,7 +503,7 @@ Steps:
                        annotation sets that may be of lower or uncertain quality.
            summarize - compute synteny stats
 """
-  commandlist="init ingest mmseqs filter dagchainer mcl consense add_extra summarize"
+  commandlist="init mmseqs filter dagchainer mcl consense add_extra summarize"
   if [ "$#" -eq 0 ]; then # run the whole list
     for package in $commandlist; do
       echo "RUNNING PACKAGE run_$package"
@@ -574,19 +547,6 @@ if [ "$#" -eq 0 ]; then
   echo >&2 "$TOP_DOC"
   exit 0
 fi
-#
-#
-# Create directories if needed
-dirlist="work_dir mmseqs_dir mmseqs_tmp_dir dag_dir pan_fasta_dir \
-         pan_consen_dir leftovers_dir work_data_dir \
-         work_data_extra_dir leftovers_extra_dir work_extra_out_dir"
-for dirvar in $dirlist; do
-    dirname="${!dirvar}"
-    if [ ! -d "$dirname" ]; then
-      echo "creating directory \"${dirname}\" as $dirvar"
-      mkdir -p $dirname
-    fi
-done
 #
 command="$1"
 shift 1
