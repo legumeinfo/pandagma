@@ -1,0 +1,36 @@
+Bootstrap: docker
+From: ubuntu:21.04
+Stage: dagchainer
+
+%post
+    apt update
+    apt install -y --no-install-recommends ca-certificates curl g++ make
+    readonly DAGCHAINER_VERSION=r111120
+    curl -L https://github.com/kullrich/dagchainer/archive/refs/tags/${DAGCHAINER_VERSION}.tar.gz | tar -xzf -
+    cd dagchainer-${DAGCHAINER_VERSION}
+    make
+    mv /usr/local/bin/accessory_scripts/* /usr/local/bin
+    rmdir /usr/local/bin/accessory_scripts
+    rm -rf dagchainer-${DAGCHAINER_VERSION}
+
+
+Bootstrap: docker
+From: ubuntu:21.04
+
+%files from dagchainer
+    /usr/local/bin/* /usr/local/bin
+
+%post
+    apt update
+    apt install -y --no-install-recommends ca-certificates curl libbio-perl-perl mcl mmseqs2 vsearch
+    rm -rf /var/lib/apt/lists/*
+
+    # FIXME: point to a specific tag for reproducibility
+    curl -L https://github.com/legumeinfo/pandagma/archive/refs/heads/singularity.tar.gz | tar -xzf -
+    mv pandagma-*/*.sh /usr/local/bin
+    mv pandagma-*/scripts/* /usr/local/bin
+    chmod +x /usr/local/bin/*
+    rm -rf pandagma-*
+
+%runscript
+    exec /usr/local/bin/pandagma.sh "$@"
