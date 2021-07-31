@@ -84,6 +84,7 @@ canonicalize_paths() {
     fasta_files_extra=($(realpath --canonicalize-existing "${fasta_files_extra[@]}"))
     gff_files_extra=($(realpath --canonicalize-existing "${gff_files_extra[@]}"))
   fi
+  readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
 }
 cat_or_zcat() {
   case ${1} in
@@ -128,8 +129,6 @@ ingest_fasta() {
 #
 run_mmseqs() {
   # Do mmseqs clustering on all pairings of annotation sets.
-  . "${PANDAGMA_CONF}"
-  canonicalize_paths
   cd "${PANDAGMA_WORK_DIR}"
   echo; echo "Run mmseqs -- at ${clust_iden} percent identity and minimum of ${clust_cov}% coverage."
   #
@@ -153,8 +152,6 @@ run_mmseqs() {
 #
 run_filter() {
   echo; echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
-  . "${PANDAGMA_CONF}"
-  readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
   cd "${PANDAGMA_WORK_DIR}"
   mkdir -p dag
   if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
@@ -178,7 +175,6 @@ run_filter() {
 #
 run_dagchainer() {
   # Identify syntenic blocks, using DAGchainer
-  . "${PANDAGMA_CONF}"
   cd "${PANDAGMA_WORK_DIR}"
   echo; echo "Run DAGchainer, using args \"${dagchainer_args}\""
   for match_path in dag/*_matches.tsv; do
@@ -211,7 +207,6 @@ run_dagchainer() {
 #
 run_mcl() {
   # Calculate clusters using Markov clustering
-  . "${PANDAGMA_CONF}"
   cd "${PANDAGMA_WORK_DIR}"
   printf "\nCalculate clusters. use Markov clustering with inflation parameter $mcl_inflation and ${NPROC} threads\n"
   echo "MCL COMMAND: mcl synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv"
@@ -228,8 +223,6 @@ run_mcl() {
 run_consense() {
   echo; echo "Calculate a consensus sequence for each pan-gene set, using vsearch."
   echo "Then add previously unclustered sequences into an \"augmented\" pan-gene set, by homology."
-  . "${PANDAGMA_CONF}"
-  canonicalize_paths
   cd "${PANDAGMA_WORK_DIR}"
   mkdir -p pan_consen pan_fasta
 
@@ -292,9 +285,6 @@ run_consense() {
 #
 run_add_extra() {
   echo; echo "Add extra annotation sets to the augmented clusters, by homology"
-  . "${PANDAGMA_CONF}"
-  canonicalize_paths
-
   echo "  Search non-clustered genes against pan-gene consensus sequences"
   cd "${PANDAGMA_WORK_DIR}"
   mkdir -p extra_out_dir
@@ -327,7 +317,6 @@ run_add_extra() {
 }
 #
 run_summarize() {
-  . "${PANDAGMA_CONF}"
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
   full_out_dir=`echo "$out_dir_base.id${clust_iden}.cov${clust_cov}.I${mcl_inflation}" | perl -pe 's/(\d)\.(\d+)/$1_$2/g'`
   stats_file=${full_out_dir}/stats.txt
@@ -508,6 +497,8 @@ Steps:
            summarize - compute synteny stats
 """
   commandlist="mmseqs filter dagchainer mcl consense add_extra summarize"
+  . "${PANDAGMA_CONF}"
+  canonicalize_paths
   if [ "$#" -eq 0 ]; then # run the whole list
     for package in $commandlist; do
       echo "RUNNING PACKAGE run_$package"
