@@ -38,7 +38,7 @@ which provides anticipated chromosome pairings, e.g.
 These pairings are used in a regular expression to identify terminal portions of molecule IDs, e.g.
   glyma.Wm82.gnm2.Gm01  glyso.PI483463.gnm1.Gs01
   glyma.Wm82.gnm2.Gm13  glyso.W05.gnm1.Chr11
-If \"expected_chr_matches.tsv\" is not provided, then no such filtering will be done.
+If an expected_chr_matches file is not provided, then no such filtering will be done.
 
 At the end of the process, remaining genes will be added to initial clusters, based on homology.
 Remaining genes may be those falling on unanchored scaffolds, or on chromosomes by not part of
@@ -85,6 +85,7 @@ canonicalize_paths() {
     gff_files_extra=($(realpath --canonicalize-existing "${gff_files_extra[@]}"))
   fi
   readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
+  readonly submit_dir=${PWD}
 }
 cat_or_zcat() {
   case ${1} in
@@ -320,6 +321,8 @@ run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
   full_out_dir=`echo "$out_dir_base.id${clust_iden}.cov${clust_cov}.I${mcl_inflation}" | perl -pe 's/(\d)\.(\d+)/$1_$2/g'`
   stats_file=${full_out_dir}/stats.txt
+
+  cd "${submit_dir}"
 
   if [ ! -d "$full_out_dir" ]; then
       echo "creating output directory \"${full_out_dir}/\""
