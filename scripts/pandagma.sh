@@ -16,11 +16,7 @@ export PANDAGMA_WORK_DIR=${PANDAGMA_WORK_DIR:-${PWD}/work}
 
 pandagma_conf_params='clust_iden clust_cov consen_iden mcl_inflation dagchainer_args pan_prefix out_dir_base'
 
-error_exit() {
-  echo >&2 "ERROR -- unexpected exit from ${BASH_SOURCE} script at line:"
-  echo >&2 "   $BASH_COMMAND"
-}
-trap error_exit EXIT
+trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
 TOP_DOC="""Compute pan-gene clusters using the programs mmseqs, dagchainer, and mcl, and
 additional pre- and post-refinement steps.
@@ -60,7 +56,6 @@ Subommands (in order they are usually run):
       run add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
       run summarize - Move results into output directory, and report summary statistics.
-              clean - Delete work directory
 
 Variables in pandagma config file:
     dagchainer_args - Argument for DAGchainer command
@@ -82,12 +77,12 @@ Environment variables:
 # Helper functions begin here
 #
 canonicalize_paths() {
-  fasta_files=$(realpath --canonicalize-existing ${fasta_files})
-  gff_files=$(realpath --canonicalize-existing ${gff_files})
-  fasta_files_extra=${fasta_files_extra:+$(realpath --canonicalize-existing ${fasta_files_extra})}
-  if [ "${fasta_files_extra}" ]
+  fasta_files=($(realpath --canonicalize-existing "${fasta_files[@]}"))
+  gff_files=($(realpath --canonicalize-existing "${gff_files[@]}"))
+  if (( ${#fasta_files_extra[@]} > 0 ))
   then
-    gff_files_extra=$(realpath --canonicalize-existing ${gff_files_extra})
+    fasta_files_extra=($(realpath --canonicalize-existing "${fasta_files_extra[@]}"))
+    gff_files_extra=($(realpath --canonicalize-existing "${gff_files_extra[@]}"))
   fi
 }
 cat_or_zcat() {
@@ -114,6 +109,7 @@ make_augmented_cluster_sets() {
     END { add_leftovers() }' "$@"
 }
 # add positional information to FASTA ids
+# usage: ingest_fasta file.gff[.gz] file.fna[.gz]
 ingest_fasta() {
   cat_or_zcat "${1}" |
     awk -F '\t' -v OFS="\t" '
@@ -123,7 +119,7 @@ ingest_fasta() {
        print ID "\t" $1 "__" ID "__" $4 "__" $5
     }' |
       hash_into_fasta_id.pl\
-        -fasta "${1}" \
+        -fasta "${2}" \
         -hash /dev/stdin \
         -suff_regex
 }
@@ -138,24 +134,26 @@ run_mmseqs() {
   echo; echo "Run mmseqs -- at ${clust_iden} percent identity and minimum of ${clust_cov}% coverage."
   #
   mkdir -p mmseqs mmseqs_tmp
-  for qry_path in ${fasta_files}/*; do
-    qry_base=$(basename ${qry_path%.*})
-    for sbj_path in ${fasta_files}/*; do
-      sbj_base=$(basename ${sbj_path%.*})
-      if [[ "$qry_base" > "$sbj_base" ]]; then
-         echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
-         mmseqs easy-cluster <(ingest_fasta ${qry_path}) <(ingest_fasta ${sbj_path}) mmseqs/${qry_base}.x.${sbj_base} mmseqs_tmp \
+  for (( query = 0; query < ${#fasta_files[@]} - 1; query++ )); do
+    for (( subject = query + 1; subject < ${#fasta_files[@]}; subject++ )); do
+      qry_base=$(basename ${fasta_files[query]%.*})
+      sbj_base=$(basename ${fasta_files[subject]%.*})
+      echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
+      mmseqs easy-cluster \
+           <(ingest_fasta "${gff_files[query]}" "${fasta_files[query]}") \
+           <(ingest_fasta "${gff_files[subject]}" "${fasta_files[subject]}") \
+           mmseqs/${qry_base}.x.${sbj_base} mmseqs_tmp \
            --min-seq-id $clust_iden \
            -c $clust_cov \
            --cov-mode 0 \
            --cluster-reassign 1>/dev/null
-      fi
     done
   done
 }
 #
 run_filter() {
   echo; echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
+  . "${PANDAGMA_CONF}"
   readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
   cd "${PANDAGMA_WORK_DIR}"
   mkdir -p dag
@@ -236,7 +234,7 @@ run_consense() {
   mkdir -p pan_consen pan_fasta
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-  get_fasta_from_family_file.pl ${fasta_files} -fam syn_pan.clust.tsv -out pan_fasta
+  get_fasta_from_family_file.pl "${fasta_files[@]}" -fam syn_pan.clust.tsv -out pan_fasta
 
   echo "  Calculate consensus sequences for each pan-gene set."
   ls pan_fasta/ | xargs -I{} -n 1 -P ${NPROC} \
@@ -254,7 +252,7 @@ run_consense() {
   rm pan_consen/*
 
   echo "  Get sorted list of all genes, from the original fasta files"
-  cat_or_zcat ${fasta_files} | awk '/^>/ {print substr($1,2)}' | sort > lis.all_genes
+  cat_or_zcat "${fasta_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lis.all_genes
 
   echo "  Get sorted list of all clustered genes"
   awk '$1~/^>/ {print $1}' pan_fasta/* | sed 's/>//' | sort > lis.all_clustered_genes
@@ -263,7 +261,7 @@ run_consense() {
   comm -13 lis.all_clustered_genes lis.all_genes > lis.genes_not_in_clusters
 
   echo "  Retrieve the non-clustered genes"
-  cat_or_zcat ${fasta_files} |
+  cat_or_zcat "${fasta_files[@]}" |
     get_fasta_subset.pl -in /dev/stdin \
                         -out genes_not_in_clusters.fna \
                         -lis lis.genes_not_in_clusters -clobber
@@ -281,7 +279,7 @@ run_consense() {
 
   echo "  Retrieve sequences for the leftover genes"
   mkdir -p pan_leftovers
-  get_fasta_from_family_file.pl ${fasta_files} \
+  get_fasta_from_family_file.pl "${fasta_files[@]}" \
     -fam syn_pan_leftovers.clust.tsv -out pan_leftovers/
 
   cd "${PANDAGMA_WORK_DIR}"
@@ -300,16 +298,15 @@ run_add_extra() {
   echo "  Search non-clustered genes against pan-gene consensus sequences"
   cd "${PANDAGMA_WORK_DIR}"
   mkdir -p extra_out_dir
-  for path in ${fasta_files_extra}
+  for path in "${fasta_files_extra[@]}"
   do
-    fasta_file=`basename $path` 
+    fasta_file=`basename ${path%.*}` 
     echo "Extra: $fasta_file"
 
-    ingest_fasta "${path}" |
-      mmseqs easy-search /dev/stdin \
-                         syn_pan_consen.fna \
-                         extra_out_dir/${fasta_file}.x.all_cons.m8 mmseqs_tmp/ \
-                         --search-type 3 --cov-mode 5 -c 0.5 1>/dev/null
+    mmseqs easy-search "${path}" \
+                       syn_pan_consen.fna \
+                       extra_out_dir/${fasta_file}.x.all_cons.m8 mmseqs_tmp/ \
+                       --search-type 3 --cov-mode 5 -c 0.5 1>/dev/null
   done
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
@@ -319,7 +316,7 @@ run_add_extra() {
 
   echo "  Retrieve sequences for the extra genes"
   mkdir -p pan_leftovers_extra
-  get_fasta_from_family_file.pl ${fasta_files} \
+  get_fasta_from_family_file.pl "${fasta_files_extra[@]}" \
     -fam syn_pan_extra.clust.tsv -out pan_leftovers_extra/
 
   echo "  Make augmented cluster sets"
@@ -460,23 +457,30 @@ dagchainer_args='-g 10000 -M 50 -D 200000 -E 1e-5 -A 6 -s'
 pan_prefix='pan'
 out_dir_base='out'
 
-# space-separated list of GFF & FASTA file paths.
+##### (required) list of GFF & FASTA file paths
+# Uncomment add file paths to the the gff_files and fasta_files arrays.
 # The nth listed GFF file corresponds to the nth listed FASTA file.
 
-gff_files='
+#gff_files=(
 # file1.gff.gz
 # file2.gff.gz
-'
-fasta_files='
+#)
+
+#fasta_files=(
 # file1.fna.gz
 # file2.fna.gz
-'
+#)
 
-# (optional) Extra GFF & FASTA files
-gff_files_extra=''
-fasta_files_extra=''
+#### (optional) Extra GFF & FASTA files
+#gff_files_extra=(
+# file1-extra.gff.gz
+#)
 
-# (optional) expected_chr_matches file path
+#fasta_files_extra=(
+# file1-extra.gff.gz
+#)
+
+##### (optional) expected_chr_matches file path
 expected_chr_matches=''
 END
 
@@ -503,7 +507,7 @@ Steps:
                        annotation sets that may be of lower or uncertain quality.
            summarize - compute synteny stats
 """
-  commandlist="init mmseqs filter dagchainer mcl consense add_extra summarize"
+  commandlist="mmseqs filter dagchainer mcl consense add_extra summarize"
   if [ "$#" -eq 0 ]; then # run the whole list
     for package in $commandlist; do
       echo "RUNNING PACKAGE run_$package"
@@ -518,7 +522,6 @@ Steps:
       run_$command $@
       ;;
     $commandlist)
-      trap - EXIT
       echo >&2 "$RUN_DOC"
       if [ "$command" == "-h" ]; then
         exit 0
@@ -534,16 +537,9 @@ version() {
   echo $scriptname $version
 }
 #
-clean() {
-  echo "cleaning work directory and tmpOut files"
-  rm -rf $work_dir 
-  rm -f .*.tmpOut
-}
-#
 # Command-line interpreter.
 #
 if [ "$#" -eq 0 ]; then
-  trap - EXIT
   echo >&2 "$TOP_DOC"
   exit 0
 fi
@@ -551,9 +547,6 @@ fi
 command="$1"
 shift 1
 case $command in
-"clean")
-  clean $@
-  ;;
 "init")
   init $@
   ;;
@@ -564,10 +557,7 @@ case $command in
   version $@
   ;;
 *)
-  trap - EXIT
   echo >&2 "ERROR -- command \"$command\" not recognized."
   exit 1
   ;;
 esac
-trap - EXIT
-exit 0
