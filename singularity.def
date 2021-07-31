@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: ubuntu:21.04
+From: debian:bullseye-slim
 Stage: dagchainer
 
 %post
@@ -15,7 +15,7 @@ Stage: dagchainer
 
 
 Bootstrap: docker
-From: ubuntu:21.04
+From: debian:bullseye-slim
 
 %files from dagchainer
     /usr/local/bin/* /usr/local/bin
