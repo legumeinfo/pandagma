@@ -139,14 +139,17 @@ run_mmseqs() {
       qry_base=$(basename ${fasta_files[query]%.*})
       sbj_base=$(basename ${fasta_files[subject]%.*})
       echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
-      mmseqs easy-cluster \
-           <(ingest_fasta "${gff_files[query]}" "${fasta_files[query]}") \
-           <(ingest_fasta "${gff_files[subject]}" "${fasta_files[subject]}") \
-           mmseqs/${qry_base}.x.${sbj_base} mmseqs_tmp \
-           --min-seq-id $clust_iden \
-           -c $clust_cov \
-           --cov-mode 0 \
-           --cluster-reassign 1>/dev/null
+      {
+         ingest_fasta "${gff_files[query]}" "${fasta_files[query]}"
+         ingest_fasta "${gff_files[subject]}" "${fasta_files[subject]}"
+      } |
+        mmseqs easy-cluster \
+             stdin \
+             mmseqs/${qry_base}.x.${sbj_base} mmseqs_tmp \
+             --min-seq-id $clust_iden \
+             -c $clust_cov \
+             --cov-mode 0 \
+             --cluster-reassign 1>/dev/null
     done
   done
 }
