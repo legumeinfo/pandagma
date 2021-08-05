@@ -6,9 +6,10 @@ gene models (GFFs) for a collection of accessions and/or closely related species
 The script drives several programs that do the primary work of clustering, identifying synteny, and 
 additional searches and refinements. 
 
-Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021
-The pandagma.sh script is derived in part from dagchainer-tool.sh in the azulejo project (joelb123), 
-and also from the workflow described in
+Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021.
+
+The pandagma.sh script is derived in part from dagchainer-tool.sh in the azulejo project by Joel Berendzen (see [GitHub](https://github.com/legumeinfo/azulejo) and [PyPi](https://pypi.org/project/azulejo/), 
+and also from an older version of the workflow, described by Steven Cannon in
 [allelic_pangene_methods.sh](https://github.com/LegumeFederationDataStore/about_the_data_store/blob/master/allelic_pangene_method/notes/allelic_pangene_methods.sh).
 
 The workflow is as follows:
