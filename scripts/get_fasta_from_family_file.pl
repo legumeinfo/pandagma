@@ -52,7 +52,14 @@ foreach my $input_fas ( @ARGV ) {
   chomp($input_fas);
   print "    $input_fas\n";
   
-  my $seqio_obj  = Bio::SeqIO->new(-file => $input_fas , '-format' => 'Fasta');
+  my $seqio_obj;
+  if ($input_fas =~ /.gz$/) {
+    open my $fh, "gzip -dc $input_fas |" or die $!;
+    $seqio_obj = Bio::SeqIO->new(-fh => $fh, -format => 'Fasta');
+  } else {
+    $seqio_obj = Bio::SeqIO->new(-file => $input_fas, -format => 'Fasta');
+  }
+
   while ( my $seq_obj = $seqio_obj->next_seq ) {
     my $display_id = $seq_obj->display_id();
     $seq_hsh{$display_id} = $seq_obj->seq();
