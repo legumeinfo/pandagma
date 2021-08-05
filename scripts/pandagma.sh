@@ -3,10 +3,10 @@
 # Configuration and run script for "pandagma", which generates pan-gene clusters using the programs 
 # mmseqs, dagchainer, mcl, and vsearch. These are used to do the initial clustering, 
 # synteny-finding, and re-clustering.
-# Authors: Steven Cannon, Joel Berendzen, 2020-2021
+# Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021
 #
 scriptname=`basename "$0"`
-version="0.9.1"
+version="0.9.5"
 set -o errexit -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
