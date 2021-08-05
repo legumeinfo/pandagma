@@ -5,6 +5,7 @@ The pandagma.sh script generates pan-gene clusters, given input consisting of co
 gene models (GFFs) for a collection of accessions and/or closely related species.
 The script drives several programs that do the primary work of clustering, identifying synteny, and 
 additional searches and refinements. 
+
 Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021
 The pandagma.sh script is derived in part from dagchainer-tool.sh in the azulejo project (joelb123), 
 and also from the workflow described in
