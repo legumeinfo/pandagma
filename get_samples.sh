@@ -9,6 +9,9 @@
 # in parallel using an indicated proportion of the available cores, as controlled by configuration 
 # of the pandagma.sh script.
 
+set -o errexit
+set -o nounset
+
 # Base URL for LegumeInfo/SoyBase Data Store, for genus Glycine
 url_base="https://legumeinfo.org/data/v2/Glycine"
 
