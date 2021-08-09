@@ -25,7 +25,7 @@ From: debian:bullseye-slim
     apt install -y --no-install-recommends ca-certificates curl libbio-perl-perl mcl mmseqs2 vsearch
     rm -rf /var/lib/apt/lists/*
 
-    # FIXME: point to a specific tag for reproducibility
+    # Build from main branch
     curl -L https://github.com/legumeinfo/pandagma/archive/refs/heads/singularity.tar.gz | tar -xzf -
     mv pandagma-*/*.sh /usr/local/bin
     mv pandagma-*/scripts/* /usr/local/bin

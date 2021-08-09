@@ -103,9 +103,26 @@ pandagma.sh run summarize
 ~~~
 Usage: pandagma.sh SUBCOMMAND [SUBCOMMAND_OPTIONS]
 
-Primary coding sequence (fasta) and annotation (GFF) files must be listed in the
-fasta_files and gff_files variables defined in pandagma.conf, which by default must exist
+Primary coding sequence (fasta) and annotation (GFF3 or 4-column BED) files must be listed in the
+fasta_files and annotation_files variables defined in pandagma.conf, which by default must exist
 within the working directory from where this script is called.
+
+FASTA deflines are assumed to be formatted with the ID separated from any additional fields by a space:
+
+    >id1 ...optional fields...
+
+GFF annotation files must have corresponding IDs specified in mRNA feature ID attributes.
+CDS coordinates are derived from CDS features:
+
+    Chr1	.	mRNA	1111	6666	.	.	.	ID=id1
+    Chr1	.	CDS	2222	3333	.	.	.	Parent=id1
+    Chr1	.	CDS	4444	5555	.	.	.	Parent=id1
+
+GFF files are not required to be sorted.
+
+BED files are assumed to contain a single feature for each primary coding sequence specified, where the coordinates represent the minimum start (0-based) and maximum end positions of the the primary coding sequence in the reference:
+
+	Chr1	2221	5555	id1
 
 Optionally, a file specified in the expected_chr_matches variable can be specified in pandagma.conf,
 which provides anticipated chromosome pairings, e.g.

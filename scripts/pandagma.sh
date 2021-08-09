@@ -7,7 +7,7 @@
 #
 scriptname=`basename "$0"`
 version="0.9.5"
-set -o errexit -o nounset -o pipefail
+set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
 export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
@@ -24,8 +24,8 @@ additional pre- and post-refinement steps.
 Usage:
         pandagma.sh SUBCOMMAND [SUBCOMMAND_OPTIONS]
 
-Primary coding sequence (fasta) and annotation (GFF) files must be listed in the
-fasta_files and gff_files variables defined in pandagma.conf, which by default must exist
+Primary coding sequence (fasta) and annotation (GFF3 or BED) files must be listed in the
+fasta_files and annotation_files variables defined in pandagma.conf, which by default must exist
 within the working directory from where this script is called.
 
 Optionally, a file specified in the expected_chr_matches variable can be specified in pandagma.conf,
@@ -78,11 +78,11 @@ Environment variables:
 #
 canonicalize_paths() {
   fasta_files=($(realpath --canonicalize-existing "${fasta_files[@]}"))
-  gff_files=($(realpath --canonicalize-existing "${gff_files[@]}"))
+  annotation_files=($(realpath --canonicalize-existing "${annotation_files[@]}"))
   if (( ${#fasta_files_extra[@]} > 0 ))
   then
     fasta_files_extra=($(realpath --canonicalize-existing "${fasta_files_extra[@]}"))
-    gff_files_extra=($(realpath --canonicalize-existing "${gff_files_extra[@]}"))
+    annotation_files_extra=($(realpath --canonicalize-existing "${annotation_files_extra[@]}"))
   fi
   readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
   readonly submit_dir=${PWD}
@@ -110,15 +110,34 @@ make_augmented_cluster_sets() {
     /^>/ { printf("\t%s", substr($1,2)) }
     END { add_leftovers() }' "$@"
 }
-# add positional information to FASTA ids
-# usage: ingest_fasta file.gff[.gz] file.fna[.gz]
+# add positional information from GFF3 or 4-column BED to FASTA ids
+# BED start coordinate converted to 1-based
+# usage: ingest_fasta file.[gff[3]|bed][.gz] file.fna[.gz]
 ingest_fasta() {
   cat_or_zcat "${1}" |
-    awk -F '\t' -v OFS="\t" '
-    $3 == "mRNA" {
-        match($9, /ID=[^;]+/)
-        ID=substr($9, RSTART+3, RLENGTH-3)
-       print ID "\t" $1 "__" ID "__" $4 "__" $5
+    awk '
+    BEGIN { FS = OFS = "\t" }
+    NF == 4 { # 4-column BED
+       print $4,  $1 "__" $4 "__" $2 + 1 "__" $3
+       next
+    }
+    NF == 9 && $3 == "CDS" { # GFF3
+        match($9, /Parent=[^;]+/)
+        mRNA_ID=substr($9, RSTART+7, RLENGTH-7)
+        nf = split(transcript_CDS[mRNA_ID], A, ",")
+        if (nf == 0)
+            transcript_CDS[mRNA_ID] = $1 "," $4 "," $5
+        else {
+            if ($4 < A[2]) A[2] = $4 # min start pos
+            if ($5 > A[3]) A[3] = $5 # max end pos
+            transcript_CDS[mRNA_ID] = A[1] "," A[2] "," A[3]
+        }
+    }
+    END {
+        for (mRNA_ID in transcript_CDS) { # if GFF input
+            split(transcript_CDS[mRNA_ID], A, ",")
+            print mRNA_ID, A[1] "__" mRNA_ID "__" A[2] "__" A[3]
+        }
     }' |
       hash_into_fasta_id.pl\
         -fasta "${2}" \
@@ -140,8 +159,8 @@ run_mmseqs() {
       sbj_base=$(basename ${fasta_files[subject]%.*})
       echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
       {
-         ingest_fasta "${gff_files[query]}" "${fasta_files[query]}"
-         ingest_fasta "${gff_files[subject]}" "${fasta_files[subject]}"
+         ingest_fasta "${annotation_files[query]}" "${fasta_files[query]}"
+         ingest_fasta "${annotation_files[subject]}" "${fasta_files[subject]}"
       } |
         mmseqs easy-cluster \
              stdin \
@@ -359,7 +378,7 @@ run_summarize() {
   let "clusters=$(wc -l < ${full_out_dir}/syn_pan.clust.tsv)"
   printf '%-20s\t%s\n' "num_of_clusters" $clusters >> ${stats_file}
 
-  let "largest=$(awk "{print NF-1}" ${full_out_dir}/syn_pan.clust.tsv | head -1)"
+  let "largest=$(awk 'NR == 1 {print NF-1; exit}' ${full_out_dir}/syn_pan.clust.tsv)"
   printf '%-20s\t%s\n' "largest_cluster" $largest >> ${stats_file}
 
   let "mode=$(awk "{print NF-1}" ${full_out_dir}/syn_pan.clust.tsv | \
@@ -452,27 +471,29 @@ dagchainer_args='-g 10000 -M 50 -D 200000 -E 1e-5 -A 6 -s'
 pan_prefix='pan'
 out_dir_base='out'
 
-##### (required) list of GFF & FASTA file paths
-# Uncomment add file paths to the the gff_files and fasta_files arrays.
-# The nth listed GFF file corresponds to the nth listed FASTA file.
+##### (required) list of GFF3/4-column BED & FASTA file paths
+# Uncomment add file paths to the the annotation_files and fasta_files arrays.
+# The nth listed annotation file corresponds to the nth listed FASTA file.
+# Files with a ".gz" suffix are uncompressed on-the-fly; otherwise, file suffix
+# is ignored.
 
-#gff_files=(
+#annotation_files=(
 # file1.gff.gz
-# file2.gff.gz
+# file2.bed.gz
 #)
 
 #fasta_files=(
 # file1.fna.gz
-# file2.fna.gz
+# file2.fa.gz
 #)
 
-#### (optional) Extra GFF & FASTA files
-#gff_files_extra=(
-# file1-extra.gff.gz
+#### (optional) Extra GFF3/BED & FASTA files
+#annotation_files_extra=(
+# file1-extra.gff3.gz
 #)
 
 #fasta_files_extra=(
-# file1-extra.gff.gz
+# file1-extra.fa.gz
 #)
 
 ##### (optional) expected_chr_matches file path
