@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Configuration and run script for "pandagma", which generates pan-gene clusters using the programs 
 # mmseqs, dagchainer, mcl, and vsearch. These are used to do the initial clustering, 
@@ -47,6 +47,7 @@ synteny blocks and so not making it into the synteny-based clusters.
 Subommands (in order they are usually run):
             version - Get installed package version
                init - Initialize parameters required for run
+         run ingest - Prepare the assembly and annotation files for analysis
          run mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
          run filter - Filter the synteny results for chromosome pairings, returning gene pairs.
      run dagchainer - Run DAGchainer to filter for syntenic blocks
@@ -110,67 +111,50 @@ make_augmented_cluster_sets() {
     /^>/ { printf("\t%s", substr($1,2)) }
     END { add_leftovers() }' "$@"
 }
-# add positional information from GFF3 or 4-column BED to FASTA ids
-# BED start coordinate converted to 1-based
-# usage: ingest_fasta file.[gff[3]|bed][.gz] file.fna[.gz]
-ingest_fasta() {
-  cat_or_zcat "${1}" |
-    awk '
-    BEGIN { FS = OFS = "\t" }
-    NF == 4 { # 4-column BED
-       print $4,  $1 "__" $4 "__" $2 + 1 "__" $3
-       next
-    }
-    NF == 9 && $3 == "CDS" { # GFF3
-        match($9, /Parent=[^;]+/)
-        mRNA_ID=substr($9, RSTART+7, RLENGTH-7)
-        nf = split(transcript_CDS[mRNA_ID], A, ",")
-        if (nf == 0)
-            transcript_CDS[mRNA_ID] = $1 "," $4 "," $5
-        else {
-            if ($4 < A[2]) A[2] = $4 # min start pos
-            if ($5 > A[3]) A[3] = $5 # max end pos
-            transcript_CDS[mRNA_ID] = A[1] "," A[2] "," A[3]
-        }
-    }
-    END {
-        for (mRNA_ID in transcript_CDS) { # if GFF input
-            split(transcript_CDS[mRNA_ID], A, ",")
-            print mRNA_ID, A[1] "__" mRNA_ID "__" A[2] "__" A[3]
-        }
-    }' |
-      hash_into_fasta_id.pl\
-        -fasta "${2}" \
-        -hash /dev/stdin \
-        -suff_regex
-}
 #
 # run functions
 #
+run_ingest() {
+# Add positional information from GFF3 or 4-column BED to FASTA IDs
+# BED start coordinate converted to 1-based
+  cd "${PANDAGMA_WORK_DIR}"
+  echo; echo "Run ingest: from fasta and gff or bed data, create fasta with IDs containing positional info."
+  #
+  mkdir -p fasta posn_hsh
+  for (( file_num = 0; file_num < ${#fasta_files[@]} - 1; file_num++ )); do
+    file_base=$(basename ${fasta_files[file_num]%.*})
+    echo "  Adding positional information to fasta file $file_base"
+    cat_or_zcat "${annotation_files[file_num]}" | gff_or_bed_to_hash.awk > posn_hsh/$file_base.hsh
+    hash_into_fasta_id.pl -fasta "${fasta_files[file_num]}" \
+                          -hash posn_hsh/$file_base.hsh \
+                          -suff_regex \
+                          -out fasta/$file_base
+  done
+}
 run_mmseqs() {
   # Do mmseqs clustering on all pairings of annotation sets.
   cd "${PANDAGMA_WORK_DIR}"
   echo; echo "Run mmseqs -- at ${clust_iden} percent identity and minimum of ${clust_cov}% coverage."
   #
   mkdir -p mmseqs mmseqs_tmp
-  for (( query = 0; query < ${#fasta_files[@]} - 1; query++ )); do
-    for (( subject = query + 1; subject < ${#fasta_files[@]}; subject++ )); do
-      qry_base=$(basename ${fasta_files[query]%.*})
-      sbj_base=$(basename ${fasta_files[subject]%.*})
-      echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
-      {
-         ingest_fasta "${annotation_files[query]}" "${fasta_files[query]}"
-         ingest_fasta "${annotation_files[subject]}" "${fasta_files[subject]}"
-      } |
-        mmseqs easy-cluster \
-             stdin \
-             mmseqs/${qry_base}.x.${sbj_base} mmseqs_tmp \
-             --min-seq-id $clust_iden \
-             -c $clust_cov \
-             --cov-mode 0 \
-             --cluster-reassign 1>/dev/null
+  for qry_path in ${PANDAGMA_WORK_DIR}/fasta/*.fna; do
+    qry_base=$(basename $qry_path .fna)
+    for sbj_path in ${PANDAGMA_WORK_DIR}/fasta/*.fna; do
+      sbj_base=$(basename $sbj_path .fna)
+      if [[ "$qry_base" > "$sbj_base" ]]; then
+         echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
+         mmseqs easy-cluster $qry_path $sbj_path mmseqs/${qry_base}.x.${sbj_base} mmseqs_tmp \
+           --min-seq-id $clust_iden \
+           -c $clust_cov \
+           --cov-mode 0 \
+           --cluster-reassign  1>/dev/null &  ## in background, for parallelization  
+
+        # allow to execute up to $n_jobs in parallel
+        if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
+      fi
     done
   done
+  wait # wait for last jobs to finish
 }
 #
 run_filter() {
@@ -513,6 +497,7 @@ Steps:
    If STEP is not set, the following steps will be run in order,
    otherwise the step is run by itself:
                 init - initialize parameters required for run
+              ingest - get info from matching GFF and FNA files
               mmseqs - run mmseqs for all gene sets
               filter - select gene matches from indicated chromosome pairings
           dagchainer - compute Directed Acyclic Graphs
@@ -523,7 +508,7 @@ Steps:
                        annotation sets that may be of lower or uncertain quality.
            summarize - compute synteny stats
 """
-  commandlist="mmseqs filter dagchainer mcl consense add_extra summarize"
+  commandlist="ingest mmseqs filter dagchainer mcl consense add_extra summarize"
   . "${PANDAGMA_CONF}"
   canonicalize_paths
   if [ "$#" -eq 0 ]; then # run the whole list
