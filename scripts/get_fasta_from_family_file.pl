@@ -54,6 +54,7 @@ foreach my $input_fas ( @ARGV ) {
   
   my $seqio_obj;
   if ($input_fas =~ /.gz$/) {
+    # print "    Processing FASTA: $input_fas\n";
     open my $fh, "gzip -dc $input_fas |" or die $!;
     $seqio_obj = Bio::SeqIO->new(-fh => $fh, -format => 'Fasta');
   } else {
@@ -104,4 +105,4 @@ VERSIONS
 
 v01 2017-07-02 Initial version
 v02 2021-07-09 Takes fasta FILES in via stdin. Add option for program to assign fam IDs.
-
+v03 2021-08-09 Process gzipped fasta files.

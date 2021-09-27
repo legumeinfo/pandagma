@@ -6,7 +6,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021
 #
 scriptname=`basename "$0"`
-version="0.9.5"
+version="2021-09-27"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -121,13 +121,12 @@ run_ingest() {
   echo; echo "Run ingest: from fasta and gff or bed data, create fasta with IDs containing positional info."
   #
   mkdir -p fasta posn_hsh
-  for (( file_num = 0; file_num < ${#fasta_files[@]} - 1; file_num++ )); do
+  for (( file_num = 0; file_num < ${#fasta_files[@]} ; file_num++ )); do
     file_base=$(basename ${fasta_files[file_num]%.*})
     echo "  Adding positional information to fasta file $file_base"
     cat_or_zcat "${annotation_files[file_num]}" | gff_or_bed_to_hash.awk > posn_hsh/$file_base.hsh
     hash_into_fasta_id.pl -fasta "${fasta_files[file_num]}" \
                           -hash posn_hsh/$file_base.hsh \
-                          -suff_regex \
                           -out fasta/$file_base
   done
 }
@@ -142,15 +141,12 @@ run_mmseqs() {
     for sbj_path in ${PANDAGMA_WORK_DIR}/fasta/*.fna; do
       sbj_base=$(basename $sbj_path .fna)
       if [[ "$qry_base" > "$sbj_base" ]]; then
-         echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
-         mmseqs easy-cluster $qry_path $sbj_path mmseqs/${qry_base}.x.${sbj_base} mmseqs_tmp \
-           --min-seq-id $clust_iden \
-           -c $clust_cov \
-           --cov-mode 0 \
-           --cluster-reassign  1>/dev/null &  ## in background, for parallelization  
-
-        # allow to execute up to $n_jobs in parallel
-        if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
+        echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
+        { cat $qry_path $sbj_path ; } |
+          mmseqs easy-cluster stdin mmseqs/${qry_base}.x.${sbj_base} mmseqs_tmp \
+           --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null & # background
+          # allow to execute up to $NPROC in parallel
+          if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
       fi
     done
   done
@@ -234,10 +230,11 @@ run_consense() {
   mkdir -p pan_consen pan_fasta
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
+  echo "    Fasta file:" "${fasta_files[@]}"
   get_fasta_from_family_file.pl "${fasta_files[@]}" -fam syn_pan.clust.tsv -out pan_fasta
 
   echo "  Calculate consensus sequences for each pan-gene set."
-  ls pan_fasta/ | xargs -I{} -n 1 -P ${NPROC} \
+  ls pan_fasta | xargs -I{} -n 1 -P ${NPROC} \
     vsearch --cluster_fast pan_fasta/{} --id ${consen_iden} --fasta_width 0 \
             --consout pan_consen/{} \
             --quiet \

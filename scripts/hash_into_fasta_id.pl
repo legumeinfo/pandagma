@@ -42,9 +42,6 @@ GetOptions (
 die "$usage\n" unless (defined($fasta_file) and defined($hash_file));
 die "$usage\n" if ($help);
 
-my $REX = "$suff_regex";
- #print "[$suff_regex] [$REX]\n";
-
 # read hash in
 open(my $HSH, '<', $hash_file) or die "can't open in input_hash, $hash_file: $!";
 my %hash;
@@ -79,7 +76,7 @@ while ( my $seq = $in->next_seq ) {
   my $base_id = $display_id;
   my $suffix = "";
   if (defined($suff_regex)) {
-    $display_id =~ m/(.+)($REX)$/;
+    $display_id =~ m/(.+)($suff_regex)$/;
     $base_id = $1;
     $suffix = $2;
     #print "\n[$base_id] [$suffix]\n"
@@ -112,7 +109,12 @@ while ( my $seq = $in->next_seq ) {
       }
   }
 }
-print "\n";
+if (defined($out_file)) {
+  print $OUT ">";
+}
+else {
+  print ">";
+}
 
 __END__
 

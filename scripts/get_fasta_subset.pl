@@ -1,5 +1,4 @@
 #!/usr/bin/env perl
-# #!/usr/bin/env perl
 
 # PROGRAM: get_fasta_subset.pl
 # VERSION: see version notes at bottom of file.
