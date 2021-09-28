@@ -75,6 +75,9 @@ pandagma.sh init
 
 # NOTE: modify pandagma.conf before continuing
 
+# get info from matching GFF/BED and FNA files
+pandagma.sh run ingest
+
 # do mmseqs on all pairings of annotation sets
 pandagma.sh run mmseqs
 
@@ -143,6 +146,7 @@ synteny blocks and so not making it into the synteny-based clusters.
 Subommands (in order they are usually run):
             version - Get installed package version
                init - Initialize parameters required for run
+         run ingest - Prepare the assembly and annotation files for analysis
          run mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
          run filter - Filter the synteny results for chromosome pairings, returning gene pairs.
      run dagchainer - Run DAGchainer to filter for syntenic blocks

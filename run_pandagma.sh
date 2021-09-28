@@ -4,11 +4,9 @@ pandagma.sh version
 # Set initial default values
 pandagma.sh init
 
-# Override default values for some variables
-#pandagma.sh config clust_iden 0.98
-#pandagma.sh config mcl_inflation 2
+# NOTE: modify pandagma.conf before continuing
 
-# get info from matching GFF and FNA files
+# get info from matching GFF/BED and FNA files
 pandagma.sh run ingest
 
 # do mmseqs on all pairings of annotation sets
