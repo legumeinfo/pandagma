@@ -26,7 +26,7 @@ From: debian:bullseye-slim
     rm -rf /var/lib/apt/lists/*
 
     # Build from main branch
-    curl -L https://github.com/legumeinfo/pandagma/archive/refs/heads/singularity.tar.gz | tar -xzf -
+    curl -L https://github.com/legumeinfo/pandagma/archive/refs/heads/main.tar.gz | tar -xzf -
     mv pandagma-*/*.sh /usr/local/bin
     mv pandagma-*/scripts/* /usr/local/bin
     chmod +x /usr/local/bin/*

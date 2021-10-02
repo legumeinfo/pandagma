@@ -29,12 +29,16 @@ To build a [Singularity](https://singularity.hpcng.org/) container image from th
 
 Where the `--remote` option is used if building the image as an unprivileged user using (by default) the [Sylabs Cloud Remote Builder](https://cloud.sylabs.io/builder).
 
-To run pandamga using singularity, prefix the `pandagma.sh run` commands with `singularity exec pandagma.sif`, optionally setting environment variables, e.g.:
+(Optional) To download the Glycine sample data into data/ and data_extra/:
 
-    singularity exec pandagma.sif init
+    singularity exec pandagma.sif get_samples.sh
+
+To run pandamga using singularity, use `singularity run pandagma.sif [run command]`, optionally setting environment variables, e.g.:
+
+    singularity run pandagma.sif init
     ... modify pandagma.conf ...
     mkdir /path/to/pandagma/work_dir # create work dir on fast, node-local storage
-    singularity exec --env NPROC=<number of cpus> --env PANDAGMA_WORK_DIR=/path/to/work/dir pandagma.sif pandagma.sh run
+    singularity run --env NPROC=<number of cpus> --env PANDAGMA_WORK_DIR=/path/to/work/dir pandagma.sif run
 
 ## Installation of scripts and dependencies (manual)
 
