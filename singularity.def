@@ -8,9 +8,7 @@ Stage: dagchainer
     readonly DAGCHAINER_VERSION=r111120
     curl -L https://github.com/kullrich/dagchainer/archive/refs/tags/${DAGCHAINER_VERSION}.tar.gz | tar -xzf -
     cd dagchainer-${DAGCHAINER_VERSION}
-    make
-    mv /usr/local/bin/accessory_scripts/* /usr/local/bin
-    rmdir /usr/local/bin/accessory_scripts
+    make PREFIX=/usr/local/dagchainer
     rm -rf dagchainer-${DAGCHAINER_VERSION}
 
 
@@ -18,7 +16,10 @@ Bootstrap: docker
 From: debian:bullseye-slim
 
 %files from dagchainer
-    /usr/local/bin/* /usr/local/bin
+    /usr/local/dagchainer
+
+%environment
+    export PATH=/usr/local/dagchainer/bin:/usr/local/dagchainer/bin/accessory_scripts:${PATH}
 
 %post
     apt update
