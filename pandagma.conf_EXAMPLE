@@ -11,14 +11,14 @@ out_dir_base='out'
 # The nth listed GFF file corresponds to the nth listed FASTA file.
 
 annotation_files=(
-  data/glyma.FiskebyIII.gnm1.ann1.SS25.gene_models_main.bed.gz
-  data/glyma.Lee.gnm1.ann1.6NZV.gene_models_main.bed.gz
-  data/glyma.Wm82.gnm2.ann1.RVB6.gene_models_main.bed.gz
+  data/glyma.FiskebyIII.gnm1.ann1.SS25.primaryTranscript.bed.gz
+  data/glyma.Lee.gnm1.ann1.6NZV.primaryTranscript.bed.gz
+  data/glyma.Wm82.gnm2.ann1.RVB6.primaryTranscript.bed.gz
   data/glyma.Wm82.gnm2.ann2.BG1Q.gene_models_gmap_match.bed.gz
-  data/glyma.Wm82.gnm4.ann1.T8TQ.gene_models_main.bed.gz
-  data/glyma.Zh13.gnm1.ann1.8VV3.gene_models_main.bed.gz
-  data/glyso.PI483463.gnm1.ann1.3Q3Q.gene_models_main.bed.gz
-  data/glyso.W05.gnm1.ann1.T47J.gene_models_main.bed.gz
+  data/glyma.Wm82.gnm4.ann1.T8TQ.primaryTranscript.bed.gz
+  data/glyma.Zh13.gnm1.ann1.8VV3.primaryTranscript.bed.gz
+  data/glyso.PI483463.gnm1.ann1.3Q3Q.primaryTranscript.bed.gz
+  data/glyso.W05.gnm1.ann1.T47J.primaryTranscript.bed.gz
 )
 
 fasta_files=(
@@ -34,9 +34,9 @@ fasta_files=(
 
 ### (optional) Extra GFF & FASTA files
 annotation_files_extra=(
-  data_extra/glyma.Jinyuan_IGA1006.gnm1.ann1.2NNX.gene_models_main.bed.gz
-  data_extra/glyma.Wm82.gnm1.ann1.DvBy.gene_models_main.bed.gz
-  data_extra/glyma.Zh13.gnm2.ann1.FJ3G.gene_models_main.bed.gz
+  data_extra/glyma.Jinyuan_IGA1006.gnm1.ann1.2NNX.primaryTranscript.bed.gz
+  data_extra/glyma.Wm82.gnm1.ann1.DvBy.primaryTranscript.bed.gz
+  data_extra/glyma.Zh13.gnm2.ann1.FJ3G.primaryTranscript.bed.gz
 )
 
 fasta_files_extra=(
