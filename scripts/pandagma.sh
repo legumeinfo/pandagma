@@ -6,7 +6,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021
 #
 scriptname=`basename "$0"`
-version="2021-09-27"
+version="2021-10-07"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -115,7 +115,7 @@ make_augmented_cluster_sets() {
 # run functions
 #
 run_ingest() {
-# Add positional information from GFF3 or 4-column BED to FASTA IDs
+# Add positional information from GFF3 or 4- or 6-column BED to FASTA IDs
 # BED start coordinate converted to 1-based
   cd "${PANDAGMA_WORK_DIR}"
   echo; echo "Run ingest: from fasta and gff or bed data, create fasta with IDs containing positional info."

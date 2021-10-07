@@ -8,9 +8,9 @@
 #     
 # OPERANDS
 #     INPUT_FILE
-#         A file containing GFF or four-column BED data
+#         A file containing GFF or four- or six-column BED data
 BEGIN { FS = OFS = "\t" }
-NF == 4 { # 4-column BED
+NF == 4 || NF == 6 { # 4- or 6-column BED
    print $4,  $1 "__" $4 "__" $2 + 1 "__" $3
    next
 }
