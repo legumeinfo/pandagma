@@ -6,7 +6,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021
 #
 scriptname=`basename "$0"`
-version="2021-10-07"
+version="2021-10-21"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -34,7 +34,7 @@ which provides anticipated chromosome pairings, e.g.
   02 02
   ...
   11 13  # allows for translocation between 11 and 13
-  13 11  # allows for translocation between 13 and 11
+  12 12
 These pairings are used in a regular expression to identify terminal portions of molecule IDs, e.g.
   glyma.Wm82.gnm2.Gm01  glyso.PI483463.gnm1.Gs01
   glyma.Wm82.gnm2.Gm13  glyso.W05.gnm1.Chr11
@@ -129,6 +129,12 @@ run_ingest() {
                           -hash posn_hsh/$file_base.hsh \
                           -out fasta/$file_base
   done
+  # Also get position information from the "extra" annotation sets, if any.
+  for (( file_num = 0; file_num < ${#fasta_files_extra[@]} ; file_num++ )); do
+    file_base=$(basename ${fasta_files_extra[file_num]%.*})
+    echo "  Adding positional information to extra fasta file $file_base"
+    cat_or_zcat "${annotation_files_extra[file_num]}" | gff_or_bed_to_hash.awk > posn_hsh/$file_base.hsh
+  done
 }
 run_mmseqs() {
   # Do mmseqs clustering on all pairings of annotation sets.
@@ -161,7 +167,7 @@ run_filter() {
     echo "Filtering on chromosome patterns from file ${chr_match_list}"
     for mmseqs_path in mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
-      filter_mmseqs_by_chroms.pl -chr ${chr_match_list} > dag/${outfilebase}_matches.tsv < ${mmseqs_path} &
+      filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > dag/${outfilebase}_matches.tsv < ${mmseqs_path} &
 
       # allow to execute up to $NPROC in parallel
       if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
@@ -240,11 +246,15 @@ run_consense() {
             --quiet \
             --threads 1
 
-  echo "  Combine consensus sequences into one multifasta file"
+  echo "  Combine consensus sequences into one multifasta file."
+  echo "  If there are multiple consensus sequences in a cluster, pick the one with the"
+  echo "  largest number of constituent sequences, as a representative."
 
   awk 'FNR==1 { nf=split(FILENAME, FN, "/") }
          /^>/ { print ">" FN[nf] " " substr($1,2); next }
-              { print }' pan_consen/* > syn_pan_consen.fna
+              { print }' pan_consen/* | fasta_to_table.awk |
+    perl -pe 's/^(\S+) (centroid=[^;]+;seqs=)(\d+)/$1\t$2\t$3/' | sort -k1,1 -k3nr,3nr | 
+    top_line.awk | perl -pe 's/^(\S+)\t(\S+)\t(\d+)\t/>$1 $2$3\n/' > syn_pan_consen.fna
       
   rm pan_consen/*
 
@@ -270,6 +280,8 @@ run_consense() {
                      --search-type 3 --cov-mode 5 -c 0.5 1>/dev/null
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
+  echo "  Use consensus identity ($consen_iden) rather than clust_iden ($clust_iden),"
+  echo "  as the former is typically more permissive."
   top_line.awk unclust.x.all_cons.m8 | 
     awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' |
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  syn_pan_leftovers.clust.tsv
@@ -308,21 +320,48 @@ run_add_extra() {
     awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' |
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > syn_pan_extra.clust.tsv
 
+  echo "  Retrieve sequences for the syn_pan_augmented genes (from \"run consense\")"
+  mkdir -p pan_augmented
+  get_fasta_from_family_file.pl "${fasta_files[@]}" \
+    -fam syn_pan_augmented.clust.tsv -out pan_augmented/
+
   echo "  Retrieve sequences for the extra genes"
   mkdir -p pan_leftovers_extra
   get_fasta_from_family_file.pl "${fasta_files_extra[@]}" \
     -fam syn_pan_extra.clust.tsv -out pan_leftovers_extra/
 
   echo "  Make augmented cluster sets"
-  make_augmented_cluster_sets leftovers_dir=pan_leftovers_extra pan_fasta/* > syn_pan_aug_extra.clust.tsv
+  make_augmented_cluster_sets leftovers_dir=pan_leftovers_extra pan_augmented/* > syn_pan_aug_extra.clust.tsv
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
-  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' syn_pan_aug_extra.clust.tsv > syn_pan_aug_extra.hsh.tsv
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' syn_pan_aug_extra.clust.tsv > syn_pan_aug_extra.tmp
+
+  echo "  Make a version of the hash output that contains positional information"
+  join -a 1 -1 2 -2 1 <(sort -k2,2 syn_pan_aug_extra.tmp) <(cat posn_hsh/*hsh | sort -k1,1) | 
+    perl -pe 's/__/\t/g; s/ /\t/g' | awk -v OFS="\t" '{print $2, $1, $3, $5, $6}' |
+    sort -k1,1 -k2,2 > syn_pan_aug_extra.hsh.tsv
+
+  echo "  Generate a report of observed chromosome pairs"
+  cat syn_pan_aug_extra.hsh.tsv | 
+    awk 'BEGIN{IGNORECASE=1} $3!~/scaff|sc|pilon|mito|chl|unanchor/ {print $1 "\t" $3}' |
+    perl -pe 's/\w+\.\w+\.\w+\.\D+(\d+)/$1/' | sort | uniq | pile_against_col1.awk |
+    perl -pe 's/^\S+\t//' | sort | uniq -c | perl -pe 's/^ +(\d+)\s/$1\t/' | sort -k1n,1n |
+    awk -v OFS="\t" 'NF==4 {print $1, $2, $3 "\n" $1, $2, $4 "\n" $1, $3, $4}
+                   NF==5 {print $1, $2, $3 "\n" $1, $2, $4 "\n" $1, $2, $5;
+                          print $1, $3, $4 "\n" $1, $3, $5; print $1, $4, $5}
+                   NF<4 || NF>5 {print}' |
+    awk -v OFS="\t" 'NF==2 {print $1, $2, $2} NF>2 {print}' | sort -k2n,2n -k3n,3n |
+    awk -v OFS="\t" 'NR==1 {sum=$1; prev2=$2; prev3=$3}
+                     NR>1 && prev2==$2 && prev3==$3 {sum+=$1; prev2=$2; prev3=$3}
+                     NR>1 && prev2!=$2 || prev3!=$3 {print sum, prev2, prev3; prev2=$2; prev3=$3; sum=$1}
+                     END{print sum, prev2, prev3}' |
+    sort -k1nr,1nr -k2n,2n -k3n,3n | sed '/^[[:space:]]*$/d' > observed_chr_pairs.tsv
 }
 #
 run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
-  full_out_dir=`echo "$out_dir_base.id${clust_iden}.cov${clust_cov}.I${mcl_inflation}" | perl -pe 's/(\d)\.(\d+)/$1_$2/g'`
+  full_out_dir=`echo "$out_dir_base.id${clust_iden}.cov${clust_cov}.cons${consen_iden}.I${mcl_inflation}" |
+                       perl -pe 's/0\.(\d+)/$1/g'`
   stats_file=${full_out_dir}/stats.txt
 
   cd "${submit_dir}"
@@ -337,6 +376,7 @@ run_summarize() {
   cp ${PANDAGMA_WORK_DIR}/syn_pan.hsh.tsv ${full_out_dir}/
   cp ${PANDAGMA_WORK_DIR}/syn_pan_consen.fna ${full_out_dir}/
   cp ${PANDAGMA_WORK_DIR}/syn_pan_aug*.tsv ${full_out_dir}/
+  cp ${PANDAGMA_WORK_DIR}/observed_chr_pairs.tsv ${full_out_dir}/
 
   printf "Run of program $scriptname, version $version\n\n" > ${stats_file}
 
@@ -417,19 +457,19 @@ run_summarize() {
 
   # histograms
   if [ -f ${full_out_dir}/syn_pan.clust.tsv ]; then
-    printf "\nCounts of initial clusters by cluster size:\n" >> ${stats_file}
+    printf "\nCounts of initial clusters by cluster size, file syn_pan.clust.tsv:\n" >> ${stats_file}
     awk '{print NF-1}' ${full_out_dir}/syn_pan.clust.tsv |
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
   fi
 
   if [ -f ${full_out_dir}/syn_pan_augmented.clust.tsv ]; then
-    printf "\nCounts of augmented clusters by cluster size:\n" >> ${stats_file}
+    printf "\nCounts of augmented clusters by cluster size, file syn_pan_augmented.clust.tsv:\n" >> ${stats_file}
     awk '{print NF-1}' ${full_out_dir}/syn_pan_augmented.clust.tsv |
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
   fi
 
   if [ -f ${full_out_dir}/syn_pan_aug_extra.clust.tsv ]; then
-    printf "\nCounts of augmented-extra clusters by cluster size:\n" >> ${stats_file}
+    printf "\nCounts of augmented-extra clusters by cluster size, file syn_pan_aug_extra.clust.tsv:\n" >> ${stats_file}
     awk '{print NF-1}' ${full_out_dir}/syn_pan_aug_extra.clust.tsv |
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
   fi
