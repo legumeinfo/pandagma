@@ -42,8 +42,7 @@ cd $base_dir/data/
   curl -O $url_base/soja/annotations/W05.gnm1.ann1.T47J/glyso.W05.gnm1.ann1.T47J.cds_primaryTranscript.fna.gz
   curl -O $url_base/soja/annotations/W05.gnm1.ann1.T47J/glyso.W05.gnm1.ann1.T47J.cds.bed.gz
 
-## data_extra
-cd $base_dir/data_extra
+# "extra" sets
   curl -O $url_base/max/annotations/Wm82.gnm1.ann1.DvBy/glyma.Wm82.gnm1.ann1.DvBy.cds_primaryTranscript.fna.gz
   curl -O $url_base/max/annotations/Wm82.gnm1.ann1.DvBy/glyma.Wm82.gnm1.ann1.DvBy.cds.bed.gz
 
