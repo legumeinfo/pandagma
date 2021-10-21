@@ -10,10 +10,11 @@ use warnings;
 use Getopt::Long;
 use File::Basename;
 
-my ($chr_pat, $help);
+my ($chr_pat, $verbose, $help);
 
 GetOptions (
   "chr_pat=s" =>  \$chr_pat,   # required
+  "verbose"  =>   \$verbose,
   "help" =>       \$help
 );
 
@@ -30,7 +31,6 @@ my $usage = <<EOS;
   Example from chr_pat ...
     11 11
     13 11
-    11 13
     20 20
   ... to match these gene ID pairs (genes, starts, and ends have placeholders here):
   glyma.Wm82.gnm2.Gm11__gene__start__end  glyma.Wm82.gnm2.Gm11__gene__start__end
@@ -40,7 +40,8 @@ my $usage = <<EOS;
 
   Flags and parameters:
    -chr_pat -- regex for filtering chromosomes in two fields, as indicated above **
-   -help       for more info
+   -verbose -- for some intermediate output to STDERR
+   -help    --  for more info
    
    ** = required
 EOS
@@ -53,34 +54,50 @@ open( my $PAT_IN, '<', $chr_pat ) or die "can't open chr_pat $chr_pat: $!";
 my %rexen;
 while (<$PAT_IN>){ # two fields, e.g. "01 01"
   chomp;
-  next if (/^#/);
+  next if (/^#/ || /^$/);
   my $line = $_;
-  $line =~ s/\s+/ /; # separate the two fields by a single space, if not already
-  $line =~ s/(\S+)\s+(\S+)/\\S+$1 \\S+$2/;
-  my $chr_rex = qr($line);
+  my ($left, $right) = split(/\s+/);
+  
+  my $chr_rex;
+  # Store the pattern for later regex use
+  $chr_rex = qr(\S+\D$left \S+\D$right$);
+  if ($verbose) {print "$left $right; $chr_rex\n"}
   $rexen{$chr_rex}++;
+
+  # Store the reverse pattern, if the left and right chroms are not the same
+  if ($left ne $right) {
+    $chr_rex = qr(\S+\D$right \S+\D$left$);
+    if ($verbose) {print "$right $left; $chr_rex\n"}
+    $rexen{$chr_rex}++;
+  }
 }
 
 # Process homology data, comparing to the stored chr patterns
 while (my $line = <>) {
+  $line =~ s/>//g; # data shouldn't have ">", but do this to make sure.
   my ($gene1, $gene2) = split(/\t/, $line);
   my @parts1 = split(/__/, $gene1);
   my @parts2 = split(/__/, $gene2);
   my $matches = 0;
   foreach my $chr_rex (keys %rexen){
+    if ($verbose){print "TEST: $parts1[0] $parts2[0] =~ /$chr_rex/\n"}
     if ("$parts1[0] $parts2[0]" =~ /$chr_rex/){
-      #print $line;
       print join("\t", @parts1), "\t", join("\t", @parts2);
       $matches++;
+      
     }
   }
   if ($matches == 0) {
     next;
     #print "NO MATCH:"$parts1[1]\t$parts2[1]\n";
   }
+  if ($verbose){print "\n"}
 }
 
 __END__
 VERSIONS
 v0.01 2021-07-11 S. Cannon. 
+v0.02 2021-10-15 strip ">" from data
+v0.03 2021-10-19 For matches between different chromosomes, handle both directions, e.g. 11 13 and 13 11
+                 and terminate regexes with "$" to ensure match of chromosome number, not preceding text
 
