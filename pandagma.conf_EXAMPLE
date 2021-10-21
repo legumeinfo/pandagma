@@ -34,15 +34,15 @@ fasta_files=(
 
 ### (optional) Extra GFF & FASTA files
 annotation_files_extra=(
-  data_extra/glyma.Jinyuan_IGA1006.gnm1.ann1.2NNX.cds.bed.gz
-  data_extra/glyma.Wm82.gnm1.ann1.DvBy.cds.bed.gz
-  data_extra/glyma.Zh13.gnm2.ann1.FJ3G.cds.bed.gz
+  data/glyma.Jinyuan_IGA1006.gnm1.ann1.2NNX.cds.bed.gz
+  data/glyma.Wm82.gnm1.ann1.DvBy.cds.bed.gz
+  data/glyma.Zh13.gnm2.ann1.FJ3G.cds.bed.gz
 )
 
 fasta_files_extra=(
-  data_extra/glyma.Jinyuan_IGA1006.gnm1.ann1.2NNX.cds.fna.gz
-  data_extra/glyma.Wm82.gnm1.ann1.DvBy.cds_primaryTranscript.fna.gz
-  data_extra/glyma.Zh13.gnm2.ann1.FJ3G.cds_primaryTranscript.fna.gz
+  data/glyma.Jinyuan_IGA1006.gnm1.ann1.2NNX.cds.fna.gz
+  data/glyma.Wm82.gnm1.ann1.DvBy.cds_primaryTranscript.fna.gz
+  data/glyma.Zh13.gnm2.ann1.FJ3G.cds_primaryTranscript.fna.gz
 )
 
 #### (optional) expected_chr_matches file path
