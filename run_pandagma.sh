@@ -27,6 +27,12 @@ pandagma.sh run consense
 # Add extra annotation sets, by homology to prior clusters
 pandagma.sh run add_extra
 
+# Assign pan-gene names with consensus chromosome and position information
+pandagma.sh run name_pangenes
+
+# Calculate observed chromosome pairs
+pandagma.sh run calc_chr_pairs
+
 # Move results into output directory, and report some summary statistics
 pandagma.sh run summarize
 
