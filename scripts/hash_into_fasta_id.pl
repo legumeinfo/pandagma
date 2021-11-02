@@ -109,12 +109,6 @@ while ( my $seq = $in->next_seq ) {
       }
   }
 }
-if (defined($out_file)) {
-  print $OUT ">";
-}
-else {
-  print ">";
-}
 
 __END__
 
@@ -124,3 +118,4 @@ Versions
 v01 2014-05-21 New script, derived from hash_into_fasta_description.pl
 v02 2018-02-09 Handle suffixes (e.g. for splice variants)
 v03 2019-05-07 Print original ID if no hash is found
+v04 2021-11-01 Don't print final ">" without ID or sequence!
