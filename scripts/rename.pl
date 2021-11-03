@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# rename -- change filenames
+# rename.pl -- change filenames
 use strict;
 use warnings;
 
