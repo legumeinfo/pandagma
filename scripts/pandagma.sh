@@ -159,7 +159,7 @@ run_ingest() {
 
   # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end.
   # Depends on four-part prefix form of the names, e.g. glyma.Wm82.gnm2.ann2.BG1Q.cds_primary.fna
-  cat tmp.gene_count_start_0 | perl -pe 's/^(\w+\.\w+\.\w+\.\w+)\.\S+\t(\d+)/$1\t$2/' | sort > tmp.gene_count_start
+  cat tmp.gene_count_start_0 | perl -pe 's/^([^.]+\.[^.]+\.[^.]+\.[^.]+)\.\S+\t(\d+)/$1\t$2/' | sort > tmp.gene_count_start
   rm tmp.gene_count_start_0
 }
 
@@ -597,7 +597,7 @@ run_summarize() {
 
   # Print per-annotation-set coverage stats (sequence counts, sequences retained), if stats-extra flag is set
   if [ ${extra_stats,,} = "yes" ]; then
-    cut -f2 ${PANDAGMA_WORK_DIR}/syn_pan_aug_extra.hsh.tsv | perl -pe 's/(\w+\.\w+\.\w+\.\w+)\..+/$1/' | 
+    cut -f2 ${PANDAGMA_WORK_DIR}/syn_pan_aug_extra.hsh.tsv | perl -pe 's/([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+/$1/' | 
       sort | uniq -c | awk '{print $2 "\t" $1}' > ${PANDAGMA_WORK_DIR}/tmp.gene_count_end
 
     # tmp.gene_count_start was generated during run_ingest
