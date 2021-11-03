@@ -197,8 +197,8 @@ run_filter() {
       outfilebase=`basename $mmseqs_path _cluster.tsv`
       filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > dag/${outfilebase}_matches.tsv < ${mmseqs_path} &
 
-      # allow to execute up to $MMSEQSTHREADS in parallel
-      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+      # allow to execute up to $NPROC in parallel
+      if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
     done
     wait # wait for last jobs to finish
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
@@ -445,7 +445,7 @@ run_name_pangenes() {
     sort -k2,2 -k3n,3n | name_ordered_genes.awk > consen_${consen_prefix}.tsv
 
   echo "  Reshape defline into a hash, e.g. pan47789	Glycine.pan3.chr01__Glycine.pan3.chr01_000100__45224__45786"
-  cat consen_Glycine.pan3.tsv | 
+  cat consen_${consen_prefix}.tsv | 
     perl -pe 's/^(\S+)\t([^.]+\.[^.]+)\.(chr\d+)_(\d+)\t(\d+)\t(\d+)/$1\t$2.$3__$2.$3_$4__$5__$6/' > consen_posn.hsh
 
   echo "  Hash position information into fasta file"
@@ -483,8 +483,8 @@ run_calc_chr_pairs() {
   echo "  Generate a report of observed chromosome pairs"
 
   cat syn_pan_aug_extra.hsh.tsv | 
-    awk 'BEGIN{IGNORECASE=1} $3!~/scaff|sc|pilon|mito|chl|unanchor/ {print $1 "\t" $3}' |
-    perl -pe 's/\w+\.\w+\.\w+\.\D+(\d+)/$1/' | sort | uniq | pile_against_col1.awk |
+    awk 'BEGIN{IGNORECASE=1} $3!~/cont|scaff|sc|pilon|mito|chl|unanchor/ {print $1 "\t" $3}' |
+    perl -pe 's/(^\S+)\t.+\.\D+(\d+)/$1\t$2/' | sort | uniq | pile_against_col1.awk |
     perl -pe 's/^\S+\t//' | sort | uniq -c | perl -pe 's/^ +(\d+)\s/$1\t/' | sort -k1n,1n |
     awk -v OFS="\t" 'NF==4 {print $1, $2, $3 "\n" $1, $2, $4 "\n" $1, $3, $4}
                    NF==5 {print $1, $2, $3 "\n" $1, $2, $4 "\n" $1, $2, $5;
