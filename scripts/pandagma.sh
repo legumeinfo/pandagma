@@ -351,7 +351,7 @@ run_add_extra() {
        -fam 14_syn_pan_extra.clust.tsv -out 16_pan_leftovers_extra/
   
     echo "  Make augmented cluster sets"
-    augment_cluster_sets.awk leftovers_dir=16_pan_leftovers_extra 07_pan_augmented/* |
+    augment_cluster_sets.awk leftovers_dir=16_pan_leftovers_extra 15_pan_augmented/* |
       cat > 17_syn_pan_aug_extra.clust.tsv
 
     echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
