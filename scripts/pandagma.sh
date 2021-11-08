@@ -6,7 +6,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021
 #
 scriptname=`basename "$0"`
-version="2021-11-02"
+version="2021-11-04"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -441,7 +441,7 @@ run_name_pangenes() {
     sort -k1,1 -k2,2 > syn_pan_aug_extra.hsh.tsv
 
   echo "  Calculate consensus pan-gene positions"
-  consen_pangene_posn.pl -pre ${consen_prefix}.chr syn_pan_aug_extra.hsh.tsv | 
+  cat syn_pan_aug_extra.hsh.tsv | consen_pangene_posn.pl -pre ${consen_prefix}.chr |
     sort -k2,2 -k3n,3n | name_ordered_genes.awk > consen_${consen_prefix}.tsv
 
   echo "  Reshape defline into a hash, e.g. pan47789	Glycine.pan3.chr01__Glycine.pan3.chr01_000100__45224__45786"
@@ -483,8 +483,8 @@ run_calc_chr_pairs() {
   echo "  Generate a report of observed chromosome pairs"
 
   cat syn_pan_aug_extra.hsh.tsv | 
-    awk 'BEGIN{IGNORECASE=1} $3!~/cont|scaff|sc|pilon|mito|chl|unanchor/ {print $1 "\t" $3}' |
-    perl -pe 's/(^\S+)\t.+\.\D+(\d+)/$1\t$2/' | sort | uniq | pile_against_col1.awk |
+    awk 'BEGIN{IGNORECASE=1} $3!~/cont|scaff|sc|pilon|mito|mt|cp|chl|unanchor/ {print $1 "\t" $3}' |
+    perl -pe 's/(^\S+)\t.+\.\D+(\d+\.*\d*)/$1\t$2/' | sort | uniq | pile_against_col1.awk |
     perl -pe 's/^\S+\t//' | sort | uniq -c | perl -pe 's/^ +(\d+)\s/$1\t/' | sort -k1n,1n |
     awk -v OFS="\t" 'NF==4 {print $1, $2, $3 "\n" $1, $2, $4 "\n" $1, $3, $4}
                    NF==5 {print $1, $2, $3 "\n" $1, $2, $4 "\n" $1, $2, $5;
