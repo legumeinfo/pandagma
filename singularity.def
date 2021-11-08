@@ -23,7 +23,7 @@ From: debian:bullseye-slim
 
 %post
     apt update
-    apt install -y --no-install-recommends ca-certificates curl libbio-perl-perl mcl mmseqs2 vsearch
+    apt install -y --no-install-recommends ca-certificates curl libbio-perl-perl mcl mmseqs2 
     rm -rf /var/lib/apt/lists/*
 
     # Build from main branch
