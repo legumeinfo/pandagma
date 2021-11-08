@@ -9,20 +9,13 @@ my $PROGRAM_NAME = basename($0);
 my $PROGRAM_VERSION = "v01";
 
 my $usage = <<EOS;
-Given a tabular file of pan-genes, with pan-gene ID in the first column and constituent gene IDs
-in the second column, followed by genomic positions in the remaining columns, report the 
-consensus chromosome for each pan-gene, and average position for genes with the consensus 
-chromosome for that pan-gene.
+Given five-column input with pan-IDs, gene IDs, and genomic positional information,
+report consensus chromosome for each pan-gene, and average position for genes with 
+the consensus chromosome for that pan-gene.
 
-Usage: $PROGRAM_NAME [options] syn_pan_aug_extra.hsh.tsv
-
-Usage: cat STRING_OF_NUMS or STRING_OF_IDS_AND_NUMS | consen_pangene_posn.awk -filename FILE
-   consen_pangene_posn.awk - Given a tabular pan-gene file with chromosomes and positions,
-                             sorted by pan-gene ID, identify a consensus genomic position.
+Usage: cat PANGENE_TABLE | consen_pangene_posn.pl [options]
    Input has five columns:
      panID  geneID  chr  gene_start  gene_end
-
-  REQUIRED: five-column tabular pan-gene file
 
   OPTIONS:
     -outfile  Specify OUT_FH; otherwise, default to STDOUT.
@@ -42,26 +35,27 @@ GetOptions (
   "help" =>      \$help,
 );
 
-die "\n$usage\n" if ( $help or not $ARGV[0] );
+#die "\n$usage\n" if ( $help or not -t STDIN );
+die "\n$usage\n" if ( $help );
 
-my ($inputfile) = ($ARGV[0]);
-unless ($inputfile) { die "\n$usage\n";}
 my $logstr;
 
-my ($IN_FH, $OUT_FH);
-open ($IN_FH, "<", $inputfile) or die "\nUnable to open input file for reading: $!\n\n";
+my $OUT_FH;
 if ($outfile) { open ($OUT_FH, ">", $outfile) or die "\nUnable to open output file for writing: $!\n\n"; }
 
 # Put file into an array, and get count of each scaffold
 my %count_panID_chr;
 my %HoH_panID_chr;
-while (<$IN_FH>) {
+my @pangene_table;
+while (<>) {
   chomp;
   next unless (/^\S+/);
-  my ($panID, $geneID, $chr, $start, $end) = split(/\t/);
-  next if ($chr =~ /chloro|mito|pilon|scaff|sc\d+|un\w+\d+/i);
-  $chr =~ s/\S+\.\D+(\d+)/$1/;
+  my $line = $_;
+  my ($panID, $geneID, $chr, $start, $end) = split(/\t/, $line);
+  next if ($chr =~ /chloro|chl|CP|mito|MT|pilon|scaff|sc\d+|un\w+\d+/i);
+  $chr =~ s/\S+\.\D+(\d+\.*\d*)/$1/;
   $HoH_panID_chr{$panID}{$chr}++;
+  push(@pangene_table, $line);
 }
 
 my %top_chr;
@@ -95,14 +89,12 @@ if ($OUT_FH){
 } else {
   print "#pangeneID\ttop_chr\tmedian_start\tmedian_end\n";
 }
-seek $IN_FH, 0, 0;
+
 my %starts_per_top_chr_HoA;
 my %ends_per_top_chr_HoA;
-while (<$IN_FH>) {
-  chomp;
-  next unless (/^\S+/);
+foreach (@pangene_table) {
   my ($panID, $geneID, $chr, $start, $end) = split(/\t/);
-  next if ($chr =~ /chloro|mito|pilon|scaff|sc\d+|un\w+\d+/i);
+  next if ($chr =~ /chloro|chl|CP|mito|MT|pilon|scaff|sc\d+|un\w+\d+/i);
   $chr =~ s/\S+\.\D+(\d+)/$1/;
   if ($chr eq $top_chr{$panID}){
     push @{ $starts_per_top_chr_HoA{$panID} }, $start;
@@ -153,6 +145,6 @@ sub calc_average {
 __END__
 2021
 
-v01 10-29 initial version.
-
+v01 10-29 Initial version.
+v01 11-04 Read from STDIN rather than file
 
