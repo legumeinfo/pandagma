@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021
 #
 scriptname=`basename "$0"`
-version="2021-11-08"
+version="2021-11-09"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -66,7 +66,7 @@ Variables in pandagma config file:
     dagchainer_args - Argument for DAGchainer command
          clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
           clust_cov - Minimum coverage for mmseqs clustering [0.60]
-        consen_iden - Minimum identity threshold for vsearch consensus generation [0.80]
+        consen_iden - Minimum identity threshold for consensus generation [0.80]
          extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [90]
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
       consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
@@ -119,6 +119,8 @@ run_ingest() {
   # For use when calculating stats at the end, count genes in CDS files
     cat /dev/null > stats/tmp.gene_count_start_0
     cat /dev/null > stats/tmp.fasta_list
+    start_time=`date`
+    printf "Run started at: $start_time\n" > stats/tmp.timing
 
   for (( file_num = 0; file_num < ${#fasta_files[@]} ; file_num++ )); do
     file_base=$(basename ${fasta_files[file_num]%.*})
@@ -356,9 +358,7 @@ run_add_extra() {
 
     echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
     perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 17_syn_pan_aug_extra.clust.tsv |
-      cat > 18_syn_pan_aug_extra.tmp
-      # 18_syn_pan_aug_extra.tmp is the main pangene hash file; but it is named "tmp" because 
-      # it will be used later, in run_name_pangenes
+      cat > 17_syn_pan_aug_extra.hsh.tsv
 
     echo "  Merge fasta sets"
     mkdir -p 19_pan_aug_leftover_merged
@@ -401,7 +401,7 @@ run_add_extra() {
   else  # no "extra" fasta files, so just promote the syn_pan_aug files as syn_pan_aug_extra
         # TO DO: handle this better, i.e. report that no "extra" files were provided and skip these "aug" files.
     cp 12_syn_pan_aug.clust.tsv 17_syn_pan_aug_extra.clust.tsv
-    cp 12_syn_pan_aug.hsh.tsv 18_syn_pan_aug_extra.tmp
+    cp 12_syn_pan_aug.hsh.tsv 17_syn_pan_aug_extra.hsh.tsv
     cp 08_pan_fasta_clust_rep_seq_subcl.$faext 21_pan_fasta_clust_rep_seq_subcl.$faext
     #cp syn_pan_cent.$faext syn_pan_cent_merged.$faext
 fi
@@ -411,12 +411,12 @@ run_name_pangenes() {
   cd "${PANDAGMA_WORK_DIR}"
 
   echo "  Add positional information to the hash output."
-  join -a 1 -1 2 -2 1 <(sort -k2,2 18_syn_pan_aug_extra.tmp) <(cat 01_posn_hsh/*hsh | sort -k1,1) | 
+  join -a 1 -1 2 -2 1 <(sort -k2,2 17_syn_pan_aug_extra.hsh.tsv) <(cat 01_posn_hsh/*hsh | sort -k1,1) | 
     perl -pe 's/__/\t/g; s/ /\t/g' | awk -v OFS="\t" '{print $2, $1, $3, $5, $6}' |
-    sort -k1,1 -k2,2 > 18_syn_pan_aug_extra.hsh.tsv
+    sort -k1,1 -k2,2 > 18_syn_pan_aug_extra_posn.hsh.tsv
 
   echo "  Calculate consensus pan-gene positions"
-  cat 18_syn_pan_aug_extra.hsh.tsv | consen_pangene_posn.pl -pre ${consen_prefix}.chr |
+  cat 18_syn_pan_aug_extra_posn.hsh.tsv | consen_pangene_posn.pl -pre ${consen_prefix}.chr |
     sort -k2,2 -k3n,3n | name_ordered_genes.awk > consen_${consen_prefix}.tsv
 
   echo "  Reshape defline into a hash, e.g. pan47789	Glycine.pan3.chr01__Glycine.pan3.chr01_000100__45224__45786"
@@ -452,7 +452,7 @@ run_calc_chr_pairs() {
   cd "${PANDAGMA_WORK_DIR}"
   echo "  Generate a report of observed chromosome pairs"
 
-  cat 18_syn_pan_aug_extra.hsh.tsv | 
+  cat 18_syn_pan_aug_extra_posn.hsh.tsv | 
     awk 'BEGIN{IGNORECASE=1} $3!~/cont|scaff|sc|pilon|mito|mt|cp|chl|unanchor/ {print $1 "\t" $3}' |
     perl -pe 's/(^\S+)\t.+\.\D+(\d+\.*\d*)/$1\t$2/' | sort | uniq | pile_against_col1.awk |
     perl -pe 's/^\S+\t//' | sort | uniq -c | perl -pe 's/^ +(\d+)\s/$1\t/' | sort -k1n,1n |
@@ -488,7 +488,17 @@ run_summarize() {
   cp ${PANDAGMA_WORK_DIR}/consen_${consen_prefix}.tsv ${full_out_dir}/
   cp ${PANDAGMA_WORK_DIR}/22_syn_pan_cent_merged_posn.$faext ${full_out_dir}/
 
-  printf "Run of program $scriptname, version $version\n\n" > ${stats_file}
+  printf "Run of program $scriptname, version $version\n" > ${stats_file}
+
+  end_time=`date`
+  cat ${PANDAGMA_WORK_DIR}/stats/tmp.timing >> ${stats_file}
+  printf "Run ended at:   $end_time\n\n" >> ${stats_file}
+
+  if [[ $faext =~ na || $faext =~ fas ]] ; then 
+    printf "Fasta extension is $faext; looks like NUCLEOTIDE files\n\n" >> ${stats_file}
+  else 
+    printf "Fasta extension is $faext; looks like PROTEIN\n\n" >> ${stats_file}
+  fi
 
   printf "Parameter  \tvalue\n" >> ${stats_file}
   for key in ${pandagma_conf_params}; do
@@ -555,7 +565,7 @@ run_summarize() {
       sort -n | uniq -c | sort -n | tail -1 | awk '{print $1}')"
     printf '%-20s\t%s\n' "num_at_mode" $numB_at_mode >> ${stats_file}
     
-    let "seqs_clustered=$(wc -l ${full_out_dir}/18_syn_pan_aug_extra.hsh.tsv | awk '{print $1}')"
+    let "seqs_clustered=$(wc -l ${full_out_dir}/18_syn_pan_aug_extra_posn.hsh.tsv | awk '{print $1}')"
     printf '%-20s\t%s\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
   fi
 
@@ -565,7 +575,7 @@ run_summarize() {
 
   # Print per-annotation-set coverage stats (sequence counts, sequences retained), if stats-extra flag is set
   if [ ${extra_stats,,} = "yes" ]; then
-    cut -f2 ${PANDAGMA_WORK_DIR}/18_syn_pan_aug_extra.hsh.tsv | perl -pe 's/([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+/$1/' | 
+    cut -f2 ${PANDAGMA_WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv | perl -pe 's/([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+/$1/' | 
       sort | uniq -c | awk '{print $2 "\t" $1}' > ${PANDAGMA_WORK_DIR}/stats/tmp.gene_count_end
 
     # tmp.gene_count_start was generated during run_ingest
