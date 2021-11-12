@@ -1,0 +1,4 @@
+# Ignore the following
+/data/*gz
+/data_extra/*gz
+out*
