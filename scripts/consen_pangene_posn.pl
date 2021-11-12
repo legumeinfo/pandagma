@@ -52,7 +52,7 @@ while (<>) {
   next unless (/^\S+/);
   my $line = $_;
   my ($panID, $geneID, $chr, $start, $end) = split(/\t/, $line);
-  next if ($chr =~ /chloro|chl|CP|mito|MT|pilon|scaff|sc\d+|un\w+\d+/i);
+  next if ($chr =~ /chloro|chl|CP|mito|MT|ctg|contig|pilon|scaff|sc\d+|un\w+\d+/i);
   $chr =~ s/\S+\.\D+(\d+\.*\d*)/$1/;
   $HoH_panID_chr{$panID}{$chr}++;
   push(@pangene_table, $line);
@@ -94,7 +94,7 @@ my %starts_per_top_chr_HoA;
 my %ends_per_top_chr_HoA;
 foreach (@pangene_table) {
   my ($panID, $geneID, $chr, $start, $end) = split(/\t/);
-  next if ($chr =~ /chloro|chl|CP|mito|MT|pilon|scaff|sc\d+|un\w+\d+/i);
+  next if ($chr =~ /chloro|chl|CP|mito|MT|ctg|contig|pilon|scaff|sc\d+|un\w+\d+/i);
   $chr =~ s/\S+\.\D+(\d+)/$1/;
   if ($chr eq $top_chr{$panID}){
     push @{ $starts_per_top_chr_HoA{$panID} }, $start;
