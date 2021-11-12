@@ -14,12 +14,13 @@ and also from an older version of the workflow, described by Steven Cannon in
 
 The workflow is as follows:
 * Add positional information to the gene IDs
-* Find gene pairings (using mmseqs2 rather than BLAST)
+* Find gene homologies among pairs of annotation sets, using mmseqs2
 * Filter by synteny (DAGChainer) -- and, optionally, by a list of allowed chromosome pairings.
 * Cluster (mcl)
-* Calculate consensus sequences from the initial clusters (vsearch)
-* Add back the genes that were excluded to this point (mmseqs2)
-* Add "extra" annotation sets by homology (mmseqs2)
+* Calculate consensus sequences from the initial clusters 
+* Add back the genes that were excluded to this point 
+* Add "extra" annotation sets by homology 
+* Calculate and report statistics
 
 ## Installation by creating a Singularity container image (recommended)
 
@@ -47,7 +48,7 @@ The scripts should be added to your path - either by copying them to a directory
 (e.g. `export PATH=$PATH:~/src/pandagma/scripts` ... if that is where you have them).
 
 Also, these dependencies are required: 
-  bioperl, mmseqs, dagchainer, mcl, and vsearch. 
+  bioperl, mmseqs, dagchainer, and mcl.
 These need to be installed and available in the script's environment.
 
 Installing the dependencies is up to you. They can be installed via a suitable package manager. 
@@ -57,7 +58,6 @@ For example, using conda:
   conda install -n pandagma -c conda-forge -c bioconda perl-bioperl-core
   conda install -n pandagma -c conda-forge -c bioconda dagchainer
   conda install -n pandagma -c conda-forge -c bioconda mcl
-  conda install -n pandagma -c conda-forge -c bioconda vsearch
   conda install -n pandagma -c conda-forge -c bioconda mmseqs2
   conda activate pandagama
 ~~~
