@@ -11,9 +11,11 @@ use Getopt::Long;
 use File::Basename;
 
 my ($chr_pat, $verbose, $help);
+my $noself = "true";
 
 GetOptions (
   "chr_pat=s" =>  \$chr_pat,   # required
+  "noself"    =>  \$noself,
   "verbose"  =>   \$verbose,
   "help" =>       \$help
 );
@@ -28,7 +30,7 @@ my $usage = <<EOS;
   filter on patterns in the two chromosomes, provided in an input file
   via the flag -chr_pat .
   
-  Example from chr_pat ...
+  Example1 from chr_pat file ...
     11 11
     13 11
     20 20
@@ -38,10 +40,20 @@ my $usage = <<EOS;
   glyso.W05.gnm1.Chr11__gene__start__end  glyma.Wm82.gnm2.Gm13__gene__start__end
   glyma.Wm82.gnm2.Gm13__gene__start__end  glyso.W05.gnm1.Chr11__gene__start__end
 
+  Example2 from chr_pat file ...
+    1 1
+    9 10
+    10 10
+  ... to match these gene ID pairs (genes, starts, and ends have placeholders here):
+  Zm-CML103_NAM-1.chr1__gene_start_end  Zm-Oh7B_NAM-1.chr1__gene_start_end
+  Zm-CML103_NAM-1.chr10__gene_start_end  Zm-Oh7B_NAM-1.chr10__gene_start_end
+  Zm-Oh7B_NAM-1.chr9__gene_start_end  Zm-CML103_NAM-1.chr10__gene_start_end  
+
   Flags and parameters:
-   -chr_pat -- regex for filtering chromosomes in two fields, as indicated above **
+   -chr_pat -- file with regex for filtering chromosomes in two fields, as indicated above **
+   -noself  -- boolean requiring that chromosome IDs to not match [true]
    -verbose -- for some intermediate output to STDERR
-   -help    --  for more info
+   -help    -- for this info
    
    ** = required
 EOS
@@ -78,13 +90,17 @@ while (my $line = <>) {
   my ($gene1, $gene2) = split(/\t/, $line);
   my @parts1 = split(/__/, $gene1);
   my @parts2 = split(/__/, $gene2);
+  my $chr1 = $parts1[0];
+  my $chr2 = $parts2[0];
+  if ($noself){
+    next if ($chr1 eq $chr2);
+  }
   my $matches = 0;
   foreach my $chr_rex (keys %rexen){
-    if ($verbose){print "TEST: $parts1[0] $parts2[0] =~ /$chr_rex/\n"}
-    if ("$parts1[0] $parts2[0]" =~ /$chr_rex/){
+    if ($verbose){print "TEST: $chr1 $chr2 =~ /$chr_rex/\n"}
+    if ("$chr1 $chr2" =~ /$chr_rex/){
       print join("\t", @parts1), "\t", join("\t", @parts2);
       $matches++;
-      
     }
   }
   if ($matches == 0) {
@@ -100,4 +116,4 @@ v0.01 2021-07-11 S. Cannon.
 v0.02 2021-10-15 strip ">" from data
 v0.03 2021-10-19 For matches between different chromosomes, handle both directions, e.g. 11 13 and 13 11
                  and terminate regexes with "$" to ensure match of chromosome number, not preceding text
-
+v0.04 2021-10-19 Add "noself" flag
