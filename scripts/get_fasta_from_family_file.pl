@@ -54,7 +54,7 @@ foreach my $input_fas ( @ARGV ) {
   
   my $seqio_obj;
   if ($input_fas =~ /.gz$/) {
-    # print "    Processing FASTA: $input_fas\n";
+    print "    Processing FASTA: $input_fas\n";
     open my $fh, "gzip -dc $input_fas |" or die $!;
     $seqio_obj = Bio::SeqIO->new(-fh => $fh, -format => 'Fasta');
   } else {
