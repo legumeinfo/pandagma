@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021
 #
 scriptname=`basename "$0"`
-version="2021-11-09"
+version="2021-11-10"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -116,8 +116,10 @@ run_ingest() {
   
   mkdir -p 02_fasta 01_posn_hsh stats
 
-  # For use when calculating stats at the end, count genes in CDS files
-    cat /dev/null > stats/tmp.gene_count_start_0
+    # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end.
+    # Reqjires chromosome names to be prefixed with the annotation name, separated by dot from chr/scaff number
+    # e.g. glyma.FiskebyIII.gnm1.Gm11  or  Zm-B73_GRAMENE-4
+    cat /dev/null > stats/tmp.gene_count_start
     cat /dev/null > stats/tmp.fasta_list
     start_time=`date`
     printf "Run started at: $start_time\n" > stats/tmp.timing
@@ -129,10 +131,22 @@ run_ingest() {
     hash_into_fasta_id.pl -fasta "${fasta_files[file_num]}" \
                           -hash 01_posn_hsh/$file_base.hsh \
                           -out 02_fasta/$file_base
+    annot_name=$(head -1 02_fasta/$file_base | perl -pe 's/>(.+)__.+__\d+__\d+$/$1/' | perl -pe 's/(.+)\.[^.]+$/$1/')
     cat_or_zcat "${fasta_files[file_num]}" | 
-      awk -v FILE=$file_base '$1~/^>/ {ct++} END{print FILE "\t" ct}' >> stats/tmp.gene_count_start_0
+      awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
     echo "Main:   $file_base" >> stats/tmp.fasta_list
   done
+
+  # Determine if the sequence looks like nucleotide or like protein. Set default type as NUC
+  SEQTYPE="NUC"
+  someseq=$(head 02_fasta/$file_base | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
+  proportion_nuc=$(echo $someseq | fold -w1 | awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
+  if (( $(bc <<< "$proportion_nuc > 0.9") )); then
+    echo "Sequence type: nucleotide" > stats/tmp.seq_type
+  else
+    echo "Sequence type: protein" > stats/tmp.seq_type
+    SEQTYPE="PEP"
+  fi
 
   # Also get position information from the "extra" annotation sets, if any.
   if (( ${#fasta_files_extra[@]} > 0 ))
@@ -141,39 +155,38 @@ run_ingest() {
       file_base=$(basename ${fasta_files_extra[file_num]%.*})
       echo "  Adding positional information to extra fasta file $file_base"
       cat_or_zcat "${annotation_files_extra[file_num]}" | gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
+      hash_into_fasta_id.pl -fasta "${fasta_files_extra[file_num]}" \
+                            -hash 01_posn_hsh/$file_base.hsh \
+                            -out 02_fasta/$file_base
+      annot_name=$(head -1 02_fasta/$file_base | perl -pe 's/>(.+)__.+__\d+__\d+$/$1/' | perl -pe 's/(.+)\.[^.]+$/$1/')
       cat_or_zcat "${fasta_files_extra[file_num]}" | 
-        awk -v FILE=$file_base '$1~/^>/ {ct++} END{print FILE "\t" ct}' >> stats/tmp.gene_count_start_0
+        awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
       echo "Extra:  $file_base" >> stats/tmp.fasta_list
     done
   fi
 
-  # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end.
-  # Depends on four-part prefix form of the names, e.g. glyma.Wm82.gnm2.ann2.BG1Q.cds_primary.faa
-  cat stats/tmp.gene_count_start_0 | 
-    perl -pe 's/^([^.]+\.[^.]+\.[^.]+\.[^.]+)\.\S+\t(\d+)/$1\t$2/' | sort > stats/tmp.gene_count_start
-  rm stats/tmp.gene_count_start_0
+  sort -o stats/tmp.gene_count_start stats/tmp.gene_count_start
 }
 
 run_mmseqs() {
-  # Do mmseqs clustering on all pairings of annotation sets.
+  # Do mmseqs clustering on all pairings of the main annotation sets (not the extra ones though)
   cd "${PANDAGMA_WORK_DIR}"
   echo; echo "Run mmseqs -- at ${clust_iden} percent identity and minimum of ${clust_cov}% coverage."
   #
 
   mkdir -p 03_mmseqs 03_mmseqs_tmp
-  for qry_path in ${PANDAGMA_WORK_DIR}/02_fasta/*.$faext; do
-    qry_base=$(basename $qry_path .$faext)
-    for sbj_path in ${PANDAGMA_WORK_DIR}/02_fasta/*.$faext; do
-      sbj_base=$(basename $sbj_path .$faext)
-      if [[ "$qry_base" > "$sbj_base" ]]; then
-        echo "Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
-        { cat $qry_path $sbj_path ; } |
-          mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} 03_mmseqs_tmp \
-           --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null & # background
-          # allow to execute up to $MMSEQSTHREADS in parallel
-          if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
-      fi
+  for (( file1_num = 0; file1_num < ${#fasta_files[@]} ; file1_num++ )); do
+    qry_base=$(basename ${fasta_files[file1_num]%.*} .$faext)
+    for (( file2_num = $( expr $file1_num + 1 ); file2_num < ${#fasta_files[@]} ; file2_num++ )); do
+      sbj_base=$(basename ${fasta_files[file2_num]%.*} .$faext)
+      echo "  Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
+      { cat 02_fasta/$qry_base.$faext 02_fasta/$sbj_base.$faext ; } |
+        mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} 03_mmseqs_tmp \
+         --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null & # background
+        # allow to execute up to $MMSEQSTHREADS in parallel
+        if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
     done
+    echo
   done
   wait # wait for last jobs to finish
 }
@@ -186,7 +199,8 @@ run_filter() {
     echo "Filtering on chromosome patterns from file ${chr_match_list}"
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
-      filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${outfilebase}_matches.tsv < ${mmseqs_path} &
+      echo "  $outfilebase"
+      cat ${mmseqs_path} | filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${outfilebase}_matches.tsv &
 
       # allow to execute up to $NPROC in parallel
       if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
@@ -453,7 +467,7 @@ run_calc_chr_pairs() {
   echo "  Generate a report of observed chromosome pairs"
 
   cat 18_syn_pan_aug_extra_posn.hsh.tsv | 
-    awk 'BEGIN{IGNORECASE=1} $3!~/cont|scaff|sc|pilon|mito|mt|cp|chl|unanchor/ {print $1 "\t" $3}' |
+    awk 'BEGIN{IGNORECASE=1} $3!~/cont|scaff|sc|pilon|ctg|contig|mito|mt|cp|chl|unanchor|unkn/ {print $1 "\t" $3}' |
     perl -pe 's/(^\S+)\t.+\.\D+(\d+\.*\d*)/$1\t$2/' | sort | uniq | pile_against_col1.awk |
     perl -pe 's/^\S+\t//' | sort | uniq -c | perl -pe 's/^ +(\d+)\s/$1\t/' | sort -k1n,1n |
     awk -v OFS="\t" 'NF==4 {print $1, $2, $3 "\n" $1, $2, $4 "\n" $1, $3, $4}
@@ -464,15 +478,19 @@ run_calc_chr_pairs() {
     awk -v OFS="\t" 'NR==1 {sum=$1; prev2=$2; prev3=$3}
                      NR>1 && prev2==$2 && prev3==$3 {sum+=$1; prev2=$2; prev3=$3}
                      NR>1 && prev2!=$2 || prev3!=$3 {print sum, prev2, prev3; prev2=$2; prev3=$3; sum=$1}
+                     END{print sum, prev2, prev3}' | sort -k2,3 |
+    awk -v OFS="\t" 'NR==1 {sum=$1; prev2=$2; prev3=$3}
+                     NR>1 && $2==prev2 && $3==prev3 {sum+=$1; prev2=$2; prev3=$3} 
+                     NR>1 && $2!=prev2 || $3!=prev3 {print sum, prev2, prev3; sum=$1; prev2=$2; prev3=$3}
                      END{print sum, prev2, prev3}' |
     sort -k1nr,1nr -k2n,2n -k3n,3n | sed '/^[[:space:]]*$/d' > observed_chr_pairs.tsv
 }
 
 run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
-  full_out_dir=`echo "$out_dir_base.id${clust_iden}.cov${clust_cov}.cns${consen_iden}.ext${extra_iden}.I${mcl_inflation}" |
-                       perl -pe 's/0\.(\d+)/$1/g'`
-  stats_file=${full_out_dir}/stats.txt
+  param_string="${SEQTYPE}.id${clust_iden}.cov${clust_cov}.cns${consen_iden}.ext${extra_iden}.I${mcl_inflation}"
+  full_out_dir=$(echo "$out_dir_base.$param_string" | perl -pe 's/0\.(\d+)/$1/g')
+  stats_file=${full_out_dir}/stats.$param_string.txt
 
   cd "${submit_dir}"
 
@@ -494,11 +512,8 @@ run_summarize() {
   cat ${PANDAGMA_WORK_DIR}/stats/tmp.timing >> ${stats_file}
   printf "Run ended at:   $end_time\n\n" >> ${stats_file}
 
-  if [[ $faext =~ na || $faext =~ fas ]] ; then 
-    printf "Fasta extension is $faext; looks like NUCLEOTIDE files\n\n" >> ${stats_file}
-  else 
-    printf "Fasta extension is $faext; looks like PROTEIN\n\n" >> ${stats_file}
-  fi
+  # Report sequence type (determined during "run ingest")
+  cat ${PANDAGMA_WORK_DIR}/stats/tmp.seq_type >> ${stats_file}
 
   printf "Parameter  \tvalue\n" >> ${stats_file}
   for key in ${pandagma_conf_params}; do
@@ -575,7 +590,8 @@ run_summarize() {
 
   # Print per-annotation-set coverage stats (sequence counts, sequences retained), if stats-extra flag is set
   if [ ${extra_stats,,} = "yes" ]; then
-    cut -f2 ${PANDAGMA_WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv | perl -pe 's/([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+/$1/' | 
+    cut -f3 ${PANDAGMA_WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv | 
+      perl -pe 's/(.+)\.([^.]+)$/$1\n/' |
       sort | uniq -c | awk '{print $2 "\t" $1}' > ${PANDAGMA_WORK_DIR}/stats/tmp.gene_count_end
 
     # tmp.gene_count_start was generated during run_ingest
@@ -616,7 +632,7 @@ init() {
   # Initialize parameters required for run. Write these to files, for persistent access through the program.
   echo; echo "Setting run configuration parameters in ${PANDAGMA_CONF}"
   cat <<END > "${PANDAGMA_CONF}"
-clust_iden='0.95'
+clust_iden='0.90'
 clust_cov='0.60'
 consen_iden='0.80'
 extra_iden='0.90'
