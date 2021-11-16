@@ -115,7 +115,7 @@ echo "Add annotation name (e.g. Zm-W22_NRGENE-2) as prefix to the chromosome/sca
     export annot_name=$(echo $base | perl -pe 's/(.+)-REFERENCE[-_](.+\d)\.\d_Z\w\d+.+/$1_$2/')
     zcat $path | ../scripts/gff_to_bed6_mRNA.awk | 
       perl -pe '$prefix=$ENV{'annot_name'}; s/^(\D+)/$prefix.$1/; s/transcript://' |
-       cat > ../test/$base.bed &
+       cat > ../data/$base.bed &
   done
   wait
 
