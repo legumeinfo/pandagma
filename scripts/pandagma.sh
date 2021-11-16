@@ -306,7 +306,7 @@ run_consense() {
                      --search-type ${MMST} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
-  echo "  Use the \"main set\" $clust_iden threshold. Re-merge sub-clusters."
+  echo "  Use the \"main set\" $clust_iden threshold."
   top_line.awk 10_unclust.x.07_pan_fasta.m8 | 
     awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' | perl -pe 's/^(pan\d+)__\S+/$1/' |
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  11_syn_pan_leftovers.clust.tsv
@@ -366,7 +366,7 @@ run_add_extra() {
     wait # wait for jobs to finish
   
     echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
-    echo "  Use identity threshold extr_iden: $extra_iden. Re-merge sub-clusters."
+    echo "  Use identity threshold extr_iden: $extra_iden."
     top_line.awk 13_extra_out_dir/*.x.all_cons.m8 |
       awk -v IDEN=${extra_iden} '$3>=IDEN {print $2 "\t" $1}' | perl -pe 's/^(pan\d+)__\S+/$1/' |
       perl -pe 's/^(\w+)\.\d+/$1/' |
@@ -415,7 +415,6 @@ run_add_extra() {
     cp 12_syn_pan_aug.clust.tsv 17_syn_pan_aug_extra.clust.tsv
     cp 12_syn_pan_aug.hsh.tsv 17_syn_pan_aug_extra.hsh.tsv
     cp 08_pan_fasta_clust_rep_seq.$faext 21_pan_fasta_clust_rep_seq.$faext
-    #cp syn_pan_cent.$faext syn_pan_cent_merged.$faext
 fi
 }
 
@@ -443,7 +442,7 @@ run_name_pangenes() {
   fasta_to_table.awk 21_pan_fasta_clust_rep_seq_posnTMP.$faext | sed 's/__/\t/g; s/ /\t/' | 
     perl -pe 's/^(\w+)\s+(.+)\.(chr\d+)_(\d+)\s+/$1\t$2\t$3\t$4\t/' | sed 's/chr//' | sort -k3n -k4n |
     awk '{print ">" $2 ".chr" $3 "_" $4 " " $1 " " $5 " " $6 " " $7; print $8}' > 22_syn_pan_cent_merged_posn.$faext
-  rm 21_pan_fasta_clust_rep_seq_posnTMP.fa
+  rm 21_pan_fasta_clust_rep_seq_posnTMP.$faext
  
   echo "  Re-cluster, to identify neighboring genes that are highly similar"
     mmseqs easy-cluster 22_syn_pan_cent_merged_posn.$faext 23_pan_fasta 03_mmseqs_tmp \
