@@ -8,11 +8,12 @@ set -o errexit
 set -o nounset
 
 # Base URL for LegumeInfo/SoyBase Data Store, for genus Medicago
+if [ ! -d data ]; then mkdir -p data; fi
 url_base="https://legumeinfo.org/data/v2/Medicago"
 
 ## data
 base_dir=$PWD
-cd $base_dir/data/
+cd $base_dir/data_orig
   curl -O $url_base/sativa/annotations/XinJiangDaYe.gnm1.ann1.RKB9/medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed.gz
   curl -O $url_base/truncatula/annotations/A17_HM341.gnm4.ann2.G3ZY/medtr.A17_HM341.gnm4.ann2.G3ZY.cds.bed.gz
   curl -O $url_base/truncatula/annotations/HM004.gnm1.ann1.2XTB/medtr.HM004.gnm1.ann1.2XTB.cds.bed.gz
@@ -148,7 +149,7 @@ echo  "  Re-compress the files"
     for file in *bed *fna *faa; do gzip $file &
     done
 
-cat << DATA > expected_chr_matches.tsv
+cat << 'DATA' > expected_chr_matches.tsv
 # Expected chromosome matches for Medicago truncatula and Medicago sativa
 1 1
 2 2
