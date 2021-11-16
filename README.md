@@ -108,9 +108,18 @@ pandagma.sh run summarize
 ## Usage for the main pandagma.sh
 
 ~~~
-Usage: pandagma.sh SUBCOMMAND [SUBCOMMAND_OPTIONS]
+Usage: 
+       pandagma.sh run
+   or
+       pandagma.sh run SUBCOMMAND
 
-Primary coding sequence (fasta) and annotation (GFF3 or 4-column BED) files must be listed in the
+Add the scripts directory to your PATH
+Export these environment variables:
+  PANDAGMA_WORK_DIR
+  PANDAGMA_CONF
+  NPROC
+
+Primary coding sequence (fasta) and annotation (GFF3 or BED) files must be listed in the
 fasta_files and annotation_files variables defined in pandagma.conf, which by default must exist
 within the working directory from where this script is called.
 
@@ -149,7 +158,6 @@ synteny blocks and so not making it into the synteny-based clusters.
 
 Subommands (in order they are usually run):
             version - Get installed package version
-               init - Initialize parameters required for run
          run ingest - Prepare the assembly and annotation files for analysis
          run mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
          run filter - Filter the synteny results for chromosome pairings, returning gene pairs.
@@ -177,3 +185,4 @@ Environment variables:
      PANDAGMA_WORK_DIR - Location of working files (default ${PWD}/work)
                  NPROC - Number of processors to use (default 1)
 ~~~
+
