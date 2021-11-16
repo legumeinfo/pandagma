@@ -295,7 +295,7 @@ run_consense() {
   echo "  Search non-clustered genes against genes already clustered."
 
   # Check sequence type (in case this run function is called separately from the usually-prior ones)
-  someseq=$(head 07_pan_fasta.fa | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
+  someseq=$(head 07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
   SEQTYPE=$(check_seq_type "${someseq}")
   if [[ "$SEQTYPE" == "NUC" ]]; then MMST=3; else MMST=1; fi
 
@@ -348,7 +348,7 @@ run_add_extra() {
     done
 
     # Check sequence type (in case this run function is called separately from the usually-prior ones)
-    someseq=$(head 07_pan_fasta.fa | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
+    someseq=$(head 07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
     SEQTYPE=$(check_seq_type "${someseq}")
     if [[ "$SEQTYPE" == "NUC" ]]; then MMST=3; else MMST=1; fi
 
@@ -498,7 +498,7 @@ run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
  
   # Determine if the sequence looks like nucleotide or like protein. Set default type as NUC
-  someseq=$(head ${PANDAGMA_WORK_DIR}/07_pan_fasta.fa | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
+  someseq=$(head ${PANDAGMA_WORK_DIR}/07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
   SEQTYPE=$(check_seq_type "${someseq}")
 
   param_string="${SEQTYPE}.id${clust_iden}.cov${clust_cov}.cns${consen_iden}.ext${extra_iden}.I${mcl_inflation}"
