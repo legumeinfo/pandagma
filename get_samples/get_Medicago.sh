@@ -115,6 +115,13 @@ echo "  Then shorten the chr names from e.g. chr8.1 to chr8, because we want the
     rm medsa.XJDY.faa1
     rm medsa.XinJiangDaYe.gnm1.ann1.RKB9.protein.faa
 
+echo "  Make sativa subgenome names unique in chromosome field, in bed files"
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_1.gnm1/' medsa.XinJiangDaYe_1.gnm1.ann1.RKB9.cds.bed
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_2.gnm1/' medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.cds.bed
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_3.gnm1/' medsa.XinJiangDaYe_3.gnm1.ann1.RKB9.cds.bed
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_4.gnm1/' medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.cds.bed
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_sc.gnm1/' medsa.XinJiangDaYe_sc.gnm1.ann1.RKB9.cds.bed
+
 echo "  Fix a gene-name discrepancy in medtr.jemalong_A17.gnm5.ann1_6"
     # bed file has gene names like this:    medtr.jemalong_A17.gnm5.ann1_6.mRNA:MtrunA17Chr2g0284411
     # fasta file has gene names like this:  medtr.jemalong_A17.gnm5.ann1_6.MtrunA17_Chr2g0284411
