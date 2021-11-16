@@ -1,10 +1,13 @@
 
 pandagma.sh version
 
-# Set initial default values
-pandagma.sh init
+# NOTE 1: All of the following commands depend on parameters being set in
+# pandagma.conf (or equivalent file, pointed to as below), before continuing.
+# Example:  export PANDAGMA_CONF=pandagma_Zea.conf
 
-# NOTE: modify pandagma.conf before continuing
+# Note 2: All of the commands below will be run in order if the program is called
+# without specifying any subcommand, e.g.
+#   nohup pandagma.sh run &
 
 # get info from matching GFF/BED and FNA files
 pandagma.sh run ingest
