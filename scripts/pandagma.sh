@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Configuration and run script for "pandagma", which generates pan-gene clusters using the programs 
-# mmseqs, dagchainer, and mcl. These are used to do the initial clustering, # synteny-finding, and re-clustering.
+# Configuration and run script which, with other scripts in this package, generates pan-gene 
+# clusters using the programs mmseqs, dagchainer, and mcl. 
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021
 #
 scriptname=`basename "$0"`
-version="2021-11-15"
+version="2021-11-16"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -411,6 +411,7 @@ run_add_extra() {
   
   else  # no "extra" fasta files, so just promote the syn_pan_aug files as syn_pan_aug_extra
         # TO DO: handle this better, i.e. report that no "extra" files were provided and skip these "aug" files.
+    cp 07_pan_fasta.$faext 20_pan_fasta.$faext
     cp 12_syn_pan_aug.clust.tsv 17_syn_pan_aug_extra.clust.tsv
     cp 12_syn_pan_aug.hsh.tsv 17_syn_pan_aug_extra.hsh.tsv
     cp 08_pan_fasta_clust_rep_seq.$faext 21_pan_fasta_clust_rep_seq.$faext
@@ -441,24 +442,29 @@ run_name_pangenes() {
   # Reshape defline, and sort by position
   fasta_to_table.awk 21_pan_fasta_clust_rep_seq_posnTMP.$faext | sed 's/__/\t/g; s/ /\t/' | 
     perl -pe 's/^(\w+)\s+(.+)\.(chr\d+)_(\d+)\s+/$1\t$2\t$3\t$4\t/' | sed 's/chr//' | sort -k3n -k4n |
-    awk '{print ">" $2 "." chr$3 "_" $4 " " $1 " " $5 " " $6 " " $7; print $8}' > 22_syn_pan_cent_merged_posn.$faext
+    awk '{print ">" $2 ".chr" $3 "_" $4 " " $1 " " $5 " " $6 " " $7; print $8}' > 22_syn_pan_cent_merged_posn.$faext
   rm 21_pan_fasta_clust_rep_seq_posnTMP.fa
-
-  # # Parse mmseqs clusters into pairs of genes that are similar and ordinally close
-  # close=10 # genes within a neighborhood of +-close genes among the consensus-orderd genes
-  # cat 21_pan_fasta_clust_cluster.tsv | perl -pe 's/__/\t/g; s/(chr\d+)_(\d+)/$1_$2\t$2/g' |
-  #   awk -v CLOSE=$close '$1==$6 && $2!=$7 && sqrt(($3/100-$8/100)^2)<=CLOSE {print $2 "\t" $7}' |
-  #   cat > 21_pan_fasta_clust_cluster.closepairs
-
-  # # Cluster the potential near-duplicate neighboring paralogs
-  # mcl  21_pan_fasta_clust_cluster.closepairs --abc -o 21_pan_fasta_clust_cluster.clst
  
-  # # Keep the first gene from the cluster and discard the rest. Do this by removing the others.
-  # cat 21_pan_fasta_clust_cluster.clst | awk '{$1=""}1' | awk '{$1=$1}1' | tr ' ' '\n' > lists/lis.clust_genes_remove
+  echo "  Re-cluster, to identify neighboring genes that are highly similar"
+    mmseqs easy-cluster 22_syn_pan_cent_merged_posn.$faext 23_pan_fasta 03_mmseqs_tmp \
+    --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
-  # # Remove neighboring close paralogs, leaving one
-  # get_fasta_subset.pl -in 22_syn_pan_cent_merged_posn.$faext -out syn_pan_cent_merged_posn_trimd.$faext \
-  #   -lis lists/lis.clust_genes_remove -xclude -clobber
+  # Parse mmseqs clusters into pairs of genes that are similar and ordinally close
+  close=10 # genes within a neighborhood of +-close genes among the consensus-orderd genes
+  cat 23_pan_fasta_cluster.tsv | perl -pe 's/\S+\.chr(\d+)_(\d+)/$1\t$2/g' | 
+    awk -v CLOSE=$close -v PRE=$consen_prefix '$1==$3 && sqrt(($2/100-$4/100)^2)<=CLOSE \
+             {print PRE ".chr" $1 "_" $2 "\t" PRE ".chr" $3 "_" $4}' > 23_pan_fasta_cluster.closepairs
+
+  # Cluster the potential near-duplicate neighboring paralogs
+  mcl  23_pan_fasta_cluster.closepairs --abc -o 23_pan_fasta_cluster.close.clst
+ 
+  # Keep the first gene from the cluster and discard the rest. Do this by removing the others.
+  cat 23_pan_fasta_cluster.close.clst | awk '{$1=""}1' | 
+    awk '{$1=$1}1' | tr ' ' '\n' | sort -u > lists/lis.clust_genes_remove
+
+  # Remove neighboring close paralogs, leaving one
+  get_fasta_subset.pl -in 22_syn_pan_cent_merged_posn.$faext -out 22_syn_pan_cent_merged_posn_trimd.$faext \
+    -lis lists/lis.clust_genes_remove -xclude -clobber
 }
 
 run_calc_chr_pairs() {
@@ -512,6 +518,7 @@ run_summarize() {
   cp ${PANDAGMA_WORK_DIR}/observed_chr_pairs.tsv ${full_out_dir}/
   cp ${PANDAGMA_WORK_DIR}/consen_${consen_prefix}.tsv ${full_out_dir}/
   cp ${PANDAGMA_WORK_DIR}/22_syn_pan_cent_merged_posn.$faext ${full_out_dir}/
+  cp ${PANDAGMA_WORK_DIR}/22_syn_pan_cent_merged_posn_trimd.$faext ${full_out_dir}/
 
   printf "Run of program $scriptname, version $version\n" > ${stats_file}
 
