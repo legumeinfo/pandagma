@@ -3,10 +3,8 @@ use strict;
 use warnings;
 use Getopt::Long;
 use List::Util qw(sum);
-
 use File::Basename;
 my $PROGRAM_NAME = basename($0);
-my $PROGRAM_VERSION = "v01";
 
 my $usage = <<EOS;
 Given five-column input with pan-IDs, gene IDs, and genomic positional information,
@@ -52,7 +50,7 @@ while (<>) {
   next unless (/^\S+/);
   my $line = $_;
   my ($panID, $geneID, $chr, $start, $end) = split(/\t/, $line);
-  next if ($chr =~ /chloro|chl|CP|mito|MT|ctg|contig|pilon|scaff|sc\d+|un\w+\d+/i);
+  next if ($chr =~ /chloro|chl|CP|mito|MT|Pt$|ctg|contig|pilon|scaff|sc\d+|un\w+\d+/i);
   $chr =~ s/\S+\.\D+(\d+\.*\d*)/$1/;
   $HoH_panID_chr{$panID}{$chr}++;
   push(@pangene_table, $line);
@@ -94,7 +92,7 @@ my %starts_per_top_chr_HoA;
 my %ends_per_top_chr_HoA;
 foreach (@pangene_table) {
   my ($panID, $geneID, $chr, $start, $end) = split(/\t/);
-  next if ($chr =~ /chloro|chl|CP|mito|MT|ctg|contig|pilon|scaff|sc\d+|un\w+\d+/i);
+  next if ($chr =~ /chloro|chl|CP|mito|MT|Pt$|ctg|contig|pilon|scaff|sc\d+|un\w+\d+/i);
   $chr =~ s/\S+\.\D+(\d+)/$1/;
   if ($chr eq $top_chr{$panID}){
     push @{ $starts_per_top_chr_HoA{$panID} }, $start;
@@ -146,5 +144,5 @@ __END__
 2021
 
 v01 10-29 Initial version.
-v01 11-04 Read from STDIN rather than file
+v02 11-04 Read from STDIN rather than file
 
