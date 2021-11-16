@@ -1,0 +1,52 @@
+clust_iden='0.98'
+clust_cov='0.60'
+consen_iden='0.80'
+extra_iden='0.80'
+mcl_inflation='2'
+dagchainer_args='-g 10000 -M 50 -D 200000 -E 1e-5 -A 6 -s'
+out_dir_base='out'
+consen_prefix='Glycine.pan3'
+extra_stats='yes'
+regex_type='end'
+
+##### (required) list of GFF & FASTA file paths
+# Uncomment add file paths to the the annotation_files and fasta_files arrays.
+# The nth listed GFF file corresponds to the nth listed FASTA file.
+
+annotation_files=(
+  data/glyma.FiskebyIII.gnm1.ann1.SS25.cds.bed.gz
+  data/glyma.Lee.gnm1.ann1.6NZV.cds.bed.gz
+  data/glyma.Wm82.gnm2.ann1.RVB6.cds.bed.gz
+  data/glyma.Wm82.gnm2.ann2.BG1Q.cds.bed.gz
+  data/glyma.Wm82.gnm4.ann1.T8TQ.cds.bed.gz
+  data/glyma.Zh13.gnm1.ann1.8VV3.cds.bed.gz
+  data/glyso.PI483463.gnm1.ann1.3Q3Q.cds.bed.gz
+  data/glyso.W05.gnm1.ann1.T47J.cds.bed.gz
+)
+
+fasta_files=(
+  data/glyma.FiskebyIII.gnm1.ann1.SS25.cds_primary.fna.gz
+  data/glyma.Lee.gnm1.ann1.6NZV.cds_primary.fna.gz
+  data/glyma.Wm82.gnm2.ann1.RVB6.cds_primary.fna.gz
+  data/glyma.Wm82.gnm2.ann2.BG1Q.cds_primary.fna.gz
+  data/glyma.Wm82.gnm4.ann1.T8TQ.cds_primary.fna.gz
+  data/glyma.Zh13.gnm1.ann1.8VV3.cds_primary.fna.gz
+  data/glyso.PI483463.gnm1.ann1.3Q3Q.cds_primary.fna.gz
+  data/glyso.W05.gnm1.ann1.T47J.cds_primary.fna.gz
+)
+
+### (optional) Extra GFF & FASTA files
+annotation_files_extra=(
+  data/glyma.Jinyuan_IGA1006.gnm1.ann1.2NNX.cds.bed.gz
+  data/glyma.Wm82.gnm1.ann1.DvBy.cds.bed.gz
+  data/glyma.Zh35_IGA1004.gnm1.ann1.RGN6.cds.bed.gz
+)
+
+fasta_files_extra=(
+  data/glyma.Jinyuan_IGA1006.gnm1.ann1.2NNX.cds.fna.gz
+  data/glyma.Wm82.gnm1.ann1.DvBy.cds_primary.fna.gz
+  data/glyma.Zh35_IGA1004.gnm1.ann1.RGN6.cds.fna.gz
+)
+
+#### (optional) expected_chr_matches file path
+expected_chr_matches='data/expected_chr_matches.tsv'
