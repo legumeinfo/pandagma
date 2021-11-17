@@ -17,7 +17,17 @@ The workflow is essentially as follows:
 * Add "extra" annotation sets by homology 
 * Calculate and report statistics
 
-## Installation by creating a Singularity container image (recommended)
+## Contents
+
+* [Installation methods] (#installation)
+* [Usage for the main pandagma.sh] (#usage)
+* [Detailed instructions (recommended)] (#details)
+
+
+## Installation methods <a name="installation"></a>
+
+### Installation method 1 (recommended): by creating a Singularity container image
+
 
 To build a [Singularity](https://singularity.hpcng.org/) container image from the provided [Singularity definition file](https://singularity.hpcng.org/user-docs/master/definition_files.html) (`singularity.def`):
 
@@ -32,7 +42,7 @@ To run pandamga using singularity, use `singularity run pandagma.sif [run comman
     mkdir /path/to/pandagma/work_dir # create work dir on fast, node-local storage
     singularity run --env NPROC=<number of cpus> --env PANDAGMA_WORK_DIR=/path/to/work/dir pandagma.sif run
 
-## Installation of scripts and dependencies (manual)
+### Installation method 2: manual installation of scripts and dependencies
 
 The scripts should be added to your path - either by copying them to a directory that is in your path 
 (e.g. `cp scripts/* ~/bin/`), or by adding the script directory to your path 
@@ -53,45 +63,7 @@ For example, using conda:
   conda activate pandagama
 ~~~
 
-## Running the pipeline, with suitable pandagma "run commands"
-
-The pandagma.sh has several "run commands," which are run in a particular order to do the 
-clustering and refinement. The several commands are best called via an additional calling script. 
-In the provided example, this is called run_pandagma.sh .
-
-The following commands, in run_pandagma.sh, should produce a reasonable collection of pan-genes, 
-given suitably named assembly and gene-model files:
-
-~~~
-pandagma.sh version
-
-# get info from matching GFF/BED and FNA files
-pandagma.sh run ingest
-
-# do mmseqs on all pairings of annotation sets
-pandagma.sh run mmseqs
-
-# filter based on expected chromosome pairings
-pandagma.sh run filter
-
-# Identify syntenic blocks
-pandagma.sh run dagchainer
-
-# Calculate clusters using Markov clustering
-pandagma.sh run mcl
-
-# Calculate a consensus sequence for each pan-gene set, using vsearch.
-pandagma.sh run consense
-
-# Add other gene model sets to the primary clusters. Useful for adding
-# annotation sets that may be of lower or uncertain quality.
-pandagma.sh run add_extra
-
-# Move results into output directory, and report some summary statistics
-pandagma.sh run summarize
-~~~
-
-## Usage for the main pandagma.sh
+## Usage for the main pandagma.sh <a name="usage"></a>
 
 ~~~
 Usage: 
@@ -172,7 +144,7 @@ Environment variables:
                  NPROC - Number of processors to use (default 1)
 ~~~
 
-## Detailed instructions
+## Detailed instructions <a name="details"></a>
 
 1. Clone the program and associated files from github:
       clone https://github.com/legumeinfo/pandagma
