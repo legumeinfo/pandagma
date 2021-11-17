@@ -175,8 +175,8 @@ Environment variables:
 ## Detailed instructions
 
 1. Clone the program and associated files from github:
-        clone https://github.com/legumeinfo/pandagma
-        I typically rename the downloaded repository to the genus name that I am working on, e.g.
+      clone https://github.com/legumeinfo/pandagma
+      I typically rename the downloaded repository to the genus name that I am working on, e.g.
     
             clone https://github.com/legumeinfo/pandagma.git
             mv pandagma zea
@@ -189,72 +189,79 @@ Environment variables:
               work_zea  zea
 
 3. Get into a suitable work environment (computation node), and load dependencies.
-        The script has these third-party dependencies:
-          bioperl, mcl, mmseqs2
-        These can be loaded using a module-loading system, or with a package manager such as conda, or
-        via a Singularity image. 
-        
+    The script has these third-party dependencies: **bioperl, mcl, mmseqs2**
+
+    These can be loaded using a module-loading system, or with a package manager such as conda, or
+    via a Singularity image. 
+      
           pandagma_sing_img=$YOURPATH/pandagma-v2021-11-16.sif
     
-        OR:
+    OR:
     
-          conda activate pandagma    # pandagma is the conda environment where I've installed bioperl, mcl, mmseqs2
+          conda activate pandagma    
+             # pandagma is the conda environment where I've installed bioperl, mcl, mmseqs2
     
 4. Download the annotation data from a remote source (CDS or peptide, and GFF or BED), and transform if needed.
-        I do this with a simple shell script that executes curl commands and then applies some transformations.
-        See the files in get_samples/ for examples. There are scripts for Glycine, Medicago, Vigna, and Zea.
+    I do this with a simple shell script that executes curl commands and then applies some transformations.
+    See the files in get_samples/ for examples. There are scripts for Glycine, Medicago, Vigna, and Zea.
     
           ./get_Zea.sh
-           This puts the data first into data_orig/, and puts transformed data into data/
+            # This puts the data first into data_orig/, 
+            # and puts transformed data into data/
     
 5. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
-        The config file sets nine program parameters, and then lists annotation files and fasta files.
-        The annotation and fasta files need to be listed in corresponding order.
-        The nth listed GFF file corresponds to the nth listed FASTA file.
-        Also note that there are blocks for annotation_files and fasta_files, 
-        and for annotation_files_extra and fasta_files_extra.
-        The former, main set should list annotation sets that you consider trustworthy and "central" in some respect.
-        The latter (data_extra) may be problematic in some way - for example, with questionable assemblies or annotations, 
-        or perhaps annotations for other species in the genus. For the main set, both homology and synteny information
-        is used in the clustering. Annotations in the extra set are placed into clusters from the main set, using 
-        only homology information. Currently, the program is constructed to use at least one "extra" annotation.
-        Future versions of the program may remove this requirement.
+    The config file sets nine program parameters, and then lists annotation files and fasta files.
+    The annotation and fasta files need to be listed in corresponding order.
+    The nth listed GFF file corresponds to the nth listed FASTA file.
+    Also note that there are blocks for annotation_files and fasta_files, 
+    and for annotation_files_extra and fasta_files_extra.
+    The former, main set should list annotation sets that you consider trustworthy and "central" in some respect.
+    The latter (data_extra) may be problematic in some way - for example, with questionable assemblies or annotations, 
+    or perhaps annotations for other species in the genus. For the main set, both homology and synteny information
+    is used in the clustering. Annotations in the extra set are placed into clusters from the main set, using 
+    only homology information. Currently, the program is constructed to use at least one "extra" annotation.
+    Future versions of the program may remove this requirement.
 
 6. Set environment variables.
-        The script learns about the work directory, the number of processors, the config file, and the helper scripts,
-        via environment variables.
+    The script learns about the work directory, the number of processors, the config file, and the helper scripts,
+    via environment variables.
 
-        If dependencies are manually installed and the script is called directly:
+    If dependencies are manually installed and the script is called directly:
+
           export NPROC=10
           export PANDAGMA_WORK_DIR=$PWD/../work_zea
           export PANDAGMA_CONF=config/pandagma_Zea_7_2_nuc.conf
           export PATH=$PWD/scripts:$PATH
         
-        If the dependencies and script are called via Singularity image: set the environment variables as 
-        part of the singularity invocation (see next step)
+    If the dependencies and script are called via Singularity image: set the environment variables as 
+    part of the singularity invocation (see next step)
     
 7. Start the run. The examples below assume a run using pandagma_Zea_7_2_nuc.conf.
        
-       Calling the program directly:
+    Calling the program directly:
+
          nohup pandagma.sh > nohup_7_2.out &
 
-       Using a Singularity image:
-         pandagma_sing_img=/90daydata/legume_project/singularity_images/pandagma-v2021-11-16.sif
+    Using a Singularity image:
+
+         pandagma_sing_img=$YOURPATH/pandagma-v2021-11-16.sif
          nohup singularity exec --env NPROC=$(( ${SLURM_JOB_CPUS_PER_NODE}/5 ))  \
-                            --env PANDAGMA_WORK_DIR=$PWD/../work_zea \
-                            --env PANDAGMA_CONF=config/pandagma_Zea_7_2_nuc.conf \
-                            --cleanenv $pandagma_sing_img pandagma.sh run > nohup_7_2.out &
+                      --env PANDAGMA_WORK_DIR=$PWD/../work_zea \
+                      --env PANDAGMA_CONF=config/pandagma_Zea_7_2_nuc.conf \
+                      --cleanenv $pandagma_sing_img pandagma.sh run > nohup_7_2.out &
 
 8. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
-        Output will go into a directory composed from a provided prefix name (default "out") and
-        information about key parameter values, e.g.
+    Output will go into a directory composed from a provided prefix name (default "out") and
+    information about key parameter values, e.g.
+
           out_7_2.NUC.id95.cov60.cns80.ext80.I2/
 
-        The summary of the run is given in the file stats.[parameters].txt .
-        Look at the modal values in the histograms, the report of proportion of each assembly with matches, etc.
-        One of the output files that may be of use in a subsequent run is observed_chr_pairs.tsv .
-        This can indicate possible translocations among genomes in the input data. For example, in Zea, the values
-        for one run are:
+    The summary of the run is given in the file stats.[parameters].txt .
+    Look at the modal values in the histograms, the report of proportion of each assembly with matches, etc.
+    One of the output files that may be of use in a subsequent run is observed_chr_pairs.tsv .
+    This can indicate possible translocations among genomes in the input data. For example, in Zea, the values
+    for one run are:
+
            1   1 39596   <== Main chromosome correspondences
            5   5 30158
            2   2 30038
@@ -269,7 +276,7 @@ Environment variables:
            1   5   544
            1   3   522
 
-       These values can be used to constrain matches in a subsequent run, via the file data/expected_chr_matches.tsv
-       (For the Zea run, these values were already provided, generated by get_samples/get_Zea.sh 
+    These values can be used to constrain matches in a subsequent run, via the file data/expected_chr_matches.tsv
+    (For the Zea run, these values were already provided, generated by get_samples/get_Zea.sh 
 
 
