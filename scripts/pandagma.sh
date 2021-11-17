@@ -106,7 +106,8 @@ cat_or_zcat() {
 }
 check_seq_type () {
   someseq=${1}
-  export proportion_nuc=$(echo $someseq | fold -w1 | awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
+  export proportion_nuc=$(echo $someseq | fold -w1 | 
+                          awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
   perl -le '$PN=$ENV{"proportion_nuc"}; if ($PN>0.9){print 3} else {print 1}'
 }
 
@@ -299,7 +300,8 @@ run_consense() {
                      07_pan_fasta.$faext \
                      10_unclust.x.07_pan_fasta.m8 \
                      03_mmseqs_tmp \
-                     --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
+                     --search-type 3 --cov-mode 5 -c ${clust_cov} 1>/dev/null 
+                     #--search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
   echo "  Use the \"main set\" $clust_iden threshold."
@@ -355,7 +357,8 @@ run_add_extra() {
                          13_pan_aug_fasta.$faext \
                          13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
                          03_mmseqs_tmp/ \
-                         --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
+                         --search-type 3 --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
+                         #--search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
 
       if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
     done
@@ -492,7 +495,7 @@ run_calc_chr_pairs() {
 run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
  
-  # Determine if the sequence looks like nucleotide or like protein. Set default type as NUC
+  # Determine if the sequence looks like nucleotide or like protein.
   someseq=$(head ${PANDAGMA_WORK_DIR}/07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
   SEQTYPE=$(check_seq_type "${someseq}")
   case "$SEQTYPE" in 
@@ -526,7 +529,7 @@ run_summarize() {
   printf "Run ended at:   $end_time\n\n" >> ${stats_file}
 
   # Report sequence type 
-  if [[ "$SEQTYPE" == "3" ]]; then
+  if [[ "$SEQTYPE" == 3 ]]; then
     echo "Sequence type: nucleotide" >> ${stats_file}
   else
     echo "Sequence type: protein" >> ${stats_file}
