@@ -104,14 +104,10 @@ cat_or_zcat() {
        *) cat "$@" ;;
   esac
 }
-check_seq_type() {
+check_seq_type () {
   someseq=${1}
-  proportion_nuc=$(echo $someseq | fold -w1 | awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
-  if (( $(bc <<< "$proportion_nuc > 0.9") )); then
-    echo "NUC"
-  else
-    echo "PEP"
-  fi
+  export proportion_nuc=$(echo $someseq | fold -w1 | awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
+  perl -le '$PN=$ENV{"proportion_nuc"}; if ($PN>0.9){print "NUC"} else {print "PEP"}'
 }
 
 ### run functions ###
@@ -296,14 +292,13 @@ run_consense() {
 
   # Check sequence type (in case this run function is called separately from the usually-prior ones)
   someseq=$(head 07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
-  SEQTYPE=$(check_seq_type "${someseq}")
-  if [[ "$SEQTYPE" == "NUC" ]]; then MMST=3; else MMST=1; fi
+  SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
 
   mmseqs easy-search 09_genes_not_in_clusters.$faext \
                      07_pan_fasta.$faext \
                      10_unclust.x.07_pan_fasta.m8 \
                      03_mmseqs_tmp \
-                     --search-type ${MMST} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
+                     --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
   echo "  Use the \"main set\" $clust_iden threshold."
@@ -349,8 +344,7 @@ run_add_extra() {
 
     # Check sequence type (in case this run function is called separately from the usually-prior ones)
     someseq=$(head 07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
-    SEQTYPE=$(check_seq_type "${someseq}")
-    if [[ "$SEQTYPE" == "NUC" ]]; then MMST=3; else MMST=1; fi
+    SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
 
     for path in "${fasta_files_extra[@]}"; do
       fasta_file=`basename ${path%.*}`
@@ -359,7 +353,7 @@ run_add_extra() {
                          13_pan_aug_fasta.$faext \
                          13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
                          03_mmseqs_tmp/ \
-                         --search-type ${MMST} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
+                         --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
 
       if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
     done
@@ -499,8 +493,12 @@ run_summarize() {
   # Determine if the sequence looks like nucleotide or like protein. Set default type as NUC
   someseq=$(head ${PANDAGMA_WORK_DIR}/07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
   SEQTYPE=$(check_seq_type "${someseq}")
+  case "$SEQTYPE" in 
+    3) ST="NUC" ;;
+    1) ST="PEP" ;;
+  esac
 
-  param_string="${SEQTYPE}.id${clust_iden}.cov${clust_cov}.cns${consen_iden}.ext${extra_iden}.I${mcl_inflation}"
+  param_string="${ST}.id${clust_iden}.cov${clust_cov}.cns${consen_iden}.ext${extra_iden}.I${mcl_inflation}"
   full_out_dir=$(echo "$out_dir_base.$param_string" | perl -pe 's/0\.(\d+)/$1/g')
   stats_file=${full_out_dir}/stats.$param_string.txt
 
@@ -526,7 +524,7 @@ run_summarize() {
   printf "Run ended at:   $end_time\n\n" >> ${stats_file}
 
   # Report sequence type 
-  if [[ "$SEQTYPE" == "NUC" ]]; then
+  if [[ "$SEQTYPE" == "3" ]]; then
     echo "Sequence type: nucleotide" >> ${stats_file}
   else
     echo "Sequence type: protein" >> ${stats_file}
