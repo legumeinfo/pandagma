@@ -19,9 +19,11 @@ The workflow is essentially as follows:
 
 ## Contents
 
-* [Installation methods] (#installation)
-* [Usage for the main pandagma.sh] (#usage)
-* [Detailed instructions (recommended)] (#details)
+[Installation methods] (#installation)
+
+[Usage for the main pandagma.sh] (#usage)
+
+[Detailed instructions (recommended)] (#details)
 
 
 ## Installation methods <a name="installation"></a>
