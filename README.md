@@ -171,7 +171,7 @@ Environment variables:
     I do this with a simple shell script that executes curl commands and then applies some transformations.
     See the files in get_samples/ for examples. There are scripts for Glycine, Medicago, Vigna, and Zea.
     
-          ./get_Zea.sh
+          ./get_samples/get_Zea.sh
             # This puts the data first into data_orig/, 
             # and puts transformed data into data/
     
