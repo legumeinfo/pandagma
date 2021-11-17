@@ -206,7 +206,7 @@ Environment variables:
        
     Calling the program directly:
 
-         nohup pandagma.sh > nohup_7_2.out &
+         nohup pandagma.sh run > nohup_7_2.out &
 
     Using a Singularity image:
 
