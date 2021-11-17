@@ -17,14 +17,6 @@ The workflow is essentially as follows:
 * Add "extra" annotation sets by homology 
 * Calculate and report statistics
 
-## Contents
-
-[Installation methods] (#installation)
-
-[Usage for the main pandagma.sh] (#usage)
-
-[Detailed instructions (recommended)] (#details)
-
 
 ## Installation methods <a name="installation"></a>
 
