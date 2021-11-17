@@ -176,8 +176,9 @@ run_mmseqs() {
     for (( file2_num = $( expr $file1_num + 1 ); file2_num < ${#fasta_files[@]} ; file2_num++ )); do
       sbj_base=$(basename ${fasta_files[file2_num]%.*} .$faext)
       echo "  Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
+      MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       { cat 02_fasta/$qry_base.$faext 02_fasta/$sbj_base.$faext ; } |
-        mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} 03_mmseqs_tmp \
+        mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} $MMTEMP \
          --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null & # background
         # allow to execute up to $MMSEQSTHREADS in parallel
         if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
@@ -300,8 +301,7 @@ run_consense() {
                      07_pan_fasta.$faext \
                      10_unclust.x.07_pan_fasta.m8 \
                      03_mmseqs_tmp \
-                     --search-type 3 --cov-mode 5 -c ${clust_cov} 1>/dev/null 
-                     #--search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
+                     --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
   echo "  Use the \"main set\" $clust_iden threshold."
@@ -353,12 +353,12 @@ run_add_extra() {
     for path in "${fasta_files_extra[@]}"; do
       fasta_file=`basename ${path%.*}`
       echo "Extra: $fasta_file"
+      MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       mmseqs easy-search "${path}" \
                          13_pan_aug_fasta.$faext \
                          13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
-                         03_mmseqs_tmp/ \
-                         --search-type 3 --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
-                         #--search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
+                         $MMTEMP \
+                         --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
 
       if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
     done
