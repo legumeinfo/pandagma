@@ -293,6 +293,7 @@ run_consense() {
   # Check sequence type (in case this run function is called separately from the usually-prior ones)
   someseq=$(head 07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
   SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
+  echo "SEQTYPE is: $SEQTYPE"
 
   mmseqs easy-search 09_genes_not_in_clusters.$faext \
                      07_pan_fasta.$faext \
@@ -345,6 +346,7 @@ run_add_extra() {
     # Check sequence type (in case this run function is called separately from the usually-prior ones)
     someseq=$(head 07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
     SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
+    echo "SEQTYPE is: $SEQTYPE"
 
     for path in "${fasta_files_extra[@]}"; do
       fasta_file=`basename ${path%.*}`
