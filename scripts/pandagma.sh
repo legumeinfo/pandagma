@@ -107,7 +107,7 @@ cat_or_zcat() {
 check_seq_type () {
   someseq=${1}
   export proportion_nuc=$(echo $someseq | fold -w1 | awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
-  perl -le '$PN=$ENV{"proportion_nuc"}; if ($PN>0.9){print "NUC"} else {print "PEP"}'
+  perl -le '$PN=$ENV{"proportion_nuc"}; if ($PN>0.9){print 3} else {print 1}'
 }
 
 ### run functions ###
