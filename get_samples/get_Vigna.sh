@@ -7,6 +7,8 @@
 set -o errexit
 set -o nounset
 
+if [ ! -d data ]; then mkdir -p data; fi
+
 # Base URL for LegumeInfo/SoyBase Data Store, for genus Vigna
 url_base="https://legumeinfo.org/data/v2/Vigna"
 
@@ -23,7 +25,7 @@ cd $base_dir/data/
   curl -O $url_base/unguiculata/annotations/Suvita2.gnm1.ann1.1PF6/vigun.Suvita2.gnm1.ann1.1PF6.cds_primaryTranscript.fna.gz
   curl -O $url_base/unguiculata/annotations/TZ30.gnm1.ann2.59NL/vigun.TZ30.gnm1.ann2.59NL.cds_primaryTranscript.fna.gz
   curl -O $url_base/unguiculata/annotations/UCR779.gnm1.ann1.VF6G/vigun.UCR779.gnm1.ann1.VF6G.cds_primaryTranscript.fna.gz
-  curl -O $url_base/unguiculata/annotations/Xiabao_II.gnm1.ann1.4JFL/vigun.Xiabao_II.gnm1.ann1.4JFL.cds.fna.gz
+  #curl -O $url_base/unguiculata/annotations/Xiabao_II.gnm1.ann1.4JFL/vigun.Xiabao_II.gnm1.ann1.4JFL.cds.fna.gz
   curl -O $url_base/unguiculata/annotations/ZN016.gnm1.ann2.C7YV/vigun.ZN016.gnm1.ann2.C7YV.cds_primaryTranscript.fna.gz
 
   curl -O $url_base/angularis/annotations/Gyeongwon.gnm3.ann1.3Nz5/vigan.Gyeongwon.gnm3.ann1.3Nz5.protein_primaryTranscript.faa.gz
@@ -36,7 +38,7 @@ cd $base_dir/data/
   curl -O $url_base/unguiculata/annotations/Suvita2.gnm1.ann1.1PF6/vigun.Suvita2.gnm1.ann1.1PF6.protein_primaryTranscript.faa.gz
   curl -O $url_base/unguiculata/annotations/TZ30.gnm1.ann2.59NL/vigun.TZ30.gnm1.ann2.59NL.protein_primaryTranscript.faa.gz
   curl -O $url_base/unguiculata/annotations/UCR779.gnm1.ann1.VF6G/vigun.UCR779.gnm1.ann1.VF6G.protein_primaryTranscript.faa.gz
-  curl -O $url_base/unguiculata/annotations/Xiabao_II.gnm1.ann1.4JFL/vigun.Xiabao_II.gnm1.ann1.4JFL.protein.faa.gz
+  #curl -O $url_base/unguiculata/annotations/Xiabao_II.gnm1.ann1.4JFL/vigun.Xiabao_II.gnm1.ann1.4JFL.protein.faa.gz
   curl -O $url_base/unguiculata/annotations/ZN016.gnm1.ann2.C7YV/vigun.ZN016.gnm1.ann2.C7YV.protein_primaryTranscript.faa.gz
 
   curl -O $url_base/angularis/annotations/Gyeongwon.gnm3.ann1.3Nz5/vigan.Gyeongwon.gnm3.ann1.3Nz5.cds.bed.gz
@@ -49,7 +51,7 @@ cd $base_dir/data/
   curl -O $url_base/unguiculata/annotations/Suvita2.gnm1.ann1.1PF6/vigun.Suvita2.gnm1.ann1.1PF6.cds.bed.gz
   curl -O $url_base/unguiculata/annotations/TZ30.gnm1.ann2.59NL/vigun.TZ30.gnm1.ann2.59NL.cds.bed.gz
   curl -O $url_base/unguiculata/annotations/UCR779.gnm1.ann1.VF6G/vigun.UCR779.gnm1.ann1.VF6G.cds.bed.gz
-  curl -O $url_base/unguiculata/annotations/Xiabao_II.gnm1.ann1.4JFL/vigun.Xiabao_II.gnm1.ann1.4JFL.cds.bed.gz
+  #curl -O $url_base/unguiculata/annotations/Xiabao_II.gnm1.ann1.4JFL/vigun.Xiabao_II.gnm1.ann1.4JFL.cds.bed.gz
   curl -O $url_base/unguiculata/annotations/ZN016.gnm1.ann2.C7YV/vigun.ZN016.gnm1.ann2.C7YV.cds.bed.gz
 
 # Shorten some filenames.
@@ -68,8 +70,8 @@ cd $base_dir/data/
   perl -pi -e 's/vigun.Suvita2.gnm1.chr(\d)\t/vigun.Suvita2.gnm1.chr0$1\t/' vigun.Suvita2.gnm1*.bed &
   perl -pi -e 's/vigun.TZ30.gnm1.chr(\d)\t/vigun.TZ30.gnm1.chr0$1\t/' vigun.TZ30.gnm1*.bed &
   perl -pi -e 's/vigun.UCR779.gnm1.chr(\d)\t/vigun.UCR779.gnm1.chr0$1\t/' vigun.UCR779.gnm1*.bed &
-  perl -pi -e 's/vigun.Xiabao_II.gnm1.LG(\d)\t/vigun.Xiabao_II.gnm1.chr0$1\t/' vigun.Xiabao_II.gnm1*.bed &
-  perl -pi -e 's/vigun.Xiabao_II.gnm1.LG(\d\d)\t/vigun.Xiabao_II.gnm1.chr$1\t/' vigun.Xiabao_II.gnm1*.bed &
+  #perl -pi -e 's/vigun.Xiabao_II.gnm1.LG(\d)\t/vigun.Xiabao_II.gnm1.chr0$1\t/' vigun.Xiabao_II.gnm1*.bed &
+  #perl -pi -e 's/vigun.Xiabao_II.gnm1.LG(\d\d)\t/vigun.Xiabao_II.gnm1.chr$1\t/' vigun.Xiabao_II.gnm1*.bed &
   perl -pi -e 's/vigun.ZN016.gnm1.chr(\d)\t/vigun.ZN016.gnm1.chr0$1\t/' vigun.ZN016.gnm1*.bed &
 
 # Check chromosome names
@@ -81,20 +83,20 @@ cd $base_dir/data/
   for file in *bed *fna *faa; do gzip $file &
   done
 
-cat << DATA > expected_chr_matches.tsv
+cat << 'DATA' > expected_chr_matches.tsv
 # Expected chromosome matches for Vigna unguiculata
-01	01
-02	02
-03	03
-04	04
-05	05
-06	06
-07	07
-08	08
-09	09
-10	10
-11	11
-DATA 
+01 01
+02 02
+03 03
+04 04
+05 05
+06 06
+07 07
+08 08
+09 09
+10 10
+11 11
+DATA
 
 cd $base_dir
 
