@@ -144,7 +144,7 @@ Environment variables:
       clone https://github.com/legumeinfo/pandagma
       I typically rename the downloaded repository to the genus name that I am working on, e.g.
     
-            clone https://github.com/legumeinfo/pandagma.git
+            git clone https://github.com/legumeinfo/pandagma.git
             mv pandagma zea
             cd zea
 
@@ -155,7 +155,7 @@ Environment variables:
               work_zea  zea
 
 3. Get into a suitable work environment (computation node), and load dependencies.
-    The script has these third-party dependencies: **bioperl, mcl, mmseqs2**
+    The script has these third-party dependencies: **bioperl, mcl, mmseqs2, DAGchainer**
 
     These can be loaded using a module-loading system, or with a package manager such as conda, or
     via a Singularity image. 
@@ -165,7 +165,7 @@ Environment variables:
     OR:
     
           conda activate pandagma    
-             # pandagma is the conda environment where I've installed bioperl, mcl, mmseqs2
+            # pandagma is the conda environment where I've installed the dependencies above.
     
 4. Download the annotation data from a remote source (CDS or peptide, and GFF or BED), and transform if needed.
     I do this with a simple shell script that executes curl commands and then applies some transformations.
