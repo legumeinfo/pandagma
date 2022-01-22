@@ -9,37 +9,37 @@ set -o nounset
 
 if [ ! -d data ]; then mkdir -p data; fi
 
-# Base URL for LegumeInfo/SoyBase Data Store, for genus Vigna
+# Base URL for LegumeInfo/SoyBase Data Store, for this genus
 url_base="https://legumeinfo.org/data/v2/Vigna"
 
 ## data
 base_dir=$PWD
 cd $base_dir/data/
-  curl -O $url_base/angularis/annotations/Gyeongwon.gnm3.ann1.3Nz5/vigan.Gyeongwon.gnm3.ann1.3Nz5.cds_primaryTranscript.fna.gz
-  curl -O $url_base/angularis/annotations/Shumari.gnm1.ann1.8BRS/vigan.Shumari.gnm1.ann1.8BRS.cds_primaryTranscript.fna.gz
+  curl -O $url_base/angularis/annotations/Gyeongwon.gnm3.ann1.3Nz5/vigan.Gyeongwon.gnm3.ann1.3Nz5.cds_primary.fna.gz
+  curl -O $url_base/angularis/annotations/Shumari.gnm1.ann1.8BRS/vigan.Shumari.gnm1.ann1.8BRS.cds_primary.fna.gz
   curl -O $url_base/radiata/annotations/VC1973A.gnm6.ann1.M1Qs/vigra.VC1973A.gnm6.ann1.M1Qs.cds.fna.gz
-  curl -O $url_base/unguiculata/annotations/CB5-2.gnm1.ann1.0GKC/vigun.CB5-2.gnm1.ann1.0GKC.cds_primaryTranscript.fna.gz
-  curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann1.zb5D/vigun.IT97K-499-35.gnm1.ann1.zb5D.cds_primaryTranscript.fna.gz
-  curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann2.FD7K/vigun.IT97K-499-35.gnm1.ann2.FD7K.cds_primaryTranscript.fna.gz
-  curl -O $url_base/unguiculata/annotations/Sanzi.gnm1.ann1.HFH8/vigun.Sanzi.gnm1.ann1.HFH8.cds_primaryTranscript.fna.gz
-  curl -O $url_base/unguiculata/annotations/Suvita2.gnm1.ann1.1PF6/vigun.Suvita2.gnm1.ann1.1PF6.cds_primaryTranscript.fna.gz
-  curl -O $url_base/unguiculata/annotations/TZ30.gnm1.ann2.59NL/vigun.TZ30.gnm1.ann2.59NL.cds_primaryTranscript.fna.gz
-  curl -O $url_base/unguiculata/annotations/UCR779.gnm1.ann1.VF6G/vigun.UCR779.gnm1.ann1.VF6G.cds_primaryTranscript.fna.gz
+  curl -O $url_base/unguiculata/annotations/CB5-2.gnm1.ann1.0GKC/vigun.CB5-2.gnm1.ann1.0GKC.cds_primary.fna.gz
+  curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann1.zb5D/vigun.IT97K-499-35.gnm1.ann1.zb5D.cds_primary.fna.gz
+  curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann2.FD7K/vigun.IT97K-499-35.gnm1.ann2.FD7K.cds_primary.fna.gz
+  curl -O $url_base/unguiculata/annotations/Sanzi.gnm1.ann1.HFH8/vigun.Sanzi.gnm1.ann1.HFH8.cds_primary.fna.gz
+  curl -O $url_base/unguiculata/annotations/Suvita2.gnm1.ann1.1PF6/vigun.Suvita2.gnm1.ann1.1PF6.cds_primary.fna.gz
+  curl -O $url_base/unguiculata/annotations/TZ30.gnm1.ann2.59NL/vigun.TZ30.gnm1.ann2.59NL.cds_primary.fna.gz
+  curl -O $url_base/unguiculata/annotations/UCR779.gnm1.ann1.VF6G/vigun.UCR779.gnm1.ann1.VF6G.cds_primary.fna.gz
   #curl -O $url_base/unguiculata/annotations/Xiabao_II.gnm1.ann1.4JFL/vigun.Xiabao_II.gnm1.ann1.4JFL.cds.fna.gz
-  curl -O $url_base/unguiculata/annotations/ZN016.gnm1.ann2.C7YV/vigun.ZN016.gnm1.ann2.C7YV.cds_primaryTranscript.fna.gz
+  curl -O $url_base/unguiculata/annotations/ZN016.gnm1.ann2.C7YV/vigun.ZN016.gnm1.ann2.C7YV.cds_primary.fna.gz
 
-  curl -O $url_base/angularis/annotations/Gyeongwon.gnm3.ann1.3Nz5/vigan.Gyeongwon.gnm3.ann1.3Nz5.protein_primaryTranscript.faa.gz
-  curl -O $url_base/angularis/annotations/Shumari.gnm1.ann1.8BRS/vigan.Shumari.gnm1.ann1.8BRS.protein_primaryTranscript.faa.gz
+  curl -O $url_base/angularis/annotations/Gyeongwon.gnm3.ann1.3Nz5/vigan.Gyeongwon.gnm3.ann1.3Nz5.protein_primary.faa.gz
+  curl -O $url_base/angularis/annotations/Shumari.gnm1.ann1.8BRS/vigan.Shumari.gnm1.ann1.8BRS.protein_primary.faa.gz
   curl -O $url_base/radiata/annotations/VC1973A.gnm6.ann1.M1Qs/vigra.VC1973A.gnm6.ann1.M1Qs.protein.faa.gz
-  curl -O $url_base/unguiculata/annotations/CB5-2.gnm1.ann1.0GKC/vigun.CB5-2.gnm1.ann1.0GKC.protein_primaryTranscript.faa.gz
-  curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann1.zb5D/vigun.IT97K-499-35.gnm1.ann1.zb5D.protein_primaryTranscript.faa.gz
-  curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann2.FD7K/vigun.IT97K-499-35.gnm1.ann2.FD7K.protein_primaryTranscript.faa.gz
-  curl -O $url_base/unguiculata/annotations/Sanzi.gnm1.ann1.HFH8/vigun.Sanzi.gnm1.ann1.HFH8.protein_primaryTranscript.faa.gz
-  curl -O $url_base/unguiculata/annotations/Suvita2.gnm1.ann1.1PF6/vigun.Suvita2.gnm1.ann1.1PF6.protein_primaryTranscript.faa.gz
-  curl -O $url_base/unguiculata/annotations/TZ30.gnm1.ann2.59NL/vigun.TZ30.gnm1.ann2.59NL.protein_primaryTranscript.faa.gz
-  curl -O $url_base/unguiculata/annotations/UCR779.gnm1.ann1.VF6G/vigun.UCR779.gnm1.ann1.VF6G.protein_primaryTranscript.faa.gz
+  curl -O $url_base/unguiculata/annotations/CB5-2.gnm1.ann1.0GKC/vigun.CB5-2.gnm1.ann1.0GKC.protein_primary.faa.gz
+  curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann1.zb5D/vigun.IT97K-499-35.gnm1.ann1.zb5D.protein_primary.faa.gz
+  curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann2.FD7K/vigun.IT97K-499-35.gnm1.ann2.FD7K.protein_primary.faa.gz
+  curl -O $url_base/unguiculata/annotations/Sanzi.gnm1.ann1.HFH8/vigun.Sanzi.gnm1.ann1.HFH8.protein_primary.faa.gz
+  curl -O $url_base/unguiculata/annotations/Suvita2.gnm1.ann1.1PF6/vigun.Suvita2.gnm1.ann1.1PF6.protein_primary.faa.gz
+  curl -O $url_base/unguiculata/annotations/TZ30.gnm1.ann2.59NL/vigun.TZ30.gnm1.ann2.59NL.protein_primary.faa.gz
+  curl -O $url_base/unguiculata/annotations/UCR779.gnm1.ann1.VF6G/vigun.UCR779.gnm1.ann1.VF6G.protein_primary.faa.gz
   #curl -O $url_base/unguiculata/annotations/Xiabao_II.gnm1.ann1.4JFL/vigun.Xiabao_II.gnm1.ann1.4JFL.protein.faa.gz
-  curl -O $url_base/unguiculata/annotations/ZN016.gnm1.ann2.C7YV/vigun.ZN016.gnm1.ann2.C7YV.protein_primaryTranscript.faa.gz
+  curl -O $url_base/unguiculata/annotations/ZN016.gnm1.ann2.C7YV/vigun.ZN016.gnm1.ann2.C7YV.protein_primary.faa.gz
 
   curl -O $url_base/angularis/annotations/Gyeongwon.gnm3.ann1.3Nz5/vigan.Gyeongwon.gnm3.ann1.3Nz5.cds.bed.gz
   curl -O $url_base/angularis/annotations/Shumari.gnm1.ann1.8BRS/vigan.Shumari.gnm1.ann1.8BRS.cds.bed.gz
@@ -53,9 +53,6 @@ cd $base_dir/data/
   curl -O $url_base/unguiculata/annotations/UCR779.gnm1.ann1.VF6G/vigun.UCR779.gnm1.ann1.VF6G.cds.bed.gz
   #curl -O $url_base/unguiculata/annotations/Xiabao_II.gnm1.ann1.4JFL/vigun.Xiabao_II.gnm1.ann1.4JFL.cds.bed.gz
   curl -O $url_base/unguiculata/annotations/ZN016.gnm1.ann2.C7YV/vigun.ZN016.gnm1.ann2.C7YV.cds.bed.gz
-
-# Shorten some filenames.
-  ../scripts/rename.pl 's/primaryTranscript/primary/' *primaryTranscript*
 
 # Fix the forms of chromosome IDs
   for file in *; do gunzip $file & done

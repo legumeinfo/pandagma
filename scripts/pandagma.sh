@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021
 #
 scriptname=`basename "$0"`
-version="2021-11-16"
+version="2022-01-06"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -485,8 +485,8 @@ run_calc_chr_pairs() {
        18_syn_pan_aug_extra_posn.gene_chr.hsh | perl -pe 's/ /\t/g' | sort -k2,2 | 
      join -1 2 -2 1 - 18_syn_pan_aug_extra_posn.gene_chr.hsh | 
      awk 'BEGIN{IGNORECASE=1; OFS="\t"} 
-          $3!~/cont|scaff|sc|pilon|ctg|contig|mito|mt$|cp$|pt$|chl|unanchor|unkn/ && \
-          $4!~/cont|scaff|sc|pilon|ctg|contig|mito|mt$|cp$|pt$|chl|unanchor|unkn/ \
+          $3!~/cont|scaff|sc|pilon|ctg|contig|tig|mito|mt$|cp$|pt$|chl|unanchor|unkn/ && \
+          $4!~/cont|scaff|sc|pilon|ctg|contig|tig|mito|mt$|cp$|pt$|chl|unanchor|unkn/ \
           {print $3, $4}' | perl -pe 's/^\S+\.\D+(\d+)\s+\S+\.\D+(\d+)/$1\t$2/' |
      awk -v OFS="\t" '$1<=$2 {print $1, $2} $1>$2 {print $2, $1}' |
      sort | uniq -c | awk -v OFS="\t" '{print $2, $3, $1}' | sort -k3nr,3nr > observed_chr_pairs.tsv

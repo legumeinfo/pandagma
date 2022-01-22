@@ -7,7 +7,7 @@
 set -o errexit
 set -o nounset
 
-# Base URL for LegumeInfo/SoyBase Data Store, for genus Medicago
+# Base URL for LegumeInfo/SoyBase Data Store, for this genus
 if [ ! -d data ]; then mkdir -p data; fi
 url_base="https://legumeinfo.org/data/v2/Medicago"
 
@@ -34,7 +34,7 @@ cd $base_dir/data_orig
   curl -O $url_base/truncatula/annotations/R108_HM340.gnm1.ann1.85YW/medtr.R108_HM340.gnm1.ann1.85YW.cds.bed.gz
 
   curl -O $url_base/sativa/annotations/XinJiangDaYe.gnm1.ann1.RKB9/medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna.gz
-  curl -O $url_base/truncatula/annotations/A17_HM341.gnm4.ann2.G3ZY/medtr.A17_HM341.gnm4.ann2.G3ZY.cds_primaryTranscript.fna.gz
+  curl -O $url_base/truncatula/annotations/A17_HM341.gnm4.ann2.G3ZY/medtr.A17_HM341.gnm4.ann2.G3ZY.cds_primary.fna.gz
   curl -O $url_base/truncatula/annotations/HM004.gnm1.ann1.2XTB/medtr.HM004.gnm1.ann1.2XTB.cds.fna.gz
   curl -O $url_base/truncatula/annotations/HM010.gnm1.ann1.WV9J/medtr.HM010.gnm1.ann1.WV9J.cds.fna.gz
   curl -O $url_base/truncatula/annotations/HM022.gnm1.ann1.6C8N/medtr.HM022.gnm1.ann1.6C8N.cds.fna.gz
@@ -50,10 +50,10 @@ cd $base_dir/data_orig
   curl -O $url_base/truncatula/annotations/HM185.gnm1.ann1.GB3D/medtr.HM185.gnm1.ann1.GB3D.cds.fna.gz
   curl -O $url_base/truncatula/annotations/HM324.gnm1.ann1.SQH2/medtr.HM324.gnm1.ann1.SQH2.cds.fna.gz
   curl -O $url_base/truncatula/annotations/jemalong_A17.gnm5.ann1_6.L2RX/medtr.jemalong_A17.gnm5.ann1_6.L2RX.cds.fna.gz
-  curl -O $url_base/truncatula/annotations/R108_HM340.gnm1.ann1.85YW/medtr.R108_HM340.gnm1.ann1.85YW.cds_primaryTranscript.fna.gz
+  curl -O $url_base/truncatula/annotations/R108_HM340.gnm1.ann1.85YW/medtr.R108_HM340.gnm1.ann1.85YW.cds_primary.fna.gz
 
   curl -O $url_base/sativa/annotations/XinJiangDaYe.gnm1.ann1.RKB9/medsa.XinJiangDaYe.gnm1.ann1.RKB9.protein.faa.gz
-  curl -O $url_base/truncatula/annotations/A17_HM341.gnm4.ann2.G3ZY/medtr.A17_HM341.gnm4.ann2.G3ZY.protein_primaryTranscript.faa.gz
+  curl -O $url_base/truncatula/annotations/A17_HM341.gnm4.ann2.G3ZY/medtr.A17_HM341.gnm4.ann2.G3ZY.protein_primary.faa.gz
   curl -O $url_base/truncatula/annotations/HM004.gnm1.ann1.2XTB/medtr.HM004.gnm1.ann1.2XTB.protein.faa.gz
   curl -O $url_base/truncatula/annotations/HM010.gnm1.ann1.WV9J/medtr.HM010.gnm1.ann1.WV9J.protein.faa.gz
   curl -O $url_base/truncatula/annotations/HM022.gnm1.ann1.6C8N/medtr.HM022.gnm1.ann1.6C8N.protein.faa.gz
@@ -69,10 +69,7 @@ cd $base_dir/data_orig
   curl -O $url_base/truncatula/annotations/HM185.gnm1.ann1.GB3D/medtr.HM185.gnm1.ann1.GB3D.protein.faa.gz
   curl -O $url_base/truncatula/annotations/HM324.gnm1.ann1.SQH2/medtr.HM324.gnm1.ann1.SQH2.protein.faa.gz
   curl -O $url_base/truncatula/annotations/jemalong_A17.gnm5.ann1_6.L2RX/medtr.jemalong_A17.gnm5.ann1_6.L2RX.protein.faa.gz
-  curl -O $url_base/truncatula/annotations/R108_HM340.gnm1.ann1.85YW/medtr.R108_HM340.gnm1.ann1.85YW.protein_primaryTranscript.faa.gz
-
-echo  "Shorten some filenames."
-  ../scripts/rename.pl 's/primaryTranscript/primary/' *primaryTranscript*
+  curl -O $url_base/truncatula/annotations/R108_HM340.gnm1.ann1.85YW/medtr.R108_HM340.gnm1.ann1.85YW.protein_primary.faa.gz
 
 echo "Change chromosome names for some of the files, to allow later filtering by chromosome correspondence"
 
