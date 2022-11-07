@@ -34,7 +34,7 @@ To run pandamga using singularity, use `singularity run pandagma.sif [run comman
     singularity run pandagma.sif init
     ... modify pandagma.conf ...
     mkdir /path/to/pandagma/work_dir # create work dir on fast, node-local storage
-    singularity run --env NPROC=<number of cpus> --env PANDAGMA_WORK_DIR=/path/to/work/dir pandagma.sif run
+    singularity run --env NPROC=<number of cpus> --env WORK_DIR=/path/to/work/dir pandagma.sif run
 
 ### Installation method 2: manual installation of scripts and dependencies
 
@@ -67,8 +67,8 @@ Usage:
 
 Add the scripts directory to your PATH
 Export these environment variables:
-  PANDAGMA_WORK_DIR
-  PANDAGMA_CONF
+  WORK_DIR
+  CONF
   NPROC
 
 Primary coding sequence (fasta) and annotation (GFF3 or BED) files must be listed in the
@@ -133,9 +133,9 @@ Variables in pandagma config file:
             version - version of this script at config time
 
 Environment variables:
-         PANDAGMA_CONF - Path of the pandagma config file (default ${PWD})
-     PANDAGMA_WORK_DIR - Location of working files (default ${PWD}/work)
-                 NPROC - Number of processors to use (default 1)
+               CONF - Path of the pandagma config file (default ${PWD})
+           WORK_DIR - Location of working files (default ${PWD}/work)
+              NPROC - Number of processors to use (default 1)
 ~~~
 
 ## Detailed instructions <a name="details"></a>
@@ -195,8 +195,8 @@ Environment variables:
     If dependencies are manually installed and the script is called directly:
 
           export NPROC=10
-          export PANDAGMA_WORK_DIR=$PWD/../work_zea
-          export PANDAGMA_CONF=config/pandagma_Zea_7_2_nuc.conf
+          export WORK_DIR=$PWD/../work_zea
+          export CONF=config/pandagma_Zea_7_2_nuc.conf
           export PATH=$PWD/scripts:$PATH
         
     If the dependencies and script are called via Singularity image: set the environment variables as 
@@ -212,8 +212,8 @@ Environment variables:
 
          pandagma_sing_img=$YOURPATH/pandagma-v2021-11-16.sif
          nohup singularity exec --env NPROC=$(( ${SLURM_JOB_CPUS_PER_NODE}/5 ))  \
-                      --env PANDAGMA_WORK_DIR=$PWD/../work_zea \
-                      --env PANDAGMA_CONF=config/pandagma_Zea_7_2_nuc.conf \
+                      --env WORK_DIR=$PWD/../work_zea \
+                      --env CONF=config/pandagma_Zea_7_2_nuc.conf \
                       --cleanenv $pandagma_sing_img pandagma.sh run > nohup_7_2.out &
 
 8. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
