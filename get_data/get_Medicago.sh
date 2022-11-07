@@ -9,7 +9,7 @@ set -o nounset
 
 # Base URL for LegumeInfo/SoyBase Data Store, for this genus
 if [ ! -d data ]; then mkdir -p data; fi
-url_base="https://legumeinfo.org/data/v2/Medicago"
+url_base="https://data.legumeinfo.org/Medicago"
 
 ## data
 base_dir=$PWD

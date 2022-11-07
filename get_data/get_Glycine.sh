@@ -8,7 +8,7 @@ set -o errexit
 set -o nounset
 
 # Base URL for LegumeInfo/SoyBase Data Store, for this genus
-url_base="https://legumeinfo.org/data/v2/Glycine"
+url_base="https://data.legumeinfo.org/Glycine"
 
 ## data
 base_dir=$PWD

@@ -10,7 +10,7 @@ set -o nounset
 if [ ! -d data ]; then mkdir -p data; fi
 
 # Base URL for LegumeInfo/SoyBase Data Store, for this genus
-url_base="https://legumeinfo.org/data/v2/Vigna"
+url_base="https://data.legumeinfo.org/Vigna"
 
 ## data
 base_dir=$PWD
