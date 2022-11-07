@@ -10,8 +10,8 @@ set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
 export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
-export PANDAGMA_CONF=${PANDAGMA_CONF:-${PWD}/pandagma.conf}
-export PANDAGMA_WORK_DIR=${PANDAGMA_WORK_DIR:-${PWD}/work}
+export CONF=${CONF:-${PWD}/pandagma.conf}
+export WORK_DIR=${WORK_DIR:-${PWD}/work}
 
 # mmseqs uses a significant number of threads on its own. Set a maximum, which may be below NPROC.
 MMSEQSTHREADS=$(( 10 < ${NPROC} ? 10 : ${NPROC} ))
@@ -61,7 +61,7 @@ Subommands (in order they are usually run):
  run calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
       run summarize - Move results into output directory, and report summary statistics.
 
-Variables in pandagma config file (Set the config with the PANDAGMA_CONF environment variable)
+Variables in pandagma config file (Set the config with the CONF environment variable)
     dagchainer_args - Argument for DAGchainer command
          clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
           clust_cov - Minimum coverage for mmseqs clustering [0.60]
@@ -73,12 +73,9 @@ Variables in pandagma config file (Set the config with the PANDAGMA_CONF environ
         extra_stats - Flag (yes/no) to calculate coverage stats; use only for genes with IDs that have a four-part
                        prefix like glyma.Wm82.gnm1.ann1 [no]
 
-
 Environment variables:
-         PANDAGMA_CONF - Path of the pandagma config file, default:
-                       \"${PANDAGMA_CONF}\"
-    PANDAGMA_WORK_DIR - Location of working files, default:
-                       \"${PANDAGMA_WORK_DIR}\"
+               CONF - Path of the pandagma config file, default: \"${CONF}\"
+           WORK_DIR - Location of working files, default: \"${WORK_DIR}\"
               NPROC - Number of processors to use (default 1)
 """
 #
@@ -116,7 +113,7 @@ check_seq_type () {
 run_ingest() {
 # Add positional information from GFF3 or 4- or 6-column BED to FASTA IDs
 # BED start coordinate converted to 1-based
-  cd "${PANDAGMA_WORK_DIR}"
+  cd "${WORK_DIR}"
   echo; echo "Run ingest: from fasta and gff or bed data, create fasta with IDs containing positional info."
   
   mkdir -p 02_fasta 01_posn_hsh stats
@@ -166,7 +163,7 @@ run_ingest() {
 
 run_mmseqs() {
   # Do mmseqs clustering on all pairings of the main annotation sets (not the extra ones though)
-  cd "${PANDAGMA_WORK_DIR}"
+  cd "${WORK_DIR}"
   echo; echo "Run mmseqs -- at ${clust_iden} percent identity and minimum of ${clust_cov}% coverage."
   #
 
@@ -190,7 +187,7 @@ run_mmseqs() {
 
 run_filter() {
   echo; echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
-  cd "${PANDAGMA_WORK_DIR}"
+  cd "${WORK_DIR}"
   mkdir -p 04_dag
   if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
     echo "Filtering on chromosome patterns from file ${chr_match_list}"
@@ -214,7 +211,7 @@ run_filter() {
 
 run_dagchainer() {
   # Identify syntenic blocks, using DAGchainer
-  cd "${PANDAGMA_WORK_DIR}"
+  cd "${WORK_DIR}"
   echo; echo "Run DAGchainer, using args \"${dagchainer_args}\""
   for match_path in 04_dag/*_matches.tsv; do
     align_file=`basename $match_path _matches.tsv`
@@ -239,7 +236,7 @@ run_dagchainer() {
 
 run_mcl() {
   # Calculate clusters using Markov clustering
-  cd "${PANDAGMA_WORK_DIR}"
+  cd "${WORK_DIR}"
   printf "\nCalculate clusters. use Markov clustering with inflation parameter $mcl_inflation and ${NPROC} threads\n"
   echo "MCL COMMAND: mcl 05_synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv"
   mcl 05_synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv \
@@ -256,7 +253,7 @@ run_mcl() {
 run_consense() {
   echo; 
   echo "Add previously unclustered sequences into an \"augmented\" pan-gene set, by homology."
-  cd "${PANDAGMA_WORK_DIR}"
+  cd "${WORK_DIR}"
   mkdir -p 07_pan_fasta lists
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
@@ -330,7 +327,7 @@ run_add_extra() {
   then # handle the "extra" annotation files
     echo; echo "Add extra annotation sets to the augmented clusters, by homology"
     echo "  Search non-clustered genes against pan-gene consensus sequences"
-    cd "${PANDAGMA_WORK_DIR}"
+    cd "${WORK_DIR}"
     mkdir -p 13_extra_out_dir 13_pan_aug_fasta
 
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
@@ -418,7 +415,7 @@ fi
 }
 
 run_name_pangenes() {
-  cd "${PANDAGMA_WORK_DIR}"
+  cd "${WORK_DIR}"
 
   echo "  Add positional information to the hash output."
   join -a 1 -1 2 -2 1 <(sort -k2,2 17_syn_pan_aug_extra.hsh.tsv) <(cat 01_posn_hsh/*hsh | sort -k1,1) | 
@@ -434,7 +431,7 @@ run_name_pangenes() {
     perl -pe 's/^(\S+)\t([^.]+\.[^.]+)\.(chr\d+)_(\d+)\t(\d+)\t(\d+)/$1\t$1__$2.$3_$4__$5__$6/' > consen_posn.hsh
 
   echo "  Hash position information into fasta file"
-  hash_into_fasta_id.pl -fasta 21_pan_fasta_clust_rep_seq.$faext -hash consen_posn.hsh -keep_definition \
+  hash_into_fasta_id.pl -fasta 21_pan_fasta_clust_rep_seq.$faext -hash consen_posn.hsh \
     -out_file 21_pan_fasta_clust_rep_seq_posnTMP.$faext
 
   # Reshape defline, and sort by position
@@ -466,7 +463,7 @@ run_name_pangenes() {
 }
 
 run_calc_chr_pairs() {
-  cd "${PANDAGMA_WORK_DIR}"
+  cd "${WORK_DIR}"
   echo "Generate a report of observed chromosome pairs"
 
   echo "  Identify gene pairs, ussing mmseqs --easy_cluster"
@@ -496,7 +493,7 @@ run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
  
   # Determine if the sequence looks like nucleotide or like protein.
-  someseq=$(head ${PANDAGMA_WORK_DIR}/07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
+  someseq=$(head ${WORK_DIR}/07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
   SEQTYPE=$(check_seq_type "${someseq}")
   case "$SEQTYPE" in 
     3) ST="NUC" ;;
@@ -514,18 +511,53 @@ run_summarize() {
       mkdir -p $full_out_dir
   fi
 
-  cp ${PANDAGMA_WORK_DIR}/06_syn_pan.clust.tsv ${full_out_dir}/
-  cp ${PANDAGMA_WORK_DIR}/06_syn_pan.hsh.tsv ${full_out_dir}/
-  cp ${PANDAGMA_WORK_DIR}/*_syn_pan_aug*.tsv ${full_out_dir}/
-  cp ${PANDAGMA_WORK_DIR}/observed_chr_pairs.tsv ${full_out_dir}/
-  cp ${PANDAGMA_WORK_DIR}/consen_${consen_prefix}.tsv ${full_out_dir}/
-  cp ${PANDAGMA_WORK_DIR}/22_syn_pan_cent_merged_posn.$faext ${full_out_dir}/
-  cp ${PANDAGMA_WORK_DIR}/22_syn_pan_cent_merged_posn_trimd.$faext ${full_out_dir}/
+
+  if [ -f ${WORK_DIR}/06_syn_pan.clust.tsv ]; then
+    cp ${WORK_DIR}/06_syn_pan.clust.tsv ${full_out_dir}/
+  else
+    echo "Warning: couldn't find file ${WORK_DIR}/06_syn_pan.clust.tsv; skipping"
+  fi
+
+  if [ -f ${WORK_DIR}/06_syn_pan.hsh.tsv ]; then
+    cp ${WORK_DIR}/06_syn_pan.hsh.tsv ${full_out_dir}/
+  else
+    echo "Warning: couldn't find file ${WORK_DIR}/06_syn_pan.hsh.tsv; skipping"
+  fi
+
+  if [ -f ${WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv ]; then
+    cp ${WORK_DIR}/*_syn_pan_aug*.tsv ${full_out_dir}/
+  else 
+    echo "Warning: couldn't find file ${WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv; skipping"
+  fi
+
+  if [ -f ${WORK_DIR}/observed_chr_pairs.tsv ]; then
+    cp ${WORK_DIR}/observed_chr_pairs.tsv ${full_out_dir}/
+  else 
+    echo "Warning: couldn't find file ${WORK_DIR}/observed_chr_pairs.tsv; skipping"
+  fi
+
+  if [ -f ${WORK_DIR}/consen_${consen_prefix}.tsv ]; then
+    cp ${WORK_DIR}/consen_${consen_prefix}.tsv ${full_out_dir}/
+  else
+    echo "Warning: couldn't find file ${WORK_DIR}/consen_${consen_prefix}.tsv; skipping"
+  fi
+
+  if [ -f ${WORK_DIR}/22_syn_pan_cent_merged_posn.$faext ]; then
+    cp ${WORK_DIR}/22_syn_pan_cent_merged_posn.$faext ${full_out_dir}/
+  else 
+    echo "Warning: couldn't find file ${WORK_DIR}/22_syn_pan_cent_merged_posn.$faext; skipping"
+  fi 
+
+  if [ -f ${WORK_DIR}/22_syn_pan_cent_merged_posn_trimd.$faext ]; then 
+    cp ${WORK_DIR}/22_syn_pan_cent_merged_posn_trimd.$faext ${full_out_dir}/
+  else 
+    echo "Warning: couldn't find file {WORK_DIR}/22_syn_pan_cent_merged_posn_trimd.$faext; skipping"
+  fi
 
   printf "Run of program $scriptname, version $version\n" > ${stats_file}
 
   end_time=`date`
-  cat ${PANDAGMA_WORK_DIR}/stats/tmp.timing >> ${stats_file}
+  cat ${WORK_DIR}/stats/tmp.timing >> ${stats_file}
   printf "Run ended at:   $end_time\n\n" >> ${stats_file}
 
   # Report sequence type 
@@ -606,19 +638,19 @@ run_summarize() {
 
   # Report the starting files:
     printf "\n== Starting fasta files\n" >> ${stats_file}
-    cat ${PANDAGMA_WORK_DIR}/stats/tmp.fasta_list >> ${stats_file}
+    cat ${WORK_DIR}/stats/tmp.fasta_list >> ${stats_file}
 
   # Print per-annotation-set coverage stats (sequence counts, sequences retained), if stats-extra flag is set
   if [ ${extra_stats,,} = "yes" ]; then
-    cut -f3 ${PANDAGMA_WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv | 
+    cut -f3 ${WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv | 
       perl -pe 's/(.+)\.([^.]+)$/$1\n/' |
-      sort | uniq -c | awk '{print $2 "\t" $1}' > ${PANDAGMA_WORK_DIR}/stats/tmp.gene_count_end
+      sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_end
 
     # tmp.gene_count_start was generated during run_ingest
 
     printf "\n== Start and end gene counts per annotation set\n" >> ${stats_file}
 
-    join ${PANDAGMA_WORK_DIR}/stats/tmp.gene_count_start ${PANDAGMA_WORK_DIR}/stats/tmp.gene_count_end | 
+    join ${WORK_DIR}/stats/tmp.gene_count_start ${WORK_DIR}/stats/tmp.gene_count_end | 
       awk 'BEGIN{print "\tStart\tEnd\tKept\tAnnotation_name"} 
           { printf "\t%i\t%i\t%2.1f\t%s\n", $2, $3, 100*($3/$2), $1 }'  >> ${stats_file}
   fi
@@ -672,7 +704,7 @@ Steps:
            summarize - Compute synteny stats
 """
   commandlist="ingest mmseqs filter dagchainer mcl consense add_extra name_pangenes calc_chr_pairs summarize"
-  . "${PANDAGMA_CONF}"
+  . "${CONF}"
   canonicalize_paths
   if [ "$#" -eq 0 ]; then # run the whole list
     for package in $commandlist; do
