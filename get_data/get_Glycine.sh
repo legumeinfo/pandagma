@@ -26,7 +26,7 @@ curl -O $url_base/max/annotations/Wenfeng7_IGA1001.gnm1.ann1.ZK5W/glyma.Wenfeng7
 curl -O $url_base/max/annotations/Wm82_IGA1008.gnm1.ann1.FGN6/glyma.Wm82_IGA1008.gnm1.ann1.FGN6.protein.faa.gz                
 curl -O $url_base/max/annotations/Wm82.gnm1.ann1.DvBy/glyma.Wm82.gnm1.ann1.DvBy.protein_primary.faa.gz              
 curl -O $url_base/max/annotations/Wm82.gnm2.ann1.RVB6/glyma.Wm82.gnm2.ann1.RVB6.protein_primary.faa.gz              
-curl -O $url_base/max/annotations/Wm82.gnm2.ann2.BG1Q/glyma.Wm82.gnm2.ann2.BG1Q.protein_primary.faa.gz              
+#curl -O $url_base/max/annotations/Wm82.gnm2.ann2.BG1Q/glyma.Wm82.gnm2.ann2.BG1Q.protein_primary.faa.gz              
 curl -O $url_base/max/annotations/Wm82.gnm4.ann1.T8TQ/glyma.Wm82.gnm4.ann1.T8TQ.protein_primary.faa.gz              
 curl -O $url_base/max/annotations/Zh13_IGA1005.gnm1.ann1.87Z5/glyma.Zh13_IGA1005.gnm1.ann1.87Z5.protein.faa.gz                
 curl -O $url_base/max/annotations/Zh13.gnm1.ann1.8VV3/glyma.Zh13.gnm1.ann1.8VV3.protein_primary.faa.gz              
@@ -37,7 +37,7 @@ curl -O $url_base/soja/annotations/PI483463.gnm1.ann1.3Q3Q/glyso.PI483463.gnm1.a
 curl -O $url_base/soja/annotations/W05.gnm1.ann1.T47J/glyso.W05.gnm1.ann1.T47J.protein_primary.faa.gz               
 curl -O $url_base/stenophita/annotations/G1974.gnm1.ann1.F257/glyst.G1974.gnm1.ann1.F257.protein.faa.gz                       
 curl -O $url_base/syndetika/annotations/G1300.gnm1.ann1.RRK6/glysy.G1300.gnm1.ann1.RRK6.protein.faa.gz                        
-curl -O $url_base/tomentella_D3/annotations/G1403.gnm1.ann1.XNZQ/glytoD3.G1403.gnm1.ann1.XNZQ.protein.faa.gz                  
+curl -O $url_base/D3-tomentella/annotations/G1403.gnm1.ann1.XNZQ/glyd3.G1403.gnm1.ann1.XNZQ.protein.faa.gz                  
                                            
                                            
 curl -O $url_base/cyrtoloba/annotations/G1267.gnm1.ann1.HRFD/glycy.G1267.gnm1.ann1.HRFD.cds.fna.gz
@@ -52,7 +52,7 @@ curl -O $url_base/max/annotations/Wenfeng7_IGA1001.gnm1.ann1.ZK5W/glyma.Wenfeng7
 curl -O $url_base/max/annotations/Wm82_IGA1008.gnm1.ann1.FGN6/glyma.Wm82_IGA1008.gnm1.ann1.FGN6.cds.fna.gz
 curl -O $url_base/max/annotations/Wm82.gnm1.ann1.DvBy/glyma.Wm82.gnm1.ann1.DvBy.cds_primary.fna.gz
 curl -O $url_base/max/annotations/Wm82.gnm2.ann1.RVB6/glyma.Wm82.gnm2.ann1.RVB6.cds_primary.fna.gz
-curl -O $url_base/max/annotations/Wm82.gnm2.ann2.BG1Q/glyma.Wm82.gnm2.ann2.BG1Q.cds_primary.fna.gz
+## curl -O $url_base/max/annotations/Wm82.gnm2.ann2.BG1Q/glyma.Wm82.gnm2.ann2.BG1Q.cds_primary.fna.gz
 curl -O $url_base/max/annotations/Wm82.gnm4.ann1.T8TQ/glyma.Wm82.gnm4.ann1.T8TQ.cds_primary.fna.gz
 curl -O $url_base/max/annotations/Zh13_IGA1005.gnm1.ann1.87Z5/glyma.Zh13_IGA1005.gnm1.ann1.87Z5.cds.fna.gz
 curl -O $url_base/max/annotations/Zh13.gnm1.ann1.8VV3/glyma.Zh13.gnm1.ann1.8VV3.cds_primary.fna.gz
@@ -63,7 +63,7 @@ curl -O $url_base/soja/annotations/PI483463.gnm1.ann1.3Q3Q/glyso.PI483463.gnm1.a
 curl -O $url_base/soja/annotations/W05.gnm1.ann1.T47J/glyso.W05.gnm1.ann1.T47J.cds_primary.fna.gz
 curl -O $url_base/stenophita/annotations/G1974.gnm1.ann1.F257/glyst.G1974.gnm1.ann1.F257.cds.fna.gz
 curl -O $url_base/syndetika/annotations/G1300.gnm1.ann1.RRK6/glysy.G1300.gnm1.ann1.RRK6.cds.fna.gz
-curl -O $url_base/tomentella_D3/annotations/G1403.gnm1.ann1.XNZQ/glytoD3.G1403.gnm1.ann1.XNZQ.cds.fna.gz
+curl -O $url_base/D3-tomentella/annotations/G1403.gnm1.ann1.XNZQ/glyd3.G1403.gnm1.ann1.XNZQ.cds.fna.gz
 
 
 curl -O $url_base/cyrtoloba/annotations/G1267.gnm1.ann1.HRFD/glycy.G1267.gnm1.ann1.HRFD.cds.bed.gz
@@ -78,7 +78,7 @@ curl -O $url_base/max/annotations/Wenfeng7_IGA1001.gnm1.ann1.ZK5W/glyma.Wenfeng7
 curl -O $url_base/max/annotations/Wm82_IGA1008.gnm1.ann1.FGN6/glyma.Wm82_IGA1008.gnm1.ann1.FGN6.cds.bed.gz
 curl -O $url_base/max/annotations/Wm82.gnm1.ann1.DvBy/glyma.Wm82.gnm1.ann1.DvBy.cds.bed.gz
 curl -O $url_base/max/annotations/Wm82.gnm2.ann1.RVB6/glyma.Wm82.gnm2.ann1.RVB6.cds.bed.gz
-curl -O $url_base/max/annotations/Wm82.gnm2.ann2.BG1Q/glyma.Wm82.gnm2.ann2.BG1Q.cds.bed.gz
+## curl -O $url_base/max/annotations/Wm82.gnm2.ann2.BG1Q/glyma.Wm82.gnm2.ann2.BG1Q.cds.bed.gz
 curl -O $url_base/max/annotations/Wm82.gnm4.ann1.T8TQ/glyma.Wm82.gnm4.ann1.T8TQ.cds.bed.gz
 curl -O $url_base/max/annotations/Zh13_IGA1005.gnm1.ann1.87Z5/glyma.Zh13_IGA1005.gnm1.ann1.87Z5.cds.bed.gz
 curl -O $url_base/max/annotations/Zh13.gnm1.ann1.8VV3/glyma.Zh13.gnm1.ann1.8VV3.cds.bed.gz
@@ -89,9 +89,10 @@ curl -O $url_base/soja/annotations/PI483463.gnm1.ann1.3Q3Q/glyso.PI483463.gnm1.a
 curl -O $url_base/soja/annotations/W05.gnm1.ann1.T47J/glyso.W05.gnm1.ann1.T47J.cds.bed.gz
 curl -O $url_base/stenophita/annotations/G1974.gnm1.ann1.F257/glyst.G1974.gnm1.ann1.F257.cds.bed.gz
 curl -O $url_base/syndetika/annotations/G1300.gnm1.ann1.RRK6/glysy.G1300.gnm1.ann1.RRK6.cds.bed.gz
-curl -O $url_base/tomentella_D3/annotations/G1403.gnm1.ann1.XNZQ/glytoD3.G1403.gnm1.ann1.XNZQ.cds.bed.gz
+curl -O $url_base/D3-tomentella/annotations/G1403.gnm1.ann1.XNZQ/glyd3.G1403.gnm1.ann1.XNZQ.cds.bed.gz
 
 ## Exclude glyma.Zh13.gnm2.ann1.FJ3G because gene models are too big by half: N50 2376 vs. expected 1572 (Wm82.gnm4.ann1)
+## Exclude glyma.Wm82.gnm2.ann2.BG1Q because the conversion between GFF and CDS was flawed as of mid-2022. Maybe add later.
 
 cat << DATA > expected_chr_matches.tsv
 # Expected chromosome matches for Glycine soja and Glycine max
