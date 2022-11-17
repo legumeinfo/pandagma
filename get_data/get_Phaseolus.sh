@@ -47,7 +47,7 @@ cd $base_dir/data/
 #  done
 
 cat << 'DATA' > expected_chr_matches.tsv
-# Expected chromosome matches for Vigna unguiculata
+# Expected chromosome matches for Phaseolus vulgaris
 01 01
 02 02
 03 03
