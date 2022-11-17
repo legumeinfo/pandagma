@@ -433,9 +433,7 @@ run_name_pangenes() {
   echo "  Hash position information into fasta file"
   hash_into_fasta_id.pl -fasta 21_pan_fasta_clust_rep_seq.$faext -hash consen_posn.hsh |
     grep -v "HASH UNDEFINED" > 21_pan_fasta_clust_rep_seq_posnTMP.$faext
-  # To check/fix: handle HASH UNDEFINED better. 
-  hash_into_fasta_id.pl -fasta 21_pan_fasta_clust_rep_seq.$faext -hash consen_posn.hsh |
-    grep "HASH UNDEFINED" | awk '{print "Warning: name_pangenes hash_into_fasta_id.pl reports: " $0}'
+  # To check/fix: handle HASH UNDEFINED. 
 
   # Reshape defline, and sort by position
   fasta_to_table.awk 21_pan_fasta_clust_rep_seq_posnTMP.$faext | sed 's/__/\t/g; s/ /\t/' | 
