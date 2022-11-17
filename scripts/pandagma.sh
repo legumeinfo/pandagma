@@ -130,7 +130,7 @@ run_ingest() {
     file_base=$(basename ${fasta_files[file_num]%.*})
     echo "  Adding positional information to fasta file $file_base"
     cat_or_zcat "${annotation_files[file_num]}" | gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
-    hash_into_fasta_id.pl -fasta "${fasta_files[file_num]}" \
+    hash_into_fasta_id.pl -nodef -fasta "${fasta_files[file_num]}" \
                           -hash 01_posn_hsh/$file_base.hsh \
                           -out 02_fasta/$file_base
     annot_name=$(head -1 02_fasta/$file_base | 
@@ -148,7 +148,7 @@ run_ingest() {
       file_base=$(basename ${fasta_files_extra[file_num]%.*})
       echo "  Adding positional information to extra fasta file $file_base"
       cat_or_zcat "${annotation_files_extra[file_num]}" | gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
-      hash_into_fasta_id.pl -fasta "${fasta_files_extra[file_num]}" \
+      hash_into_fasta_id.pl -nodef -fasta "${fasta_files_extra[file_num]}" \
                             -hash 01_posn_hsh/$file_base.hsh \
                             -out 02_fasta/$file_base
       annot_name=$(head -1 02_fasta/$file_base | perl -pe 's/>(.+)__.+__\d+__\d+$/$1/' | perl -pe 's/(.+)\.[^.]+$/$1/')
