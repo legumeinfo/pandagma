@@ -94,7 +94,7 @@ curl -O $url_base/D3-tomentella/annotations/G1403.gnm1.ann1.XNZQ/glyd3.G1403.gnm
 ## Exclude glyma.Zh13.gnm2.ann1.FJ3G because gene models are too big by half: N50 2376 vs. expected 1572 (Wm82.gnm4.ann1)
 ## Exclude glyma.Wm82.gnm2.ann2.BG1Q because the conversion between GFF and CDS was flawed as of mid-2022. Maybe add later.
 
-cat << DATA > expected_chr_matches.tsv
+cat <<DATA > expected_chr_matches.tsv
 # Expected chromosome matches for Glycine soja and Glycine max
 01 01
 02 02

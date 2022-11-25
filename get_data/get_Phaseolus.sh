@@ -46,7 +46,7 @@ cd $base_dir/data/
 #  for file in *bed *fna *faa; do gzip $file &
 #  done
 
-cat << 'DATA' > expected_chr_matches.tsv
+cat <<DATA > expected_chr_matches.tsv
 # Expected chromosome matches for Phaseolus vulgaris
 01 01
 02 02
