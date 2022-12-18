@@ -32,7 +32,7 @@ Where the `--remote` option is used if building the image as an unprivileged use
 To run pandamga using singularity, use `singularity run pandagma.sif [run command]`, optionally setting environment variables, e.g.:
 
     singularity run pandagma.sif init
-    ... modify pandagma.conf ...
+    ... modify config/Example.conf ...
     mkdir /path/to/pandagma/work_dir # create work dir on fast, node-local storage
     singularity run --env NPROC=<number of cpus> --env WORK_DIR=/path/to/work/dir pandagma.sif run
 
@@ -72,7 +72,7 @@ Export these environment variables:
   NPROC
 
 Primary coding sequence (fasta) and annotation (GFF3 or BED) files must be listed in the
-fasta_files and annotation_files variables defined in pandagma.conf, which by default must exist
+fasta_files and annotation_files variables defined in GENUS.conf, which by default must exist
 within the working directory from where this script is called.
 
 FASTA deflines are assumed to be formatted with the ID separated from any additional fields by a space:
@@ -92,7 +92,7 @@ BED files are assumed to contain a single feature for each primary coding sequen
 
 	Chr1	2221	5555	id1
 
-Optionally, a file specified in the expected_chr_matches variable can be specified in pandagma.conf,
+Optionally, a file specified in the expected_chr_matches variable can be specified in GENUS.conf,
 which provides anticipated chromosome pairings, e.g.
   01 01
   02 02
@@ -196,7 +196,7 @@ Environment variables:
 
           export NPROC=10
           export WORK_DIR=$PWD/../work_zea
-          export CONF=config/pandagma_Zea_7_2_nuc.conf
+          export CONF=config/Zea_7_2_nuc.conf
           export PATH=$PWD/scripts:$PATH
         
     If the dependencies and script are called via Singularity image: set the environment variables as 
