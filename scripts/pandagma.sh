@@ -412,6 +412,7 @@ run_add_extra() {
     cp 12_syn_pan_aug.clust.tsv 17_syn_pan_aug_extra.clust.tsv
     cp 12_syn_pan_aug.hsh.tsv 17_syn_pan_aug_extra.hsh.tsv
     cp 08_pan_fasta_clust_rep_seq.$faext 21_pan_fasta_clust_rep_seq.$faext
+    perl -pi -e 's/__/\t/' 21_pan_fasta_clust_rep_seq.$faext
 fi
 }
 
@@ -434,13 +435,12 @@ run_name_pangenes() {
   echo "  Hash position information into fasta file"
   hash_into_fasta_id.pl -fasta 21_pan_fasta_clust_rep_seq.$faext -hash consen_posn.hsh |
     grep -v "HASH UNDEFINED" > 21_pan_fasta_clust_rep_seq_posnTMP.$faext
-  # To check/fix: handle HASH UNDEFINED. 
 
   # Reshape defline, and sort by position
   fasta_to_table.awk 21_pan_fasta_clust_rep_seq_posnTMP.$faext | sed 's/__/\t/g; s/ /\t/' | 
     perl -pe 's/^(\w+)\s+(.+)\.(chr\d+)_(\d+)\s+/$1\t$2\t$3\t$4\t/' | sed 's/chr//' | sort -k3n -k4n |
     awk '{print ">" $2 ".chr" $3 "_" $4 " " $1 " " $5 " " $6 " " $7; print $8}' > 22_syn_pan_cent_merged_posn.$faext
-  rm 21_pan_fasta_clust_rep_seq_posnTMP.$faext
+  # rm 21_pan_fasta_clust_rep_seq_posnTMP.$faext
  
   echo "  Re-cluster, to identify neighboring genes that are highly similar"
     mmseqs easy-cluster 22_syn_pan_cent_merged_posn.$faext 23_pan_fasta 03_mmseqs_tmp \
@@ -644,7 +644,7 @@ run_summarize() {
 
   # Print per-annotation-set coverage stats (sequence counts, sequences retained), if stats-extra flag is set
   if [ ${extra_stats,,} = "yes" ]; then
-    cut -f2 ${WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv | 
+    cut -f2 ${WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv | cut -f1-4 -d'.' |
       sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_end
 
     # tmp.gene_count_start was generated during run_ingest
