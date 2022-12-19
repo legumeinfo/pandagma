@@ -134,7 +134,7 @@ run_ingest() {
                           -hash 01_posn_hsh/$file_base.hsh \
                           -out 02_fasta/$file_base
     annot_name=$(head -1 02_fasta/$file_base | 
-                 perl -pe 's/>(.+)__.+__\d+__\d+$/$1/' | perl -pe 's/(.+)\.[^.]+$/$1/')
+       perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | cut -f1-4 -d'.' ) # Assumes annot name has four dot-separated parts
     cat_or_zcat "${fasta_files[file_num]}" | 
       awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
     echo "Main:   $file_base" >> stats/tmp.fasta_list
@@ -151,7 +151,8 @@ run_ingest() {
       hash_into_fasta_id.pl -nodef -fasta "${fasta_files_extra[file_num]}" \
                             -hash 01_posn_hsh/$file_base.hsh \
                             -out 02_fasta/$file_base
-      annot_name=$(head -1 02_fasta/$file_base | perl -pe 's/>(.+)__.+__\d+__\d+$/$1/' | perl -pe 's/(.+)\.[^.]+$/$1/')
+      annot_name=$(head -1 02_fasta/$file_base | 
+         perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | cut -f1-4 -d'.' ) # Assumes annot name has four dot-separated parts
       cat_or_zcat "${fasta_files_extra[file_num]}" | 
         awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
       echo "Extra:  $file_base" >> stats/tmp.fasta_list
@@ -643,8 +644,7 @@ run_summarize() {
 
   # Print per-annotation-set coverage stats (sequence counts, sequences retained), if stats-extra flag is set
   if [ ${extra_stats,,} = "yes" ]; then
-    cut -f3 ${WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv | 
-      perl -pe 's/(.+)\.([^.]+)$/$1\n/' |
+    cut -f2 ${WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv | 
       sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_end
 
     # tmp.gene_count_start was generated during run_ingest
