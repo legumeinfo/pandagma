@@ -16,7 +16,8 @@ export WORK_DIR=${WORK_DIR:-${PWD}/work}
 # mmseqs uses a significant number of threads on its own. Set a maximum, which may be below NPROC.
 MMSEQSTHREADS=$(( 10 < ${NPROC} ? 10 : ${NPROC} ))
 
-pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation dagchainer_args out_dir_base consen_prefix extra_stats'
+pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation 
+                      dagchainer_args out_dir_base consen_prefix annot_str_regex extra_stats'
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
@@ -70,6 +71,9 @@ Variables in pandagma config file (Set the config with the CONF environment vari
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
       consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
        out_dir_base - Base name for the output directory [default: './out']
+    annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
+                        \"([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+\" for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1
+                        or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
         extra_stats - Flag (yes/no) to calculate coverage stats; use only for genes with IDs that have a four-part
                        prefix like glyma.Wm82.gnm1.ann1 [no]
 
@@ -119,12 +123,13 @@ run_ingest() {
   mkdir -p 02_fasta 01_posn_hsh stats
 
     # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end.
-    # Requires chr names to be prefixed with the annotation name, separated by dot from chr/scaff number
-    # e.g. glyma.FiskebyIII.gnm1.Gm11  or  Zm-B73_GRAMENE-4.chr1
+    # This is captured from the gene IDs using the annot_str_regex set in the config file.
     cat /dev/null > stats/tmp.gene_count_start
     cat /dev/null > stats/tmp.fasta_list
     start_time=`date`
     printf "Run started at: $start_time\n" > stats/tmp.timing
+
+  export ANN_REX=${annot_str_regex}
 
   for (( file_num = 0; file_num < ${#fasta_files[@]} ; file_num++ )); do
     file_base=$(basename ${fasta_files[file_num]%.*})
@@ -133,8 +138,8 @@ run_ingest() {
     hash_into_fasta_id.pl -nodef -fasta "${fasta_files[file_num]}" \
                           -hash 01_posn_hsh/$file_base.hsh \
                           -out 02_fasta/$file_base
-    annot_name=$(head -1 02_fasta/$file_base | 
-       perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | cut -f1-4 -d'.' ) # Assumes annot name has four dot-separated parts
+    annot_name=$(head -1 02_fasta/$file_base | perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | 
+      perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
     cat_or_zcat "${fasta_files[file_num]}" | 
       awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
     echo "Main:   $file_base" >> stats/tmp.fasta_list
@@ -151,8 +156,8 @@ run_ingest() {
       hash_into_fasta_id.pl -nodef -fasta "${fasta_files_extra[file_num]}" \
                             -hash 01_posn_hsh/$file_base.hsh \
                             -out 02_fasta/$file_base
-      annot_name=$(head -1 02_fasta/$file_base | 
-         perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | cut -f1-4 -d'.' ) # Assumes annot name has four dot-separated parts
+      annot_name=$(head -1 02_fasta/$file_base | perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | 
+         perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
       cat_or_zcat "${fasta_files_extra[file_num]}" | 
         awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
       echo "Extra:  $file_base" >> stats/tmp.fasta_list
@@ -644,7 +649,8 @@ run_summarize() {
 
   # Print per-annotation-set coverage stats (sequence counts, sequences retained), if stats-extra flag is set
   if [ ${extra_stats,,} = "yes" ]; then
-    cut -f2 ${WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv | cut -f1-4 -d'.' |
+    cut -f2 ${WORK_DIR}/18_syn_pan_aug_extra_posn.hsh.tsv | 
+      perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' |
       sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_end
 
     # tmp.gene_count_start was generated during run_ingest

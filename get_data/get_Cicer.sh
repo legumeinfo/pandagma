@@ -43,20 +43,17 @@ cd $base_dir/data/
 #  for file in *bed *fna *faa; do gzip $file &
 #  done
 
-# cat <<DATA > expected_chr_matches.tsv
-# # Expected chromosome matches for Cicer
-# 01 01
-# 02 02
-# 03 03
-# 04 04
-# 05 05
-# 06 06
-# 07 07
-# 08 08
-# 09 09
-# 10 10
-# 11 11
-# DATA
+cat <<DATA > expected_chr_matches.tsv
+# Expected chromosome matches for Cicer
+1 1
+2 2
+3 3
+4 4
+5 5
+6 6
+7 7
+8 8
+DATA
 
 cd $base_dir
 
