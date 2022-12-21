@@ -2,7 +2,6 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use List::Util qw(sum min max);
 
 my $usage = <<EOS;
 Given pan-gene results in "clust.tsv" format (pan-gene ID in first column, followed by
@@ -43,41 +42,49 @@ if ($out_matrix){
   open ($OUTMTX, ">", $out_matrix) or die "Can't open out $out_matrix: $!\n";
 }
 
-my %annots;
-my $ct_annot_global;
+# Get list of all annotation names
+my %annots; # Hash (list) of all annotation names
 while (<$PAN>){
   chomp;
-  my ($first, @rest) = split(/\t/, $_);
+  my ($pan_id, @genes) = split(/\t/, $_);
   my $ct_this_og=0;
-  my %seen; 
-  foreach my $gene (@rest){
-    $gene =~ $REX;
-    my $ann=$1;
-    unless($seen{$ann}){$seen{$ann}++; $ct_this_og++;}
-    unless($annots{$ann}){$annots{$ann}++; $ct_annot_global++;}
+  foreach my $gene (@genes){
+    $gene =~ /$REX/;
+    my $ann=$1;  # annotation name, captured with $annot_regex
+    unless($annots{$ann}){$annots{$ann}++}
   }
 }
 
 my %annot_cts;
+my %gene_cts_per_annot;
 my @annot_names = ( sort(keys %annots) );
 
+# Get gene counts per annotation per OG
 seek $PAN,0,0;
-&printstr("#pan_ID\t", join("\t", @annot_names), "\n");
+&printstr("#pan_ID\tanns_in_og\tgenes_in_og\t", join("\t", @annot_names), "\n");
 while (my $line = <$PAN>){
   chomp $line;
 
-  my @this_line = split(/\t/, $line);
-  &printstr($this_line[0], "\t");
+  my @parts = split(/\t/, $line);
+  my $anns_in_og = 0;
+  my $genes_in_og = 0;
+  my $annot_cts_in_og = "";
   for my $annot (@annot_names){
-    my @found = grep(/$annot/, @this_line);
-    &printstr(scalar(@found), "\t");
-    $annot_cts{$annot}++ if (scalar(@found)>0);
+    my $ct_per_gn_per_og = scalar(grep(/$annot/, @parts));
+    if ($ct_per_gn_per_og>0){ $anns_in_og++; $genes_in_og += $ct_per_gn_per_og }
+    $annot_cts_in_og = $annot_cts_in_og . $ct_per_gn_per_og . "\t";
+    if ( $ct_per_gn_per_og>0 ){
+      $annot_cts{$annot}++;  # increments for this annot if there are any genes in this og
+      $gene_cts_per_annot{$annot} += $ct_per_gn_per_og; # accumulates total gene count 
+    }
   }
-  &printstr("\n");
+  &printstr("$parts[0]\t$anns_in_og\t$genes_in_og\t$annot_cts_in_og\n");
 }
 
+# Print OGs per annotation set
+print "#Annotation\tannot_cts\ttotal_genes\n";
 for my $annot (sort keys %annot_cts){
-  print $annot, "\t", $annot_cts{$annot}, "\n";
+  print "$annot\t$annot_cts{$annot}\t$gene_cts_per_annot{$annot}\n";
 }
 
 #####################
@@ -90,4 +97,10 @@ sub printstr {
     print $str_to_print;
   }
 }
+
+__END__
+S. Cannon
+2022-12-21  Initial version
+
+
 
