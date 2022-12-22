@@ -4,9 +4,9 @@ use warnings;
 use Getopt::Long;
 
 my $usage = <<EOS;
-Given pan-gene results in "clust.tsv" format (pan-gene ID in first column, followed by
-gene IDs, tab-separated), and a regex for capturing assembly/annotation string from
-the gene IDs, report modal orthogroup (OG) size and composition per annotation-set.
+Calculate matrix of gene counts per orthogroup and annotation set, given input of
+pan-gene results in "clust.tsv" format (pan-gene ID in first column, followed by gene IDs, 
+tab-separated), and a regex for capturing assembly/annotation string from the gene IDs.
 
 Usage: calc_pan_stats.pl -pan FILE.clust.tsv [options]
 

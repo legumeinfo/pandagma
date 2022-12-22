@@ -3,7 +3,7 @@ pandagma.sh version
 
 # NOTE 1: All of the following commands depend on parameters being set in
 # pandagma.conf (or equivalent file, pointed to as below), before continuing.
-# Example:  export PANDAGMA_CONF=pandagma_Zea.conf
+# Example:  export PANDAGMA_CONF=conf/Zea.conf
 
 # Note 2: All of the commands below will be run in order if the program is called
 # without specifying any subcommand, e.g.
@@ -29,6 +29,9 @@ pandagma.sh run consense
 
 # Add extra annotation sets, by homology to prior clusters
 pandagma.sh run add_extra
+
+# Calculate orthogroup composition and filter fasta files to core orthogroups.
+pandagma.sh run filter_to_core
 
 # Assign pan-gene names with consensus chromosome and position information
 pandagma.sh run name_pangenes
