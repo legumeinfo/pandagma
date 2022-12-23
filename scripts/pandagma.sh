@@ -695,6 +695,21 @@ run_summarize() {
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
   fi
 
+  # Counts per accession
+  if [ -f ${full_out_dir}/17_syn_pan_aug_extra.counts.tsv ]; then
+    printf "\nFor all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" >> ${stats_file}
+    printf "genes-in-OGs\tOGs-w-genes\tOGs-w-genes/genes\tpct-non-null-OGs\tpct-null-OGs\tannotation-set\n" >> ${stats_file}
+    cat ${full_out_dir}/17_syn_pan_aug_extra.counts.tsv | transpose.pl | 
+      perl -lane 'next if ($.<=3); 
+                  $ct=0; $sum=0; $nulls=0; $OGs=0;
+                  for $i (@F[1..(@F-1)]){
+                    $OGs++;
+                    if ($i>0){$ct++; $sum+=$i}
+                    if ($i==0){$nulls++}
+                  }; 
+                  printf("%d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' >> ${stats_file}
+  fi
+
   echo
   cat ${stats_file}
 }
