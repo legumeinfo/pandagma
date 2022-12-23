@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2022
 #
 scriptname=`basename "$0"`
-version="2022-01-06"
+version="2022-12-23"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -319,16 +319,13 @@ run_consense() {
 
   echo "  Make augmented cluster sets"
   cat /dev/null > 12_syn_pan_aug.clust.tsv
-
-  echo "  Make augmented cluster sets"
   augment_cluster_sets.awk leftovers_dir=11_pan_leftovers 07_pan_fasta/* > 12_syn_pan_aug.clust.tsv
-
 }
 
 run_add_extra() {
   if (( ${#fasta_files_extra[@]} > 0 ))
   then # handle the "extra" annotation files
-    echo; echo "Add extra annotation sets to the augmented clusters, by homology"
+    echo; echo "== Add extra annotation sets to the augmented clusters, by homology =="
     echo "  Search non-clustered genes against pan-gene consensus sequences"
     cd "${WORK_DIR}"
     mkdir -p 13_extra_out_dir 13_pan_aug_fasta
@@ -404,8 +401,8 @@ run_add_extra() {
     pick_family_rep.pl -in 20_pan_fasta.$faext -out 21_pan_fasta_clust_rep_seq.$faext
     perl -pi -e 's/__/\t/' 21_pan_fasta_clust_rep_seq.$faext
   
-  else  # no "extra" fasta files, so just promote the syn_pan_aug files as syn_pan_aug_extra
-        # TO DO: handle this better, i.e. report that no "extra" files were provided and skip these "aug" files.
+  else  
+    echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
     cp 07_pan_fasta.$faext 20_pan_fasta.$faext
     cp 12_syn_pan_aug.clust.tsv 17_syn_pan_aug_extra.clust.tsv
     cp 08_pan_fasta_clust_rep_seq.$faext 21_pan_fasta_clust_rep_seq.$faext
@@ -431,8 +428,9 @@ run_filter_to_core() {
                       -out 22_pan_fasta_rep_seq_core.$faext
 
   echo "  Get a clust.tsv file with orthogroups with at least min_core_prop*max_annot_ct annotation sets"
-  join <(sort 17_syn_pan_aug_extra.core.list) <(sort 17_syn_pan_aug_extra.clust.tsv) |
-    cat > 22_syn_pan_aug_extra_core.clust.tsv
+  join <(LANG=en_EN sort sort -k1,1 17_syn_pan_aug_extra.core.list) 
+       <(LANG=en_EN sort sort -k1,1 17_syn_pan_aug_extra.clust.tsv) |
+          cat > 22_syn_pan_aug_extra_core.clust.tsv
 }
 
 run_name_pangenes() {
@@ -469,20 +467,20 @@ run_name_pangenes() {
     mmseqs easy-cluster 23_syn_pan_cent_merged_core_posn.$faext 24_pan_fasta 03_mmseqs_tmp \
     --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
-  # Parse mmseqs clusters into pairs of genes that are similar and ordinally close
+  echo "  Parse mmseqs clusters into pairs of genes that are similar and ordinally close"
   close=10 # genes within a neighborhood of +-close genes among the consensus-orderd genes
   cat 24_pan_fasta_cluster.tsv | perl -pe 's/\S+\.chr(\d+)_(\d+)/$1\t$2/g' | 
     awk -v CLOSE=$close -v PRE=$consen_prefix '$1==$3 && sqrt(($2/100-$4/100)^2)<=CLOSE \
              {print PRE ".chr" $1 "_" $2 "\t" PRE ".chr" $3 "_" $4}' > 24_pan_fasta_cluster.closepairs
 
-  # Cluster the potential near-duplicate neighboring paralogs
+  echo "  Cluster the potential near-duplicate neighboring paralogs"
   mcl  24_pan_fasta_cluster.closepairs --abc -o 24_pan_fasta_cluster.close.clst
  
-  # Keep the first gene from the cluster and discard the rest. Do this by removing the others.
+  echo "  Keep the first gene from the cluster and discard the rest. Do this by removing the others."
   cat 24_pan_fasta_cluster.close.clst | awk '{$1=""}1' | 
     awk '{$1=$1}1' | tr ' ' '\n' | sort -u > lists/lis.clust_genes_remove
 
-  # Remove neighboring close paralogs, leaving one
+  echo "  Remove neighboring close paralogs, leaving one"
   get_fasta_subset.pl -in 23_syn_pan_cent_merged_core_posn.$faext -xclude -clobber \
     -lis lists/lis.clust_genes_remove -out 24_syn_pan_cent_merged_core_posn_trimd.$faext 
 }
@@ -495,14 +493,14 @@ run_calc_chr_pairs() {
     mmseqs easy-cluster 20_pan_fasta.$faext 24_pan_fasta_clust 03_mmseqs_tmp \
     --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
-  # Extract chromosome-chromosome correspondences
+  echo "   Extract chromosome-chromosome correspondences"
   cut -f2,3 22_syn_pan_aug_extra_core_posn.hsh.tsv | sort -k1,1 > 22_syn_pan_aug_extra_core_posn.gene_chr.hsh
 
-  # From mmseqs cluster table, prune gene pairs, keeping only those in the same pangene cluster
+  echo "   From mmseqs cluster table, prune gene pairs, keeping only those in the same pangene cluster"
   cat 24_pan_fasta_clust_cluster.tsv | perl -pe 's/__/\t/g' | awk '$1==$3' |
     perl -pe 's/(pan\d+)\t/$1__/g' > 24_pan_fasta_cluster_pruned.tsv
 
-  # Join chromosome numbers to gene pairs and count chromosome correspondences among the pairs.
+  echo "   Join chromosome numbers to gene pairs and count chromosome correspondences among the pairs."
   join <(perl -pe 's/pan\d+__//g' 24_pan_fasta_cluster_pruned.tsv | sort -k1,1) \
        22_syn_pan_aug_extra_core_posn.gene_chr.hsh | perl -pe 's/ /\t/g' | sort -k2,2 | 
      join -1 2 -2 1 - 22_syn_pan_aug_extra_core_posn.gene_chr.hsh | 
