@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2022
 #
 scriptname=`basename "$0"`
-version="2022-12-23"
+version="2022-12-24"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -17,7 +17,7 @@ export WORK_DIR=${WORK_DIR:-${PWD}/work}
 MMSEQSTHREADS=$(( 10 < ${NPROC} ? 10 : ${NPROC} ))
 
 pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation min_core_prop
-                      dagchainer_args out_dir_base consen_prefix annot_str_regex'
+                      dagchainer_args out_dir_base consen_prefix annot_str_regex preferred_annot'
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
@@ -276,7 +276,12 @@ run_consense() {
   done
 
   echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
-  pick_family_rep.pl -in 07_pan_fasta.$faext -out 08_pan_fasta_clust_rep_seq.$faext
+  if ($preferred_annot) {
+    cat 07_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$faext
+  }
+  else { # $preferred_annot was not set, so pick representatives randomly from sequences with modal length
+    cat 07_pan_fasta.$faext | pick_family_rep.pl -out 08_pan_fasta_clust_rep_seq.$faext
+  }
 
   echo "  Get sorted list of all genes, from the original fasta files"
   cat_or_zcat "${fasta_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
@@ -398,7 +403,13 @@ run_add_extra() {
     done
 
     echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
-    pick_family_rep.pl -in 20_pan_fasta.$faext -out 21_pan_fasta_clust_rep_seq.$faext
+    if ($preferred_annot) {
+      cat 20_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 21_pan_fasta_clust_rep_seq.$faext
+    }
+    else { # $preferred_annot was not set, so pick representatives randomly from sequences with modal length
+      cat 20_pan_fasta.$faext | pick_family_rep.pl -out 21_pan_fasta_clust_rep_seq.$faext
+    }
+    
     perl -pi -e 's/__/\t/' 21_pan_fasta_clust_rep_seq.$faext
   
   else  
@@ -477,8 +488,7 @@ run_name_pangenes() {
   mcl  24_pan_fasta_cluster.closepairs --abc -o 24_pan_fasta_cluster.close.clst
  
   echo "  Keep the first gene from the cluster and discard the rest. Do this by removing the others."
-  cat 24_pan_fasta_cluster.close.clst | awk '{$1=""}1' | 
-    awk '{$1=$1}1' | tr ' ' '\n' | sort -u > lists/lis.clust_genes_remove
+  cat 24_pan_fasta_cluster.close.clst | awk '{$1=""}1' | awk '{$1=$1}1' | tr ' ' '\n' | sort -u > lists/lis.clust_genes_remove
 
   echo "  Remove neighboring close paralogs, leaving one"
   get_fasta_subset.pl -in 23_syn_pan_cent_merged_core_posn.$faext -xclude -clobber \
