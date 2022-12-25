@@ -276,12 +276,12 @@ run_consense() {
   done
 
   echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
-  if ($preferred_annot) {
+  if [[ ! -z "$preferred_annot" ]]; then
     cat 07_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$faext
-  }
-  else { # $preferred_annot was not set, so pick representatives randomly from sequences with modal length
+  else 
+    # $preferred_annot was not set, so pick representatives randomly from sequences with modal length
     cat 07_pan_fasta.$faext | pick_family_rep.pl -out 08_pan_fasta_clust_rep_seq.$faext
-  }
+  fi
 
   echo "  Get sorted list of all genes, from the original fasta files"
   cat_or_zcat "${fasta_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
@@ -403,12 +403,12 @@ run_add_extra() {
     done
 
     echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
-    if ($preferred_annot) {
+    if [[ ! -z "$preferred_annot" ]]; then
       cat 20_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 21_pan_fasta_clust_rep_seq.$faext
-    }
-    else { # $preferred_annot was not set, so pick representatives randomly from sequences with modal length
+    else 
+      # $preferred_annot was not set, so pick representatives randomly from sequences with modal length
       cat 20_pan_fasta.$faext | pick_family_rep.pl -out 21_pan_fasta_clust_rep_seq.$faext
-    }
+    fi
     
     perl -pi -e 's/__/\t/' 21_pan_fasta_clust_rep_seq.$faext
   
