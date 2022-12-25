@@ -4,9 +4,10 @@ use warnings;
 use Getopt::Long;
 use List::Util qw(sum min max);
 use Bio::SeqIO;
+use feature "say";
 
 my $usage = <<EOS;
-Given a fasta file of sequences in pan-genes sets, identify a representative sequence to 
+Given fasta sequences in pan-genes sets (on STDIN), identify a representative sequence to 
 for each pan-gene, with representative chosen from the median(ish) sequence length.
 In cases where the median would be the average of two central values, 
 the larger of the two is selected - e.g. of (100,150), 150 is returned. 
@@ -15,29 +16,28 @@ The deflines should have the form
   >pan00001__gene_ID
 The defline should be structured with as: pan-geneID and gene ID, separated by "__".
 
-Usage: pick_family_rep.pl -infile family_fasta.fa  [options]
+Usage: cat FAMILY_FILE.fa |  pick_family_rep.pl [options]
    Input has two fields, separated by "__"
      panID__geneID
 
   OPTIONS:
-    -infile   Input fasta file, with pangene IDs + gene IDs
+    -prefer   Pattern for matching ID(s) to be selected as representative, if that ID is available
+              with near-modal length.
     -outfile  Specify OUT_FH; otherwise, default to STDOUT.
     -verbose  For some debugging info, to STDOUT
     -help     This message. 
 EOS
 
-my ($infile, $outfile, $verbose, $help);
+my ($prefer, $outfile, $verbose, $help);
 
 GetOptions (
-  "infile=s" =>  \$infile,
+  "prefer:s" =>  \$prefer,
   "outfile:s" => \$outfile,
   "verbose" =>   \$verbose,
   "help" =>      \$help,
 );
 
-die "\n$usage\n" if ( $help or ! $infile );
-
-my $logstr;
+die "\n$usage\n" if ( $help );
 
 my $OUT_FH;
 if ($outfile) { open ($OUT_FH, ">", $outfile) or die "\nUnable to open output file for writing: $!\n\n"; }
@@ -45,7 +45,7 @@ if ($outfile) { open ($OUT_FH, ">", $outfile) or die "\nUnable to open output fi
 # Put file into an array, and get count of each scaffold
 my (%HoA_PI_lengths, %geneID_seq, %geneID_len);
 
-my $seqin = Bio::SeqIO -> new(-file => "$infile", -format => "Fasta");
+my $seqin = Bio::SeqIO -> new(-fh => \*STDIN, -format => "Fasta");
 while (my $seqobj = $seqin->next_seq() ) {
   my $display_id = $seqobj->display_id();
   if ($display_id !~ /__/){
@@ -74,31 +74,70 @@ for my $panID ( keys %HoA_PI_lengths ) {
 
   my $max = max(@{ $HoA_PI_lengths{$panID} });
   $max_PI{$panID} = $max; 
+  #say "$panID\t$count\t$min\t$median\t$max";
 }
 
-# Traverse sequences again, reporting the first sequence per panID with median length
-if ($verbose){print "panID__geneID\tcount\tmin\tmedian\tmax\n" }
-$seqin = Bio::SeqIO -> new(-file => "$infile", -format => "Fasta");
-my %seen_PI;
-while (my $seqobj = $seqin->next_seq() ) {
-  my $display_id = $seqobj->display_id();
-  my ($panID, $gene_ID) = split(/__/, $display_id);
-  my $len = $seqobj->length;
-  my $seq = $seqobj->seq;
+my $PREX;
+if ($prefer){ $PREX = qr/$prefer/ }
 
-  if($len == $median_PI{$panID}){
-    if ($seen_PI{$panID}){ next }
-    if ($verbose) { 
-      print "$display_id\t$count_PI{$panID}\t$min_PI{$panID}\t$median_PI{$panID}\t$max_PI{$panID}\n";
+# Traverse sequences again, reporting the first sequence per panID with median length
+if ($verbose){say "count\tmin\tmedian\tmax\tlen\tverdict\tpanID__geneID" }
+my %seen_PI;
+my %verdict;
+my %combo_IDs_verdict;
+for my $combo_ID (sort keys %geneID_seq){
+
+  my ($panID, $gene_ID) = split(/__/, $combo_ID);
+  my $seq = $geneID_seq{$combo_ID};
+  my $len = length($seq);
+
+  if ($prefer){
+    if ( $gene_ID =~ /$PREX/){ 
+      if ( $len == $median_PI{$panID} ){
+        $verdict{$combo_ID} = 1; 
+      }
+      else { # not equal to the median, so assign to 0; won't be used
+        $verdict{$combo_ID} = 0;
+      }
     }
-    if ($outfile){
-      print $OUT_FH ">$display_id\n$seq\n";
+    else { # $gene_ID not matching $PREX. May be used if a better one isn't seen.
+      if ( $len == $median_PI{$panID} ){
+        $verdict{$combo_ID} = rand(); # Not top-rated, but acceptable. 
+      }
+      else { # not equal to the median, so assign to 0; won't be used
+        $verdict{$combo_ID} = 0;
+      }
     }
-    else {
-      print ">$display_id\n$seq\n";
-    }
-    $seen_PI{$panID}++;
   }
+  else { # no $prefer string was provided
+    if ( $len == $median_PI{$panID} ){
+      $verdict{$combo_ID} = rand(); # Not top-rated, but acceptable. 
+    }
+    else { # not equal to the median, so assign to 0; won't be used
+      $verdict{$combo_ID} = 0;
+    }
+  }
+  #say "$panID\t$verdict{$combo_ID}\t$combo_ID";
+  $combo_IDs_verdict{$combo_ID} = { verdict => $verdict{$combo_ID}, panID => $panID };
+}
+
+my $hash_ref = \%combo_IDs_verdict;
+
+my @sorted = sort {
+    $hash_ref->{$a}{panID} cmp $hash_ref->{$b}{panID}
+    or
+    $hash_ref->{$b}{verdict} <=>  $hash_ref->{$a}{verdict}
+  } keys %$hash_ref;
+
+my %seen_panID;
+for my $combo_ID ( @sorted ){
+  my ( $panID, $geneID ) = split(/__/, $combo_ID);
+  if ( $seen_panID{$panID} ){ next }
+  #say "$verdict{$combo_ID}\t$panID\t$combo_ID";
+  say ">$combo_ID";
+  my @seq_chunks = ( $geneID_seq{$combo_ID} =~ m/(.{1,100})/g);
+  say join("\n", @seq_chunks);
+  $seen_panID{$panID}++;
 }
 
 ##################################################
@@ -112,16 +151,11 @@ sub calc_median {
   my $median;
   my $mid = int ((scalar @values)/2);
   my @sorted_values = sort {$a <=> $b} @values;
-  #if (@values % 2) {
   $median = $sorted_values[ $mid ];
-  #} else {
-  #  $median = ($sorted_values[$mid-1] + $sorted_values[$mid])/2; ## Not doing this; want larger of the two
-  #} 
   return $median;
 }
 
 __END__
-2021
-
-v01 11-15 Initial version.
+2021-11-15 Initial version.
+2022-12-23 Rewrite: Take fasta input on STDIN, and take in an optional "preferred" ID regex
 
