@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2022
 #
 scriptname=`basename "$0"`
-version="2022-12-24"
+version="2022-12-25"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -77,6 +77,10 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         \"([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+\" 
                           for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1
                         or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
+    preferred_annot - String to match and select an annotation set, from a gene ID. [NONE]
+                        This is used for picking representative IDs+sequence from an orthogroup, when
+                        this annotation is among those with the median length for the orthogroup.
+                        Otherwise, one is selected at random from those with median length.
 
 Environment variables:
                CONF - Path of the pandagma config file, default: \"${CONF}\"
@@ -276,12 +280,8 @@ run_consense() {
   done
 
   echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
-  if [[ ! -z "$preferred_annot" ]]; then
-    cat 07_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$faext
-  else 
-    # $preferred_annot was not set, so pick representatives randomly from sequences with modal length
-    cat 07_pan_fasta.$faext | pick_family_rep.pl -out 08_pan_fasta_clust_rep_seq.$faext
-  fi
+  echo "  cat 07_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$faext"
+  cat 07_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$faext
 
   echo "  Get sorted list of all genes, from the original fasta files"
   cat_or_zcat "${fasta_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
@@ -294,9 +294,8 @@ run_consense() {
 
   echo "  Retrieve the non-clustered genes"
   cat_or_zcat "${fasta_files[@]}" |
-    get_fasta_subset.pl -in /dev/stdin \
-                        -out 09_genes_not_in_clusters.$faext \
-                        -lis lists/09_genes_not_in_clusters -clobber
+    get_fasta_subset.pl -in /dev/stdin -clobber -lis lists/09_genes_not_in_clusters \
+                        -out 09_genes_not_in_clusters.$faext 
 
   echo "  Search non-clustered genes against genes already clustered."
 
@@ -403,21 +402,17 @@ run_add_extra() {
     done
 
     echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
-    if [[ ! -z "$preferred_annot" ]]; then
-      cat 20_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 21_pan_fasta_clust_rep_seq.$faext
-    else 
-      # $preferred_annot was not set, so pick representatives randomly from sequences with modal length
-      cat 20_pan_fasta.$faext | pick_family_rep.pl -out 21_pan_fasta_clust_rep_seq.$faext
-    fi
+    echo "  cat 20_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 21_pan_fasta_clust_rep_seq.$faext"
+    cat 20_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 21_pan_fasta_clust_rep_seq.$faext
     
-    perl -pi -e 's/__/\t/' 21_pan_fasta_clust_rep_seq.$faext
+    perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_seq.$faext
   
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
     cp 07_pan_fasta.$faext 20_pan_fasta.$faext
     cp 12_syn_pan_aug.clust.tsv 17_syn_pan_aug_extra.clust.tsv
     cp 08_pan_fasta_clust_rep_seq.$faext 21_pan_fasta_clust_rep_seq.$faext
-    perl -pi -e 's/__/\t/' 21_pan_fasta_clust_rep_seq.$faext
+    perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_seq.$faext
   fi
 }
 
@@ -436,11 +431,11 @@ run_filter_to_core() {
 
   echo "  Get a fasta subset with only genes from at least min_core_prop*max_annot_ct annotation sets"
   get_fasta_subset.pl -in 21_pan_fasta_clust_rep_seq.$faext -list 17_syn_pan_aug_extra.core.list \
-                      -out 22_pan_fasta_rep_seq_core.$faext
+                      -clobber -out 22_pan_fasta_rep_seq_core.$faext
 
   echo "  Get a clust.tsv file with orthogroups with at least min_core_prop*max_annot_ct annotation sets"
-  join <(LANG=en_EN sort sort -k1,1 17_syn_pan_aug_extra.core.list) 
-       <(LANG=en_EN sort sort -k1,1 17_syn_pan_aug_extra.clust.tsv) |
+  join <(LC_ALL=C sort -k1,1 17_syn_pan_aug_extra.core.list) \
+       <(LC_ALL=C sort -k1,1 17_syn_pan_aug_extra.clust.tsv) |
           cat > 22_syn_pan_aug_extra_core.clust.tsv
 }
 
@@ -488,7 +483,8 @@ run_name_pangenes() {
   mcl  24_pan_fasta_cluster.closepairs --abc -o 24_pan_fasta_cluster.close.clst
  
   echo "  Keep the first gene from the cluster and discard the rest. Do this by removing the others."
-  cat 24_pan_fasta_cluster.close.clst | awk '{$1=""}1' | awk '{$1=$1}1' | tr ' ' '\n' | sort -u > lists/lis.clust_genes_remove
+  cat 24_pan_fasta_cluster.close.clst | awk '{$1=""}1' | awk '{$1=$1}1' | tr ' ' '\n' | 
+    sort -u > lists/lis.clust_genes_remove
 
   echo "  Remove neighboring close paralogs, leaving one"
   get_fasta_subset.pl -in 23_syn_pan_cent_merged_core_posn.$faext -xclude -clobber \
@@ -574,6 +570,12 @@ run_summarize() {
   else
     echo "Warning: couldn't find file ${WORK_DIR}/consen_${consen_prefix}.tsv; skipping"
   fi
+
+  if [ -f ${WORK_DIR}/21_pan_fasta_clust_rep_seq.$faext ]; then
+    cp ${WORK_DIR}/21_pan_fasta_clust_rep_seq.$faext ${full_out_dir}/
+  else 
+    echo "Warning: couldn't find file ${WORK_DIR}/21_pan_fasta_clust_rep_seq.$faext; skipping"
+  fi 
 
   if [ -f ${WORK_DIR}/23_syn_pan_cent_merged_core_posn.$faext ]; then
     cp ${WORK_DIR}/23_syn_pan_cent_merged_core_posn.$faext ${full_out_dir}/
