@@ -77,7 +77,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         \"([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+\" 
                           for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1
                         or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
-    preferred_annot - String to match and select an annotation set, from a gene ID. [NONE]
+    preferred_annot - String to match and select an annotation set, from a gene ID.
                         This is used for picking representative IDs+sequence from an orthogroup, when
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
@@ -93,6 +93,7 @@ Environment variables:
 canonicalize_paths() {
   fasta_files=($(realpath --canonicalize-existing "${fasta_files[@]}"))
   annotation_files=($(realpath --canonicalize-existing "${annotation_files[@]}"))
+  protein_files=($(realpath --canonicalize-existing "${protein_files[@]}"))
   if (( ${#fasta_files_extra[@]} > 0 ))
   then
     fasta_files_extra=($(realpath --canonicalize-existing "${fasta_files_extra[@]}"))
@@ -125,7 +126,7 @@ run_ingest() {
   cd "${WORK_DIR}"
   echo; echo "Run ingest: from fasta and gff or bed data, create fasta with IDs containing positional info."
   
-  mkdir -p 02_fasta 01_posn_hsh stats
+  mkdir -p 02_fasta_nuc 02_fasta_prot 01_posn_hsh stats
 
     # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end.
     # This is captured from the gene IDs using the annot_str_regex set in the config file.
@@ -139,11 +140,12 @@ run_ingest() {
   for (( file_num = 0; file_num < ${#fasta_files[@]} ; file_num++ )); do
     file_base=$(basename ${fasta_files[file_num]%.*})
     echo "  Adding positional information to fasta file $file_base"
-    cat_or_zcat "${annotation_files[file_num]}" | gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
+    cat_or_zcat "${annotation_files[file_num]}" | 
+      gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
     hash_into_fasta_id.pl -nodef -fasta "${fasta_files[file_num]}" \
                           -hash 01_posn_hsh/$file_base.hsh \
-                          -out 02_fasta/$file_base
-    annot_name=$(head -1 02_fasta/$file_base | perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | 
+                          -out 02_fasta_nuc/$file_base
+    annot_name=$(head -1 02_fasta_nuc/$file_base | perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | 
       perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
     cat_or_zcat "${fasta_files[file_num]}" | 
       awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
@@ -156,15 +158,25 @@ run_ingest() {
     for (( file_num = 0; file_num < ${#fasta_files_extra[@]} ; file_num++ )); do
       file_base=$(basename ${fasta_files_extra[file_num]%.*})
       echo "  Adding positional information to extra fasta file $file_base"
-      cat_or_zcat "${annotation_files_extra[file_num]}" | gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
+      cat_or_zcat "${annotation_files_extra[file_num]}" | 
+        gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
       hash_into_fasta_id.pl -nodef -fasta "${fasta_files_extra[file_num]}" \
                             -hash 01_posn_hsh/$file_base.hsh \
-                            -out 02_fasta/$file_base
-      annot_name=$(head -1 02_fasta/$file_base | perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | 
+                            -out 02_fasta_nuc/$file_base
+      annot_name=$(head -1 02_fasta_nuc/$file_base | perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | 
          perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
       cat_or_zcat "${fasta_files_extra[file_num]}" | 
         awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
       echo "Extra:  $file_base" >> stats/tmp.fasta_list
+    done
+  fi
+
+  # Also protein files, if available
+  if (( ${#protein_files[@]} > 0 ))
+  then
+    for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
+      echo "  Copying protein file ${protein_files[file_num]}"
+      cp "${protein_files[file_num]}" 02_fasta_prot/
     done
   fi
 
@@ -184,7 +196,7 @@ run_mmseqs() {
       sbj_base=$(basename ${fasta_files[file2_num]%.*} .$faext)
       echo "  Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
-      { cat 02_fasta/$qry_base.$faext 02_fasta/$sbj_base.$faext ; } |
+      { cat 02_fasta_nuc/$qry_base.$faext 02_fasta_nuc/$sbj_base.$faext ; } |
         mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} $MMTEMP \
          --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null & # background
         # allow to execute up to $MMSEQSTHREADS in parallel
@@ -204,7 +216,8 @@ run_filter() {
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
       echo "  $outfilebase"
-      cat ${mmseqs_path} | filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${outfilebase}_matches.tsv &
+      cat ${mmseqs_path} | 
+        filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${outfilebase}_matches.tsv &
 
       # allow to execute up to $NPROC in parallel
       if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
@@ -247,7 +260,7 @@ run_dagchainer() {
 run_mcl() {
   # Calculate clusters using Markov clustering
   cd "${WORK_DIR}"
-  printf "\nCalculate clusters. use Markov clustering with inflation parameter $mcl_inflation and ${NPROC} threads\n"
+  printf "\nDo Markov clustering with inflation parameter $mcl_inflation and ${NPROC} threads\n"
   echo "MCL COMMAND: mcl 05_synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv"
   mcl 05_synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv \
     1>/dev/null
@@ -279,8 +292,9 @@ run_consense() {
                     ' >> 07_pan_fasta.$faext
   done
 
-  echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
-  echo "  cat 07_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$faext"
+  echo "  Pick a representative seq. for each orthogroup - as a sequence with the median length for that OG."
+  echo "  cat 07_pan_fasta.$faext | 
+    pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$faext"
   cat 07_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$faext
 
   echo "  Get sorted list of all genes, from the original fasta files"
@@ -427,14 +441,29 @@ run_filter_to_core() {
   echo "  Select orthogroups with genes from at least min_core_prop*max_annot_ct annotation sets"
   cat 17_syn_pan_aug_extra.counts.tsv | 
     awk -v MINCORE=$min_core_prop -v ANNCT=$max_annot_ct '$2>=ANNCT*MINCORE && $1!~/^#/ {print $1}' |
-      cat > 17_syn_pan_aug_extra.core.list
+      cat > lists/lis.17_syn_pan_aug_extra.core
 
   echo "  Get a fasta subset with only genes from at least min_core_prop*max_annot_ct annotation sets"
-  get_fasta_subset.pl -in 21_pan_fasta_clust_rep_seq.$faext -list 17_syn_pan_aug_extra.core.list \
+  get_fasta_subset.pl -in 21_pan_fasta_clust_rep_seq.$faext -list lists/lis.17_syn_pan_aug_extra.core \
                       -clobber -out 22_pan_fasta_rep_seq_core.$faext
 
+  echo "  Also get all corresponding protein sequences for genes in lists/lis.17_syn_pan_aug_extra.core"
+  cat /dev/null > 20_pan_fasta_prot.faa
+  for filepath in 02_fasta_prot/*.gz; do 
+    zcat $filepath >> 20_pan_fasta_prot.faa
+  done
+  cat 22_pan_fasta_rep_seq_core.$faext | awk '$1~/^>/ {print $2}' > lists/lis.22_pan_fasta_rep_seq_core
+  get_fasta_subset.pl -in 20_pan_fasta_prot.faa -list lists/lis.22_pan_fasta_rep_seq_core \
+                      -clobber -out 22_pan_fasta_rep_seq_core_protTMP.faa
+
+  echo "  Hash pan-ID into protein fasta file 22_pan_fasta_rep_seq_core_prot.faa"
+  cat 22_pan_fasta_rep_seq_core.$faext | 
+    awk '$1~/^>/ {print $2 "\t" substr($1, 2)}' > lists/22_pan_fasta_rep_seq_core.hsh
+  hash_into_fasta_id.pl -hash lists/22_pan_fasta_rep_seq_core.hsh -swap_IDs -nodef \
+    -fasta 22_pan_fasta_rep_seq_core_protTMP.faa > 22_pan_fasta_rep_seq_core_prot.faa
+
   echo "  Get a clust.tsv file with orthogroups with at least min_core_prop*max_annot_ct annotation sets"
-  join <(LC_ALL=C sort -k1,1 17_syn_pan_aug_extra.core.list) \
+  join <(LC_ALL=C sort -k1,1 lists/lis.17_syn_pan_aug_extra.core) \
        <(LC_ALL=C sort -k1,1 17_syn_pan_aug_extra.clust.tsv) |
           cat > 22_syn_pan_aug_extra_core.clust.tsv
 }
@@ -575,6 +604,12 @@ run_summarize() {
     cp ${WORK_DIR}/21_pan_fasta_clust_rep_seq.$faext ${full_out_dir}/
   else 
     echo "Warning: couldn't find file ${WORK_DIR}/21_pan_fasta_clust_rep_seq.$faext; skipping"
+  fi 
+
+  if [ -f ${WORK_DIR}/22_pan_fasta_rep_seq_core_prot.faa ]; then
+    cp ${WORK_DIR}/22_pan_fasta_rep_seq_core_prot.faa ${full_out_dir}/
+  else 
+    echo "Warning: couldn't find file ${WORK_DIR}/22_pan_fasta_rep_seq_core_prot.faa; skipping"
   fi 
 
   if [ -f ${WORK_DIR}/23_syn_pan_cent_merged_core_posn.$faext ]; then
