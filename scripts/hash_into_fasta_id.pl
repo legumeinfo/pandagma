@@ -19,6 +19,7 @@ my $usage = <<EOS;
   
   Options:
   -outfile   Output filename. If omitted, output is to STDOUT.
+  -swap_IDs  (boolean) Print new ID and old ID (default is just to print new ID)
   -nodef          (boolean) Don't print the def-line description (print only the ID).
   -splice_regex   (string) regular expression to use to exclude the 
                   splice variant suffix of a feature name during the match. 
@@ -35,7 +36,9 @@ my $usage = <<EOS;
   
 EOS
 
-my ($hash_file, $fasta_file, $out_file, $splice_regex, $strip_regex, $nodef, $help, $SPL_RX, $STR_RX);
+my ($hash_file, $fasta_file, $out_file, $splice_regex, $strip_regex, $swap_IDs, $nodef, $help);
+my ($SPL_RX, $STR_RX);
+
 
 GetOptions (
   "hash_file=s" =>     \$hash_file,   # required
@@ -43,6 +46,7 @@ GetOptions (
   "splice_regex:s" =>  \$splice_regex,   
   "strip_regex:s" =>   \$strip_regex,   
   "out_file:s" =>      \$out_file,   
+  "swap_IDs" =>        \$swap_IDs,
   "nodef" =>           \$nodef,   
   "help" =>            \$help,
 );
@@ -91,20 +95,30 @@ while ( <$FASTA_FH> ){
     #print "1:[$display_id] {$desc}\n";
 
     # strip off splice variant
-    $display_id =~ m/(.+)($SPL_RX)$/;
+    $display_id =~ m/(.+)($STR_RX)$/;
     ($base_id, $suffix) = ($1, $2);
     if ($strip_regex){
       $suffix =~ s/$STR_RX//; 
       $suffix =~ s/-/./; 
     }
-    #print "[$base_id] [$suffix]\n";
+    # print "[$base_id] [$suffix]\n";
     
     $hash{$base_id} = "$base_id HASH UNDEFINED" unless defined ($hash{$base_id});
-    if ($nodef){ # DON'T print the defline description
-      print $OUT_FH ">$hash{$base_id}$suffix\n";
+    if ($swap_IDs){
+      if ($nodef){ # DON'T print the defline description
+        print $OUT_FH ">$hash{$base_id}$suffix $base_id$suffix\n";
+      }
+      else { # DO print the defline description
+        print $OUT_FH ">$hash{$base_id}$suffix $base_id$suffix $desc\n";
+      }
     }
-    else { # DO print the defline description
-      print $OUT_FH ">$hash{$base_id}$suffix $desc\n";
+    else { # not $swap_IDs
+      if ($nodef){ # DON'T print the defline description
+        print $OUT_FH ">$hash{$base_id}$suffix\n";
+      }
+      else { # DO print the defline description
+        print $OUT_FH ">$hash{$base_id}$suffix $desc\n";
+      }
     }
   }
   elsif ($line =~ /^>(\S+)\s*$/){
@@ -113,9 +127,13 @@ while ( <$FASTA_FH> ){
     #print "2:[$display_id]\n";
 
     # strip off splice variant
-    $display_id =~ m/(.+)($SPL_RX)$/;
+    $display_id =~ m/(.+)($STR_RX)$/;
     ($base_id, $suffix) = ($1, $2);
-    #print "[$base_id] [$suffix]\n";
+    if ($strip_regex){
+      $suffix =~ s/$STR_RX//; 
+      $suffix =~ s/-/./; 
+    }
+    # print "[$base_id] [$suffix]\n";
     
     $hash{$base_id} = "$base_id HASH UNDEFINED" unless defined ($hash{$base_id});
     print $OUT_FH ">$hash{$base_id}$suffix\n";
@@ -142,3 +160,5 @@ Versions
             Print to named file or to STDOUT.
             Add flag "-strip_regex" to remove e.g. ".p" from protein gene IDs: Gene123.1.p --> Gene123.1
 2022-11-07 Switch to zcat from gzcat. Handle deflines containing spaces or tabs.
+2022-11-27 Fix bug in "-strip_regex" code
+2022-12-26 Add option -swap_IDs to print new ID and old ID
