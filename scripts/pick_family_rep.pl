@@ -134,9 +134,13 @@ for my $combo_ID ( @sorted ){
   my ( $panID, $geneID ) = split(/__/, $combo_ID);
   if ( $seen_panID{$panID} ){ next }
   #say "$verdict{$combo_ID}\t$panID\t$combo_ID";
-  say ">$combo_ID";
   my @seq_chunks = ( $geneID_seq{$combo_ID} =~ m/(.{1,100})/g);
-  say join("\n", @seq_chunks);
+  if ($outfile){
+    say $OUT_FH ">$combo_ID\n", join("\n", @seq_chunks);
+  }
+  else { #print to stdout
+    say ">$combo_ID\n", join("\n", @seq_chunks);
+  }
   $seen_panID{$panID}++;
 }
 
@@ -158,4 +162,4 @@ sub calc_median {
 __END__
 2021-11-15 Initial version.
 2022-12-23 Rewrite: Take fasta input on STDIN, and take in an optional "preferred" ID regex
-
+2022-12-25 Print to either stdout or out-file
