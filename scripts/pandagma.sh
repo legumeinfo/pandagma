@@ -103,7 +103,7 @@ canonicalize_paths() {
   readonly submit_dir=${PWD}
 
   fasta_file=$(basename "${fasta_files[0]}" .gz)
-  faext="${fasta_file##*.}"
+  fna="${fasta_file##*.}"
 }
 cat_or_zcat() {
   case ${1} in
@@ -191,12 +191,12 @@ run_mmseqs() {
 
   mkdir -p 03_mmseqs 03_mmseqs_tmp
   for (( file1_num = 0; file1_num < ${#fasta_files[@]} ; file1_num++ )); do
-    qry_base=$(basename ${fasta_files[file1_num]%.*} .$faext)
+    qry_base=$(basename ${fasta_files[file1_num]%.*} .$fna)
     for (( file2_num = $( expr $file1_num + 1 ); file2_num < ${#fasta_files[@]} ; file2_num++ )); do
-      sbj_base=$(basename ${fasta_files[file2_num]%.*} .$faext)
+      sbj_base=$(basename ${fasta_files[file2_num]%.*} .$fna)
       echo "  Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
-      { cat 02_fasta_nuc/$qry_base.$faext 02_fasta_nuc/$sbj_base.$faext ; } |
+      { cat 02_fasta_nuc/$qry_base.$fna 02_fasta_nuc/$sbj_base.$fna ; } |
         mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} $MMTEMP \
          --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null & # background
         # allow to execute up to $MMSEQSTHREADS in parallel
@@ -283,19 +283,19 @@ run_consense() {
   echo "    Fasta file:" "${fasta_files[@]}"
   get_fasta_from_family_file.pl "${fasta_files[@]}" -fam 06_syn_pan.clust.tsv -out 07_pan_fasta
 
-  cat /dev/null > 07_pan_fasta.$faext
+  cat /dev/null > 07_pan_fasta.$fna
   for path in 07_pan_fasta/*; do
     pan_file=`basename $path`
     cat $path | awk -v panID=$pan_file '
                       $1~/^>/ {print ">" panID "__" substr($0,2) }
                       $1!~/^>/ {print $1}
-                    ' >> 07_pan_fasta.$faext
+                    ' >> 07_pan_fasta.$fna
   done
 
   echo "  Pick a representative seq. for each orthogroup - as a sequence with the median length for that OG."
-  echo "  cat 07_pan_fasta.$faext | 
-    pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$faext"
-  cat 07_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$faext
+  echo "  cat 07_pan_fasta.$fna | 
+    pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$fna"
+  cat 07_pan_fasta.$fna | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_seq.$fna
 
   echo "  Get sorted list of all genes, from the original fasta files"
   cat_or_zcat "${fasta_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
@@ -309,17 +309,17 @@ run_consense() {
   echo "  Retrieve the non-clustered genes"
   cat_or_zcat "${fasta_files[@]}" |
     get_fasta_subset.pl -in /dev/stdin -clobber -lis lists/09_genes_not_in_clusters \
-                        -out 09_genes_not_in_clusters.$faext 
+                        -out 09_genes_not_in_clusters.$fna 
 
   echo "  Search non-clustered genes against genes already clustered."
 
   # Check sequence type (in case this run function is called separately from the usually-prior ones)
-  someseq=$(head 07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
+  someseq=$(head 07_pan_fasta.$fna | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
   SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
   echo "SEQTYPE is: $SEQTYPE"
 
-  mmseqs easy-search 09_genes_not_in_clusters.$faext \
-                     07_pan_fasta.$faext \
+  mmseqs easy-search 09_genes_not_in_clusters.$fna \
+                     07_pan_fasta.$fna \
                      10_unclust.x.07_pan_fasta.m8 \
                      03_mmseqs_tmp \
                      --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
@@ -351,17 +351,17 @@ run_add_extra() {
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
     get_fasta_from_family_file.pl "${fasta_files[@]}" -fam 12_syn_pan_aug.clust.tsv -out 13_pan_aug_fasta
     
-    cat /dev/null > 13_pan_aug_fasta.$faext
+    cat /dev/null > 13_pan_aug_fasta.$fna
     for path in 13_pan_aug_fasta/*; do
       pan_file=`basename $path`
       cat $path | awk -v panID=$pan_file '
                         $1~/^>/ {print ">" panID "__" substr($0,2) }
                         $1!~/^>/ {print $1}
-                      ' >> 13_pan_aug_fasta.$faext
+                      ' >> 13_pan_aug_fasta.$fna
     done
 
     # Check sequence type (in case this run function is called separately from the usually-prior ones)
-    someseq=$(head 07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
+    someseq=$(head 07_pan_fasta.$fna | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
     SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
     echo "SEQTYPE is: $SEQTYPE"
 
@@ -370,7 +370,7 @@ run_add_extra() {
       echo "Extra: $fasta_file"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       mmseqs easy-search "${path}" \
-                         13_pan_aug_fasta.$faext \
+                         13_pan_aug_fasta.$fna \
                          13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
                          $MMTEMP \
                          --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
@@ -406,27 +406,27 @@ run_add_extra() {
       fi
     done
   
-    cat /dev/null > 20_pan_fasta.$faext
+    cat /dev/null > 20_pan_fasta.$fna
     for path in 19_pan_aug_leftover_merged/*; do
       pan_file=`basename $path`
       cat $path | awk -v panID=$pan_file '
                         $1~/^>/ {print ">" panID "__" substr($0,2) }
                         $1!~/^>/ {print $1}
-                      ' >> 20_pan_fasta.$faext
+                      ' >> 20_pan_fasta.$fna
     done
 
     echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
-    echo "  cat 20_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 21_pan_fasta_clust_rep_seq.$faext"
-    cat 20_pan_fasta.$faext | pick_family_rep.pl -prefer $preferred_annot -out 21_pan_fasta_clust_rep_seq.$faext
+    echo "  cat 20_pan_fasta.$fna | pick_family_rep.pl -prefer $preferred_annot -out 21_pan_fasta_clust_rep_seq.$fna"
+    cat 20_pan_fasta.$fna | pick_family_rep.pl -prefer $preferred_annot -out 21_pan_fasta_clust_rep_seq.$fna
     
-    perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_seq.$faext
+    perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_seq.$fna
   
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
-    cp 07_pan_fasta.$faext 20_pan_fasta.$faext
+    cp 07_pan_fasta.$fna 20_pan_fasta.$fna
     cp 12_syn_pan_aug.clust.tsv 17_syn_pan_aug_extra.clust.tsv
-    cp 08_pan_fasta_clust_rep_seq.$faext 21_pan_fasta_clust_rep_seq.$faext
-    perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_seq.$faext
+    cp 08_pan_fasta_clust_rep_seq.$fna 21_pan_fasta_clust_rep_seq.$fna
+    perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_seq.$fna
   fi
 }
 
@@ -444,23 +444,9 @@ run_filter_to_core() {
       cat > lists/lis.17_syn_pan_aug_extra.core
 
   echo "  Get a fasta subset with only genes from at least min_core_prop*max_annot_ct annotation sets"
-  get_fasta_subset.pl -in 21_pan_fasta_clust_rep_seq.$faext -list lists/lis.17_syn_pan_aug_extra.core \
-                      -clobber -out 22_pan_fasta_rep_seq_core.$faext
+  get_fasta_subset.pl -in 21_pan_fasta_clust_rep_seq.$fna -list lists/lis.17_syn_pan_aug_extra.core \
+                      -clobber -out 22_pan_fasta_rep_seq_core.$fna
 
-  echo "  Also get all corresponding protein sequences for genes in lists/lis.17_syn_pan_aug_extra.core"
-  cat /dev/null > 20_pan_fasta_prot.faa
-  for filepath in 02_fasta_prot/*.gz; do 
-    zcat $filepath >> 20_pan_fasta_prot.faa
-  done
-  cat 22_pan_fasta_rep_seq_core.$faext | awk '$1~/^>/ {print $2}' > lists/lis.22_pan_fasta_rep_seq_core
-  get_fasta_subset.pl -in 20_pan_fasta_prot.faa -list lists/lis.22_pan_fasta_rep_seq_core \
-                      -clobber -out 22_pan_fasta_rep_seq_core_protTMP.faa
-
-  echo "  Hash pan-ID into protein fasta file 22_pan_fasta_rep_seq_core_prot.faa"
-  cat 22_pan_fasta_rep_seq_core.$faext | 
-    awk '$1~/^>/ {print $2 "\t" substr($1, 2)}' > lists/22_pan_fasta_rep_seq_core.hsh
-  hash_into_fasta_id.pl -hash lists/22_pan_fasta_rep_seq_core.hsh -swap_IDs -nodef \
-    -fasta 22_pan_fasta_rep_seq_core_protTMP.faa > 22_pan_fasta_rep_seq_core_prot.faa
 
   echo "  Get a clust.tsv file with orthogroups with at least min_core_prop*max_annot_ct annotation sets"
   join <(LC_ALL=C sort -k1,1 lists/lis.17_syn_pan_aug_extra.core) \
@@ -489,17 +475,17 @@ run_name_pangenes() {
     perl -pe 's/^(\S+)\t([^.]+\.[^.]+)\.(chr\d+)_(\d+)\t(\d+)\t(\d+)/$1\t$1__$2.$3_$4__$5__$6/' > consen_posn.hsh
 
   echo "  Hash position information into fasta file"
-  hash_into_fasta_id.pl -fasta 22_pan_fasta_rep_seq_core.$faext -hash consen_posn.hsh |
-    grep -v "HASH UNDEFINED" > 22_pan_fasta_rep_seq_core_posnTMP.$faext
+  hash_into_fasta_id.pl -fasta 22_pan_fasta_rep_seq_core.$fna -hash consen_posn.hsh |
+    grep -v "HASH UNDEFINED" > 22_pan_fasta_rep_seq_core_posnTMP.$fna
 
-  # Reshape defline, and sort by position
-  fasta_to_table.awk 22_pan_fasta_rep_seq_core_posnTMP.$faext | sed 's/__/\t/g; s/ /\t/' | 
+  echo "  Reshape defline, and sort by position"
+  fasta_to_table.awk 22_pan_fasta_rep_seq_core_posnTMP.$fna | sed 's/__/\t/g; s/ /\t/' | 
     perl -pe 's/^(\w+)\s+(.+)\.(chr\d+)_(\d+)\s+/$1\t$2\t$3\t$4\t/' | sed 's/chr//' | sort -k3n -k4n |
     awk '{print ">" $2 ".chr" $3 "_" $4 " " $1 " " $5 " " $6 " " $7; print $8}' |
-      cat > 23_syn_pan_cent_merged_core_posn.$faext
+      cat > 23_syn_pan_cent_merged_core_posn.$fna
  
   echo "  Re-cluster, to identify neighboring genes that are highly similar"
-    mmseqs easy-cluster 23_syn_pan_cent_merged_core_posn.$faext 24_pan_fasta 03_mmseqs_tmp \
+    mmseqs easy-cluster 23_syn_pan_cent_merged_core_posn.$fna 24_pan_fasta 03_mmseqs_tmp \
     --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
   echo "  Parse mmseqs clusters into pairs of genes that are similar and ordinally close"
@@ -511,13 +497,28 @@ run_name_pangenes() {
   echo "  Cluster the potential near-duplicate neighboring paralogs"
   mcl  24_pan_fasta_cluster.closepairs --abc -o 24_pan_fasta_cluster.close.clst
  
-  echo "  Keep the first gene from the cluster and discard the rest. Do this by removing the others."
+  echo "  Keep the first gene from the cluster and discard the rest."
   cat 24_pan_fasta_cluster.close.clst | awk '{$1=""}1' | awk '{$1=$1}1' | tr ' ' '\n' | 
     sort -u > lists/lis.clust_genes_remove
+  get_fasta_subset.pl -in 23_syn_pan_cent_merged_core_posn.$fna -xclude -clobber \
+    -lis lists/lis.clust_genes_remove -out 24_syn_pan_cent_merged_core_posn_trimd.$fna 
 
-  echo "  Remove neighboring close paralogs, leaving one"
-  get_fasta_subset.pl -in 23_syn_pan_cent_merged_core_posn.$faext -xclude -clobber \
-    -lis lists/lis.clust_genes_remove -out 24_syn_pan_cent_merged_core_posn_trimd.$faext 
+  echo "  Also get all corresponding protein sequences for genes in lists/lis.17_syn_pan_aug_extra.core"
+  faa="faa"
+  cat /dev/null > 20_pan_fasta_prot.$faa
+  for filepath in 02_fasta_prot/*.gz; do 
+    zcat $filepath >> 20_pan_fasta_prot.$faa
+  done
+  cat 23_syn_pan_cent_merged_core_posn.$fna | awk '$1~/^>/ {print $5}' > lists/lis.23_syn_pan_cent_merged_core_posn
+  get_fasta_subset.pl -in 20_pan_fasta_prot.$faa -list lists/lis.23_syn_pan_cent_merged_core_posn \
+                      -clobber -out 23_syn_pan_cent_merged_core_posn_protTMP.$faa
+
+  echo "  Hash pan-ID into protein fasta file"
+  cat 23_syn_pan_cent_merged_core_posn.$fna | 
+    awk '$1~/^>/ {print $5 "\t" substr($1, 2) "__" $2 "__" $3 "__" $4}' > lists/23_syn_pan_cent_merged_core_posn.hsh
+  hash_into_fasta_id.pl -hash lists/23_syn_pan_cent_merged_core_posn.hsh -swap_IDs -nodef \
+    -fasta 23_syn_pan_cent_merged_core_posn_protTMP.$faa |
+    perl -pe 's/__/ /g' > 23_syn_pan_cent_merged_core_posn_prot.$faa
 }
 
 run_calc_chr_pairs() {
@@ -525,7 +526,7 @@ run_calc_chr_pairs() {
   echo "Generate a report of observed chromosome pairs"
 
   echo "  Identify gene pairs, ussing mmseqs --easy_cluster"
-    mmseqs easy-cluster 20_pan_fasta.$faext 24_pan_fasta_clust 03_mmseqs_tmp \
+    mmseqs easy-cluster 20_pan_fasta.$fna 24_pan_fasta_clust 03_mmseqs_tmp \
     --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
   echo "   Extract chromosome-chromosome correspondences"
@@ -551,7 +552,7 @@ run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
  
   # Determine if the sequence looks like nucleotide or like protein.
-  someseq=$(head ${WORK_DIR}/07_pan_fasta.$faext | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
+  someseq=$(head ${WORK_DIR}/07_pan_fasta.$fna | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
   SEQTYPE=$(check_seq_type "${someseq}")
   case "$SEQTYPE" in 
     3) ST="NUC" ;;
@@ -569,60 +570,16 @@ run_summarize() {
       mkdir -p $full_out_dir
   fi
 
-
-  if [ -f ${WORK_DIR}/06_syn_pan.clust.tsv ]; then
-    cp ${WORK_DIR}/06_syn_pan.clust.tsv ${full_out_dir}/
-  else
-    echo "Warning: couldn't find file ${WORK_DIR}/06_syn_pan.clust.tsv; skipping"
-  fi
-
-  if [ -f ${WORK_DIR}/06_syn_pan.hsh.tsv ]; then
-    cp ${WORK_DIR}/06_syn_pan.hsh.tsv ${full_out_dir}/
-  else
-    echo "Warning: couldn't find file ${WORK_DIR}/06_syn_pan.hsh.tsv; skipping"
-  fi
-
-  if [ -f ${WORK_DIR}/22_syn_pan_aug_extra_core_posn.hsh.tsv ]; then
-    cp ${WORK_DIR}/*_syn_pan_aug*.tsv ${full_out_dir}/
-  else 
-    echo "Warning: couldn't find file ${WORK_DIR}/22_syn_pan_aug_extra_core_posn.hsh.tsv; skipping"
-  fi
-
-  if [ -f ${WORK_DIR}/observed_chr_pairs.tsv ]; then
-    cp ${WORK_DIR}/observed_chr_pairs.tsv ${full_out_dir}/
-  else 
-    echo "Warning: couldn't find file ${WORK_DIR}/observed_chr_pairs.tsv; skipping"
-  fi
-
-  if [ -f ${WORK_DIR}/consen_${consen_prefix}.tsv ]; then
-    cp ${WORK_DIR}/consen_${consen_prefix}.tsv ${full_out_dir}/
-  else
-    echo "Warning: couldn't find file ${WORK_DIR}/consen_${consen_prefix}.tsv; skipping"
-  fi
-
-  if [ -f ${WORK_DIR}/21_pan_fasta_clust_rep_seq.$faext ]; then
-    cp ${WORK_DIR}/21_pan_fasta_clust_rep_seq.$faext ${full_out_dir}/
-  else 
-    echo "Warning: couldn't find file ${WORK_DIR}/21_pan_fasta_clust_rep_seq.$faext; skipping"
-  fi 
-
-  if [ -f ${WORK_DIR}/22_pan_fasta_rep_seq_core_prot.faa ]; then
-    cp ${WORK_DIR}/22_pan_fasta_rep_seq_core_prot.faa ${full_out_dir}/
-  else 
-    echo "Warning: couldn't find file ${WORK_DIR}/22_pan_fasta_rep_seq_core_prot.faa; skipping"
-  fi 
-
-  if [ -f ${WORK_DIR}/23_syn_pan_cent_merged_core_posn.$faext ]; then
-    cp ${WORK_DIR}/23_syn_pan_cent_merged_core_posn.$faext ${full_out_dir}/
-  else 
-    echo "Warning: couldn't find file ${WORK_DIR}/23_syn_pan_cent_merged_core_posn.$faext; skipping"
-  fi 
-
-  if [ -f ${WORK_DIR}/24_syn_pan_cent_merged_core_posn_trimd.$faext ]; then 
-    cp ${WORK_DIR}/24_syn_pan_cent_merged_core_posn_trimd.$faext ${full_out_dir}/
-  else 
-    echo "Warning: couldn't find file {WORK_DIR}/24_syn_pan_cent_merged_core_posn_trimd.$faext; skipping"
-  fi
+  for file in 06_syn_pan.clust.tsv, 06_syn_pan.hsh.tsv, 22_syn_pan_aug_extra_core_posn.hsh.tsv, \
+              observed_chr_pairs.tsv, consen_${consen_prefix}.tsv, 21_pan_fasta_clust_rep_seq.fna, \
+              23_syn_pan_cent_merged_core_posn.fna, 24_syn_pan_cent_merged_core_posn_trimd.fna, \
+              23_syn_pan_cent_merged_core_posn_prot.faa; do
+    if [ -f ${WORK_DIR}/$file ]; then
+      cp ${WORK_DIR}/$file ${full_out_dir}/
+    else 
+      echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
+    fi
+  done
 
   printf "Run of program $scriptname, version $version\n" > ${stats_file}
 
@@ -748,13 +705,14 @@ run_summarize() {
     printf "genes-in-OGs\tOGs-w-genes\tOGs-w-genes/genes\tpct-non-null-OGs\tpct-null-OGs\tannotation-set\n" >> ${stats_file}
     cat ${full_out_dir}/17_syn_pan_aug_extra.counts.tsv | transpose.pl | 
       perl -lane 'next if ($.<=3); 
-                  $ct=0; $sum=0; $nulls=0; $OGs=0;
-                  for $i (@F[1..(@F-1)]){
-                    $OGs++;
-                    if ($i>0){$ct++; $sum+=$i}
-                    if ($i==0){$nulls++}
-                  }; 
-                  printf("%d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' >> ${stats_file}
+        $ct=0; $sum=0; $nulls=0; $OGs=0;
+        for $i (@F[1..(@F-1)]){
+          $OGs++;
+          if ($i>0){$ct++; $sum+=$i}
+          if ($i==0){$nulls++}
+        }; 
+        printf("%d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
+        >> ${stats_file}
   fi
 
   echo
