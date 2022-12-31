@@ -69,16 +69,18 @@ while (<$PAT_IN>){ # two fields, e.g. "01 01"
   next if (/^#/ || /^$/);
   my $line = $_;
   my ($left, $right) = split(/\s+/);
+  $left =~ s/^0+(\d+)/$1/;
+  $right =~ s/^0+(\d+)/$1/;
   
   my $chr_rex;
   # Store the pattern for later regex use
-  $chr_rex = qr(\S+\D$left \S+\D$right$);
+  $chr_rex = qr(\S+\D0*$left \S+\D0*$right$);
   if ($verbose) {print "$left $right; $chr_rex\n"}
   $rexen{$chr_rex}++;
 
   # Store the reverse pattern, if the left and right chroms are not the same
   if ($left ne $right) {
-    $chr_rex = qr(\S+\D$right \S+\D$left$);
+    $chr_rex = qr(\S+\D0*$right \S+\D0*$left$);
     if ($verbose) {print "$right $left; $chr_rex\n"}
     $rexen{$chr_rex}++;
   }
@@ -112,8 +114,10 @@ while (my $line = <>) {
 
 __END__
 VERSIONS
-v0.01 2021-07-11 S. Cannon. 
-v0.02 2021-10-15 strip ">" from data
-v0.03 2021-10-19 For matches between different chromosomes, handle both directions, e.g. 11 13 and 13 11
-                 and terminate regexes with "$" to ensure match of chromosome number, not preceding text
-v0.04 2021-10-19 Add "noself" flag
+2021-07-11 S. Cannon. 
+2021-10-15 strip ">" from data
+2021-10-19 For matches between different chromosomes, handle both directions, e.g. 11 13 and 13 11
+           and terminate regexes with "$" to ensure match of chromosome number, not preceding text
+2021-10-19 Add "noself" flag
+2022-12-31 In regex, ignore leading zeroes in e.g. chr01
+
