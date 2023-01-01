@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2022
 #
 scriptname=`basename "$0"`
-version="2022-12-31"
+version="2023-01-10"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -128,7 +128,7 @@ run_ingest() {
   
   mkdir -p 02_fasta_nuc 02_fasta_prot 01_posn_hsh stats
 
-    # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end.
+    # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_core.
     # This is captured from the gene IDs using the annot_str_regex set in the config file.
     cat /dev/null > stats/tmp.gene_count_start
     cat /dev/null > stats/tmp.fasta_list
@@ -611,105 +611,113 @@ run_summarize() {
     echo "Sequence type: protein" >> ${stats_file}
   fi
 
-  # Report parameters from config file
+echo "  Report parameters from config file"
   printf "Parameter  \tvalue\n" >> ${stats_file}
   for key in ${pandagma_conf_params}; do
     printf '%-15s\t%s\n' ${key} "${!key}" >> ${stats_file}
   done
 
-  # Report threshold for inclusion in "core"
+printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
+
+echo "  Report threshold for inclusion in \"core\""
   max_annot_ct=$(cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv |
                        awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
-  echo "  min_core_prop: $min_core_prop"
-  echo "  max_annot_ct:   $max_annot_ct"
   core_threshold=$(bc -l <<< "$min_core_prop * $max_annot_ct")
-  printf "  The core set consists of orthogroups with at least "
-  printf "%.0f genes per OG (>= %f * %d sets)\n" $core_threshold $min_core_prop $max_annot_ct 
+  export CTceil=$(echo $core_threshold | awk '{print int($1+0.5)}')
 
-  printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
+echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
+  printf "\nThe core set consists of orthogroups with at least %.0f genes per OG (>= %f * %d sets).\n" \
+     $CTceil $min_core_prop $max_annot_ct >> ${stats_file}
+  printf "The global mode may be for a smaller OG size. Modes reported below are greater than the specified core threshold.\n" \
+    >> ${stats_file}
 
-# Report orthogroup composition statistics for the three main cluster-calculation steps
-  printf '%-20s\t%s\n' "Statistic" "value" >> ${stats_file}
+  printf '\n%-20s\t%s\n' "Statistic" "value" >> ${stats_file}
 
-# Initial, synteny-based clusters
+echo "    Initial synteny-based clusters"
   printf "\n== Initial clusters (containing only genes within synteny blocks)\n" >> ${stats_file}
   let "clusters=$(wc -l < ${full_out_dir}/06_syn_pan.clust.tsv)"
   printf '%-20s\t%s\n' "num_of_clusters" $clusters >> ${stats_file}
 
   let "largest=$(awk 'NR == 1 {print NF-1; exit}' ${full_out_dir}/06_syn_pan.clust.tsv)"
-  printf '%-20s\t%s\n' "largest_cluster" $largest >> ${stats_file}
+  printf '%-20s\t%d\n' "largest_cluster" $largest >> ${stats_file}
 
-  let "mode=$(awk "{print NF-1}" ${full_out_dir}/06_syn_pan.clust.tsv | \
+  let "mode=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/06_syn_pan.clust.tsv |
     uniq -c | sort -n | tail -1 | awk '{print $2}')"
-  printf '%-20s\t%s\n' "modal_clst_size" $mode >> ${stats_file}
+  printf '%-20s\t%d\n' "modal_clst_size>=$CTceil" $mode >> ${stats_file}
 
-  let "num_at_mode=$(awk "{print NF-1}" ${full_out_dir}/06_syn_pan.clust.tsv | \
+  let "num_at_mode=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/06_syn_pan.clust.tsv |
     uniq -c | sort -n | tail -1 | awk '{print $1}')"
-  printf '%-20s\t%s\n' "num_at_mode" $num_at_mode >> ${stats_file}
+  printf '%-20s\t%d\n' "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
   
   let "seqs_clustered=$(wc -l ${full_out_dir}/06_syn_pan.hsh.tsv | awk '{print $1}')"
-  printf '%-20s\t%s\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
+  printf '%-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
 
-# Initial clusters augmented with remaining non-syntenic genes
+echo "    Initial clusters augmented with remaining non-syntenic genes"
   if [ -f ${full_out_dir}/12_syn_pan_aug.clust.tsv ]; then
     printf "\n== Augmented clusters (unanchored sequences added to the initial clusters)\n" >> ${stats_file}
     let "clustersA=$(wc -l < ${full_out_dir}/12_syn_pan_aug.clust.tsv)"
-    printf '%-20s\t%s\n' "num_of_clusters" $clustersA >> ${stats_file}
+    printf '%-20s\t%d\n' "num_of_clusters" $clustersA >> ${stats_file}
 
     let "largestA=$(awk "{print NF-1}" ${full_out_dir}/12_syn_pan_aug.clust.tsv | sort -n | tail -1)"
-    printf '%-20s\t%s\n' "largest_cluster" $largestA >> ${stats_file}
+    printf '%-20s\t%d\n' "largest_cluster" $largestA >> ${stats_file}
 
-    let "modeA=$(awk "{print NF-1}" ${full_out_dir}/12_syn_pan_aug.clust.tsv | \
+    let "modeA=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/12_syn_pan_aug.clust.tsv |
       uniq -c | sort -n | tail -1 | awk '{print $2}')"
-    printf '%-20s\t%s\n' "modal_clst_size" $modeA >> ${stats_file}
+    printf '%-20s\t%d\n' "modal_clst_size>=$CTceil" $modeA >> ${stats_file}
 
-    let "numA_at_mode=$(awk "{print NF-1}" ${full_out_dir}/12_syn_pan_aug.clust.tsv | \
+    let "numA_at_mode=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/12_syn_pan_aug.clust.tsv |
       sort -n | uniq -c | sort -n | tail -1 | awk '{print $1}')"
-    printf '%-20s\t%s\n' "num_at_mode" $numA_at_mode >> ${stats_file}
+    printf '%-20s\t%d\n' "num_at_mode>=$CTceil" $numA_at_mode >> ${stats_file}
     
     let "seqs_clustered=$(cat ${full_out_dir}/12_syn_pan_aug.clust.tsv | awk '{ct+=(NF-1)} END{print ct}')"
-    printf '%-20s\t%s\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
+    printf '%-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
   fi
 
-# Clusters with the "extra" annotation sets (if any)
+echo "    Clusters with the "extra" annotation sets (if any)"
   if [ -f ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv ]; then
     printf "\n== Augmented-extra clusters (sequences from extra annotation sets have been added)\n" >> ${stats_file}
     let "clustersB=$(wc -l < ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv)"
-    printf '%-20s\t%s\n' "num_of_clusters" $clustersB >> ${stats_file}
+    printf '%-20s\t%d\n' "num_of_clusters" $clustersB >> ${stats_file}
 
     let "largestB=$(awk "{print NF-1}" ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv | sort -n | tail -1)"
-    printf '%-20s\t%s\n' "largest_cluster" $largestB >> ${stats_file}
+    printf '%-20s\t%d\n' "largest_cluster" $largestB >> ${stats_file}
 
-    let "modeB=$(awk "{print NF-1}" ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv | \
+    let "modeB=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv |
       sort -n | uniq -c | sort -n | tail -1 | awk '{print $2}')"
-    printf '%-20s\t%s\n' "modal_clst_size" $modeB >> ${stats_file}
+    printf '%-20s\t%d\n' "modal_clst_size>=$CTceil" $modeB >> ${stats_file}
 
-    let "numB_at_mode=$(awk "{print NF-1}" ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv | \
+    let "numB_at_mode=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv |
       sort -n | uniq -c | sort -n | tail -1 | awk '{print $1}')"
-    printf '%-20s\t%s\n' "num_at_mode" $numB_at_mode >> ${stats_file}
+    printf '%-20s\t%d\n' "num_at_mode>=$CTceil" $numB_at_mode >> ${stats_file}
     
     let "seqs_clustered=$(wc -l ${full_out_dir}/22_syn_pan_aug_extra_core_posn.hsh.tsv | awk '{print $1}')"
-    printf '%-20s\t%s\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
+    printf '%-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
   fi
 
-  # Report the starting files:
-    printf "\n== Starting fasta files\n" >> ${stats_file}
-    cat ${WORK_DIR}/stats/tmp.fasta_list >> ${stats_file}
+echo "  Report the starting files"
+  printf "\n== Starting fasta files\n" >> ${stats_file}
+  cat ${WORK_DIR}/stats/tmp.fasta_list >> ${stats_file}
 
-  # Print per-annotation-set coverage stats (sequence counts, sequences retained)
-  cut -f2 ${WORK_DIR}/22_syn_pan_aug_extra_core_posn.hsh.tsv | 
+echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
+  #   tmp.gene_count_start was generated during run_ingest
+  printf "\n== Proportion of initial genes retained in the \"aug_extra\" and \"core\" sets:\n" \
+    >> ${stats_file}
+
+  cut -f2 ${WORK_DIR}/18_syn_pan_aug_extra.hsh.tsv | 
     perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' |
-    sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_end
+    sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_all_end
 
-  # tmp.gene_count_start was generated during run_ingest
+  cut -f2 ${WORK_DIR}/22_syn_pan_aug_extra_core.hsh.tsv | 
+    perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' |
+    sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_core_end
 
-  printf "\n== Start and end gene counts per annotation set\n" >> ${stats_file}
+  paste ${WORK_DIR}/stats/tmp.gene_count_start \
+        ${WORK_DIR}/stats/tmp.gene_count_all_end \
+        ${WORK_DIR}/stats/tmp.gene_count_core_end | 
+    awk 'BEGIN{print "  Start\tEnd_all\tEnd_core\tPct_kept_all\tPct_kept_core\tAnnotation_name"} 
+        { printf "  %i\t%i\t%i\t%2.1f\t%2.1f\t%s\n", $2, $4, $6, 100*($4/$2), 100*($6/$2), $1 }'  >> ${stats_file}
 
-  join ${WORK_DIR}/stats/tmp.gene_count_start ${WORK_DIR}/stats/tmp.gene_count_end | 
-    awk 'BEGIN{print "\tStart\tEnd\tKept\tAnnotation_name"} 
-        { printf "\t%i\t%i\t%2.1f\t%s\n", $2, $3, 100*($3/$2), $1 }'  >> ${stats_file}
-
-  # histograms
+echo "  Print histograms"
   if [ -f ${full_out_dir}/06_syn_pan.clust.tsv ]; then
     printf "\nCounts of initial clusters by cluster size, file 06_syn_pan.clust.tsv:\n" >> ${stats_file}
     awk '{print NF-1}' ${full_out_dir}/06_syn_pan.clust.tsv |
@@ -728,7 +736,7 @@ run_summarize() {
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
   fi
 
-  # Counts per accession
+echo "  Print counts per accession"
   if [ -f ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv ]; then
     printf "\nFor all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" >> ${stats_file}
     printf "genes-in-OGs\tOGs-w-genes\tOGs-w-genes/genes\tpct-non-null-OGs\tpct-null-OGs\tannotation-set\n" >> ${stats_file}
