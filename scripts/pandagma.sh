@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2022
 #
 scriptname=`basename "$0"`
-version="2023-01-10"
+version="2023-01-02"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -135,7 +135,7 @@ calc_seq_stats () {
           } 
           END { 
             ave=sum/ct;
-            printf("  %4d  %4d  %4d  %4d  %7.1f  %4s\n", ct, min, $1, N50, ave, ANN);
+            printf(" %4d  %4d  %4d  %4d  %7.1f  %4s\n", ct, min, $1, N50, ave, ANN);
           }'
 }
 
@@ -173,7 +173,7 @@ run_ingest() {
       awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
     echo "Main:   $file_base" >> stats/tmp.fasta_list
     # calc basic sequence stats
-    printf "Main:   " >> stats/tmp.fasta_seqstats
+    printf "  Main:  " >> stats/tmp.fasta_seqstats
     cat_or_zcat "${fasta_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
   done
 
@@ -194,7 +194,7 @@ run_ingest() {
         awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
       echo "Extra:  $file_base" >> stats/tmp.fasta_list
       # calc basic sequence stats
-      printf "Extra:  " >> stats/tmp.fasta_seqstats
+      printf "  Extra: " >> stats/tmp.fasta_seqstats
       cat_or_zcat "${fasta_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
     done
   fi
@@ -694,9 +694,30 @@ echo "  Report orthogroup composition statistics for the three main cluster-calc
     let clustcount=$((clustcount+1))
   done
 
-echo "  Report the starting files"
-  printf "\n== Starting fasta files\n" >> ${stats_file}
-  cat ${WORK_DIR}/stats/tmp.fasta_list >> ${stats_file}
+echo "  Print sequence composition statistics for each annotation set"
+  printf "\n== Sequence stats for CDS files\n" >> ${stats_file}
+  printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
+  if [ -f ${WORK_DIR}/stats/tmp.fasta_seqstats ]; then
+    cat ${WORK_DIR}/stats/tmp.fasta_seqstats >> ${stats_file}
+
+  printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
+  printf "  Avg:   " >> ${stats_file} 
+    cat ${WORK_DIR}/stats/tmp.fasta_seqstats | transpose.pl |
+      perl -ane 'BEGIN{use List::Util qw(sum)}; 
+                 if ($F[0]=~/^\d+/){
+                   $sum=sum @F; $ct=scalar(@F); $avg=$sum/$ct;
+                   printf " %4d ", $avg;
+                 END{print "   all_annot_sets\n"}
+                 }' >> ${stats_file}
+  fi
+
+  printf "\n== Sequence stats for final pangene CDS files -- core and core-trimmed\n" >> ${stats_file}
+  annot_name=23_syn_pan_core_posn_cds.fna
+    printf "  Core:  " >> ${stats_file}
+    cat_or_zcat "${WORK_DIR}/23_syn_pan_core_posn_cds.fna" | calc_seq_stats >> ${stats_file}
+  annot_name=24_syn_pan_core_posn_trim_cds.fna
+    printf "  Trim:  " >> ${stats_file}
+    cat_or_zcat "${WORK_DIR}/24_syn_pan_core_posn_trim_cds.fna" | calc_seq_stats >> ${stats_file}
 
 echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
   #   tmp.gene_count_start was generated during run_ingest
@@ -719,8 +740,10 @@ echo "  Print per-annotation-set coverage stats (sequence counts, sequences reta
 
 echo "  Print counts per accession"
   if [ -f ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv ]; then
-    printf "\nFor all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" >> ${stats_file}
-    printf "genes-in-OGs\tOGs-w-genes\tOGs-w-genes/genes\tpct-non-null-OGs\tpct-null-OGs\tannotation-set\n" >> ${stats_file}
+    printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" \
+      >> ${stats_file}
+    printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n" \
+      >> ${stats_file}
     cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv | transpose.pl | 
       perl -lane 'next if ($.<=3); 
         $ct=0; $sum=0; $nulls=0; $OGs=0;
@@ -729,14 +752,8 @@ echo "  Print counts per accession"
           if ($i>0){$ct++; $sum+=$i}
           if ($i==0){$nulls++}
         }; 
-        printf("%d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
+        printf("  %d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
         >> ${stats_file}
-  fi
-
-echo "  Print sequence composition statistics for each annotation set"
-  if [ -f ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv ]; then
-    printf "\nSequence stats for CDS files: seqs  min  max  N50  ave  annotation_name\n"
-    cat stats/tmp.fasta_seqstats >> ${stats_file}
   fi
 
 echo "  Print histograms"
