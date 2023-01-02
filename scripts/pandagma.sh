@@ -656,7 +656,7 @@ echo "  Report threshold for inclusion in \"core\""
 echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
   printf "\nThe core set consists of orthogroups with at least %.0f genes per OG (>= %f * %d sets).\n" \
      $CTceil $min_core_prop $max_annot_ct >> ${stats_file}
-  printf "The global mode may be for a smaller OG size. Modes reported below are greater than the specified core threshold.\n" \
+  printf "The global mode may be for a smaller OG size. Modes below are greater than the specified core threshold.\n" \
     >> ${stats_file}
 
   printf '\n%-20s\t%s\n' "Statistic" "value" >> ${stats_file}
@@ -672,26 +672,28 @@ echo "  Report orthogroup composition statistics for the three main cluster-calc
       elif [[ $clustcount == 3 ]]; then
         printf "\n== Augmented-extra clusters (with sequences from extra annotation sets)\n" >> ${stats_file}
       fi
+
+      let "clusters=$(wc -l < $clustfile)"
+      printf '%-20s\t%s\n' "num_of_clusters" $clusters >> ${stats_file}
+  
+      let "largest=$(awk 'NR == 1 {print NF-1; exit}' $clustfile)"
+      printf '%-20s\t%s\n' "largest_cluster" $largest >> ${stats_file}
+  
+      let "mode=$(awk "{print NF-1}" $clustfile | \
+        uniq -c | sort -n | tail -1 | awk '{print $2}')"
+      printf '%-20s\t%d\n' "modal_clst_size>=$CTceil" $mode >> ${stats_file}
+  
+      let "num_at_mode=$(awk "{print NF-1}" $clustfile | \
+        uniq -c | sort -n | tail -1 | awk '{print $1}')"
+      printf '%-20s\t%d\n' "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
+  
+      let "seqs_clustered=$(wc -l $clustfile | awk '{print $1}')"
+      printf '%-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
+  
+      let clustcount=$((clustcount+1))
+    else
+      printf "File $clustfile is not available; skipping\n"
     fi
-
-    let "clusters=$(wc -l < $clustfile)"
-    printf '%-20s\t%s\n' "num_of_clusters" $clusters >> ${stats_file}
-
-    let "largest=$(awk 'NR == 1 {print NF-1; exit}' $clustfile)"
-    printf '%-20s\t%s\n' "largest_cluster" $largest >> ${stats_file}
-
-    let "mode=$(awk "{print NF-1}" $clustfile | \
-      uniq -c | sort -n | tail -1 | awk '{print $2}')"
-    printf '%-20s\t%d\n' "modal_clst_size>=$CTceil" $mode >> ${stats_file}
-
-    let "num_at_mode=$(awk "{print NF-1}" $clustfile | \
-      uniq -c | sort -n | tail -1 | awk '{print $1}')"
-    printf '%-20s\t%d\n' "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
-
-    let "seqs_clustered=$(wc -l $clustfile | awk '{print $1}')"
-    printf '%-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
-
-    let clustcount=$((clustcount+1))
   done
 
 echo "  Print sequence composition statistics for each annotation set"
