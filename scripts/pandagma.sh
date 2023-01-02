@@ -117,6 +117,27 @@ check_seq_type () {
                           awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
   perl -le '$PN=$ENV{"proportion_nuc"}; if ($PN>0.9){print 3} else {print 1}'
 }
+calc_seq_stats () {
+  # Given fasta file on STDIN and an environment variable "annot_name", report:
+  # seqs  min  max  N50  ave  annotation_set
+  awk 'BEGIN { ORS="" } 
+       /^>/ && NR==1 { print $0"\n" } 
+       /^>/ && NR!=1 { print "\n"$0"\n" } 
+       /^[^>]/ { print } 
+       END { print "\n" }' |
+  awk '/^[^>]/ {print length($1); tot_bp+=length($1) } END { print "bases: " tot_bp "\n" }' \
+   | sort -n \
+   | awk -v ANN=$annot_name 'BEGIN { min=99999999999999 }
+          /bases:/ { N50_ct = $2/2; bases=$2 } 
+          /^[0-9]/ { 
+             ct++; sum+=$1; if ( sum >= N50_ct && !printed ) { N50=$1; printed = 1 } 
+             min = (min < $1) ? min : $1
+          } 
+          END { 
+            ave=sum/ct;
+            printf("  %4d  %4d  %4d  %4d  %7.1f  %4s\n", ct, min, $1, N50, ave, ANN);
+          }'
+}
 
 ### run functions ###
 
@@ -132,6 +153,7 @@ run_ingest() {
     # This is captured from the gene IDs using the annot_str_regex set in the config file.
     cat /dev/null > stats/tmp.gene_count_start
     cat /dev/null > stats/tmp.fasta_list
+    cat /dev/null > stats/tmp.fasta_seqstats
     start_time=`date`
     printf "Run started at: $start_time\n" > stats/tmp.timing
 
@@ -150,6 +172,9 @@ run_ingest() {
     cat_or_zcat "${fasta_files[file_num]}" | 
       awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
     echo "Main:   $file_base" >> stats/tmp.fasta_list
+    # calc basic sequence stats
+    printf "Main:   " >> stats/tmp.fasta_seqstats
+    cat_or_zcat "${fasta_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
   done
 
   # Also get position information from the "extra" annotation sets, if any.
@@ -168,6 +193,9 @@ run_ingest() {
       cat_or_zcat "${fasta_files_extra[file_num]}" | 
         awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
       echo "Extra:  $file_base" >> stats/tmp.fasta_list
+      # calc basic sequence stats
+      printf "Extra:  " >> stats/tmp.fasta_seqstats
+      cat_or_zcat "${fasta_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
     done
   fi
 
@@ -633,66 +661,38 @@ echo "  Report orthogroup composition statistics for the three main cluster-calc
 
   printf '\n%-20s\t%s\n' "Statistic" "value" >> ${stats_file}
 
-echo "    Initial synteny-based clusters"
-  printf "\n== Initial clusters (containing only genes within synteny blocks)\n" >> ${stats_file}
-  let "clusters=$(wc -l < ${full_out_dir}/06_syn_pan.clust.tsv)"
-  printf '%-20s\t%s\n' "num_of_clusters" $clusters >> ${stats_file}
+  clustcount=1
+  for clustering in 06_syn_pan 12_syn_pan_aug 18_syn_pan_aug_extra; do
+    clustfile=${full_out_dir}/$clustering.clust.tsv
+    if [[ -f $clustfile ]]; then
+      if [[ $clustcount == 1 ]]; then
+        printf "\n== Initial clusters (containing only genes within synteny blocks)\n" >> ${stats_file}
+      elif [[ $clustcount == 2 ]]; then
+        printf "\n== Augmented clusters (unanchored sequences added to the initial clusters)\n" >> ${stats_file}
+      elif [[ $clustcount == 3 ]]; then
+        printf "\n== Augmented-extra clusters (with sequences from extra annotation sets)\n" >> ${stats_file}
+      fi
+    fi
 
-  let "largest=$(awk 'NR == 1 {print NF-1; exit}' ${full_out_dir}/06_syn_pan.clust.tsv)"
-  printf '%-20s\t%d\n' "largest_cluster" $largest >> ${stats_file}
+    let "clusters=$(wc -l < $clustfile)"
+    printf '%-20s\t%s\n' "num_of_clusters" $clusters >> ${stats_file}
 
-  let "mode=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/06_syn_pan.clust.tsv |
-    uniq -c | sort -n | tail -1 | awk '{print $2}')"
-  printf '%-20s\t%d\n' "modal_clst_size>=$CTceil" $mode >> ${stats_file}
+    let "largest=$(awk 'NR == 1 {print NF-1; exit}' $clustfile)"
+    printf '%-20s\t%s\n' "largest_cluster" $largest >> ${stats_file}
 
-  let "num_at_mode=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/06_syn_pan.clust.tsv |
-    uniq -c | sort -n | tail -1 | awk '{print $1}')"
-  printf '%-20s\t%d\n' "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
-  
-  let "seqs_clustered=$(wc -l ${full_out_dir}/06_syn_pan.hsh.tsv | awk '{print $1}')"
-  printf '%-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
-
-echo "    Initial clusters augmented with remaining non-syntenic genes"
-  if [ -f ${full_out_dir}/12_syn_pan_aug.clust.tsv ]; then
-    printf "\n== Augmented clusters (unanchored sequences added to the initial clusters)\n" >> ${stats_file}
-    let "clustersA=$(wc -l < ${full_out_dir}/12_syn_pan_aug.clust.tsv)"
-    printf '%-20s\t%d\n' "num_of_clusters" $clustersA >> ${stats_file}
-
-    let "largestA=$(awk "{print NF-1}" ${full_out_dir}/12_syn_pan_aug.clust.tsv | sort -n | tail -1)"
-    printf '%-20s\t%d\n' "largest_cluster" $largestA >> ${stats_file}
-
-    let "modeA=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/12_syn_pan_aug.clust.tsv |
+    let "mode=$(awk "{print NF-1}" $clustfile | \
       uniq -c | sort -n | tail -1 | awk '{print $2}')"
-    printf '%-20s\t%d\n' "modal_clst_size>=$CTceil" $modeA >> ${stats_file}
+    printf '%-20s\t%d\n' "modal_clst_size>=$CTceil" $mode >> ${stats_file}
 
-    let "numA_at_mode=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/12_syn_pan_aug.clust.tsv |
-      sort -n | uniq -c | sort -n | tail -1 | awk '{print $1}')"
-    printf '%-20s\t%d\n' "num_at_mode>=$CTceil" $numA_at_mode >> ${stats_file}
-    
-    let "seqs_clustered=$(cat ${full_out_dir}/12_syn_pan_aug.clust.tsv | awk '{ct+=(NF-1)} END{print ct}')"
+    let "num_at_mode=$(awk "{print NF-1}" $clustfile | \
+      uniq -c | sort -n | tail -1 | awk '{print $1}')"
+    printf '%-20s\t%d\n' "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
+
+    let "seqs_clustered=$(wc -l $clustfile | awk '{print $1}')"
     printf '%-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
-  fi
 
-echo "    Clusters with the "extra" annotation sets (if any)"
-  if [ -f ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv ]; then
-    printf "\n== Augmented-extra clusters (sequences from extra annotation sets have been added)\n" >> ${stats_file}
-    let "clustersB=$(wc -l < ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv)"
-    printf '%-20s\t%d\n' "num_of_clusters" $clustersB >> ${stats_file}
-
-    let "largestB=$(awk "{print NF-1}" ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv | sort -n | tail -1)"
-    printf '%-20s\t%d\n' "largest_cluster" $largestB >> ${stats_file}
-
-    let "modeB=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv |
-      sort -n | uniq -c | sort -n | tail -1 | awk '{print $2}')"
-    printf '%-20s\t%d\n' "modal_clst_size>=$CTceil" $modeB >> ${stats_file}
-
-    let "numB_at_mode=$(awk -v CT=$CTceil "NF>=CT {print NF-1}" ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv |
-      sort -n | uniq -c | sort -n | tail -1 | awk '{print $1}')"
-    printf '%-20s\t%d\n' "num_at_mode>=$CTceil" $numB_at_mode >> ${stats_file}
-    
-    let "seqs_clustered=$(wc -l ${full_out_dir}/22_syn_pan_aug_extra_core_posn.hsh.tsv | awk '{print $1}')"
-    printf '%-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
-  fi
+    let clustcount=$((clustcount+1))
+  done
 
 echo "  Report the starting files"
   printf "\n== Starting fasta files\n" >> ${stats_file}
@@ -717,6 +717,28 @@ echo "  Print per-annotation-set coverage stats (sequence counts, sequences reta
     awk 'BEGIN{print "  Start\tEnd_all\tEnd_core\tPct_kept_all\tPct_kept_core\tAnnotation_name"} 
         { printf "  %i\t%i\t%i\t%2.1f\t%2.1f\t%s\n", $2, $4, $6, 100*($4/$2), 100*($6/$2), $1 }'  >> ${stats_file}
 
+echo "  Print counts per accession"
+  if [ -f ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv ]; then
+    printf "\nFor all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" >> ${stats_file}
+    printf "genes-in-OGs\tOGs-w-genes\tOGs-w-genes/genes\tpct-non-null-OGs\tpct-null-OGs\tannotation-set\n" >> ${stats_file}
+    cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv | transpose.pl | 
+      perl -lane 'next if ($.<=3); 
+        $ct=0; $sum=0; $nulls=0; $OGs=0;
+        for $i (@F[1..(@F-1)]){
+          $OGs++;
+          if ($i>0){$ct++; $sum+=$i}
+          if ($i==0){$nulls++}
+        }; 
+        printf("%d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
+        >> ${stats_file}
+  fi
+
+echo "  Print sequence composition statistics for each annotation set"
+  if [ -f ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv ]; then
+    printf "\nSequence stats for CDS files: seqs  min  max  N50  ave  annotation_name\n"
+    cat stats/tmp.fasta_seqstats >> ${stats_file}
+  fi
+
 echo "  Print histograms"
   if [ -f ${full_out_dir}/06_syn_pan.clust.tsv ]; then
     printf "\nCounts of initial clusters by cluster size, file 06_syn_pan.clust.tsv:\n" >> ${stats_file}
@@ -734,22 +756,6 @@ echo "  Print histograms"
     printf "\nCounts of augmented-extra clusters by cluster size, file 18_syn_pan_aug_extra.clust.tsv:\n" >> ${stats_file}
     awk '{print NF-1}' ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv |
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
-  fi
-
-echo "  Print counts per accession"
-  if [ -f ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv ]; then
-    printf "\nFor all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" >> ${stats_file}
-    printf "genes-in-OGs\tOGs-w-genes\tOGs-w-genes/genes\tpct-non-null-OGs\tpct-null-OGs\tannotation-set\n" >> ${stats_file}
-    cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv | transpose.pl | 
-      perl -lane 'next if ($.<=3); 
-        $ct=0; $sum=0; $nulls=0; $OGs=0;
-        for $i (@F[1..(@F-1)]){
-          $OGs++;
-          if ($i>0){$ct++; $sum+=$i}
-          if ($i==0){$nulls++}
-        }; 
-        printf("%d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
-        >> ${stats_file}
   fi
 
   echo
