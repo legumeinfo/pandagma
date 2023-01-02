@@ -700,8 +700,7 @@ echo "  Print sequence composition statistics for each annotation set"
   if [ -f ${WORK_DIR}/stats/tmp.fasta_seqstats ]; then
     cat ${WORK_DIR}/stats/tmp.fasta_seqstats >> ${stats_file}
 
-  printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
-  printf "  Avg:   " >> ${stats_file} 
+  printf "\n  Avg:   " >> ${stats_file} 
     cat ${WORK_DIR}/stats/tmp.fasta_seqstats | transpose.pl |
       perl -ane 'BEGIN{use List::Util qw(sum)}; 
                  if ($F[0]=~/^\d+/){
@@ -712,6 +711,7 @@ echo "  Print sequence composition statistics for each annotation set"
   fi
 
   printf "\n== Sequence stats for final pangene CDS files -- core and core-trimmed\n" >> ${stats_file}
+  printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
   annot_name=23_syn_pan_core_posn_cds.fna
     printf "  Core:  " >> ${stats_file}
     cat_or_zcat "${WORK_DIR}/23_syn_pan_core_posn_cds.fna" | calc_seq_stats >> ${stats_file}
