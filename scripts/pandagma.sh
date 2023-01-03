@@ -620,7 +620,8 @@ run_summarize() {
               24_syn_pan_core_posn_trim_cds.fna 24_syn_pan_core_posn_trim_protein.faa \
               observed_chr_pairs.tsv ; do
     if [ -f ${WORK_DIR}/$file ]; then
-      cp ${WORK_DIR}/$file ${full_out_dir}/
+      #cp ${WORK_DIR}/$file ${full_out_dir}/
+      echo
     else 
       echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
     fi
@@ -659,7 +660,7 @@ echo "  Report orthogroup composition statistics for the three main cluster-calc
   printf "The global mode may be for a smaller OG size. Modes below are greater than the specified core threshold.\n" \
     >> ${stats_file}
 
-  printf '\n%-20s\t%s\n' "Statistic" "value" >> ${stats_file}
+  printf '\n  %-20s\t%s\n' "Statistic" "value" >> ${stats_file}
 
   clustcount=1
   for clustering in 06_syn_pan 12_syn_pan_aug 18_syn_pan_aug_extra; do
@@ -667,32 +668,36 @@ echo "  Report orthogroup composition statistics for the three main cluster-calc
     if [[ -f $clustfile ]]; then
       if [[ $clustcount == 1 ]]; then
         printf "\n== Initial clusters (containing only genes within synteny blocks)\n" >> ${stats_file}
+        printf "  Cluster file: $clustering.clust.tsv\n" >> ${stats_file}
       elif [[ $clustcount == 2 ]]; then
         printf "\n== Augmented clusters (unanchored sequences added to the initial clusters)\n" >> ${stats_file}
+        printf "  Cluster file: $clustering.clust.tsv\n" >> ${stats_file}
       elif [[ $clustcount == 3 ]]; then
         printf "\n== Augmented-extra clusters (with sequences from extra annotation sets)\n" >> ${stats_file}
+        printf "  Cluster file: $clustering.clust.tsv\n" >> ${stats_file}
       fi
 
       let "clusters=$(wc -l < $clustfile)"
-      printf '%-20s\t%s\n' "num_of_clusters" $clusters >> ${stats_file}
+      printf '  %-20s\t%s\n' "num_of_clusters" $clusters >> ${stats_file}
   
-      let "largest=$(awk 'NR == 1 {print NF-1; exit}' $clustfile)"
-      printf '%-20s\t%s\n' "largest_cluster" $largest >> ${stats_file}
+      let "largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1)"
+      printf '  %-20s\t%s\n' "largest_cluster" $largest >> ${stats_file}
   
       let "mode=$(awk "{print NF-1}" $clustfile | \
         uniq -c | sort -n | tail -1 | awk '{print $2}')"
-      printf '%-20s\t%d\n' "modal_clst_size>=$CTceil" $mode >> ${stats_file}
+      printf '  %-20s\t%d\n' "modal_clst_size>=$CTceil" $mode >> ${stats_file}
+      export mode
   
-      let "num_at_mode=$(awk "{print NF-1}" $clustfile | \
-        uniq -c | sort -n | tail -1 | awk '{print $1}')"
-      printf '%-20s\t%d\n' "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
+      let "num_at_mode=$(awk -v MODE=$mode '(NF-1) == 8 {ct++} END{print ct}' $clustfile)"
+      printf '  %-20s\t%d\n' "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
   
-      let "seqs_clustered=$(wc -l $clustfile | awk '{print $1}')"
-      printf '%-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
+      let "seqs_clustered=$(awk '{sum+=NF-1} END{print sum}' $clustfile)"
+      printf '  %-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
   
       let clustcount=$((clustcount+1))
     else
       printf "File $clustfile is not available; skipping\n"
+      printf "File $clustfile is not available; skipping\n" >> ${stats_file}
     fi
   done
 
@@ -777,8 +782,6 @@ echo "  Print histograms"
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
   fi
 
-  echo
-  cat ${stats_file}
 }
 
 #
