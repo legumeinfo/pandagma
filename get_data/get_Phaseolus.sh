@@ -33,6 +33,16 @@ cd $base_dir/data/
   curl -O $url_base/vulgaris/annotations/LaborOvalle.gnm1.ann1.L1DY/phavu.LaborOvalle.gnm1.ann1.L1DY.cds.bed.gz
   curl -O $url_base/vulgaris/annotations/UI111.gnm1.ann1.8L4N/phavu.UI111.gnm1.ann1.8L4N.cds.bed.gz
 
+  curl -O $url_base/acutifolius/annotations/Frijol_Bayo.gnm1.ann1.ML22/phaac.Frijol_Bayo.gnm1.ann1.ML22.protein_primary.faa.gz
+  curl -O $url_base/acutifolius/annotations/W6_15578.gnm2.ann1.LVZ1/phaac.W6_15578.gnm2.ann1.LVZ1.protein_primary.faa.gz
+  curl -O $url_base/lunatus/annotations/G27455.gnm1.ann1.JD7C/phalu.G27455.gnm1.ann1.JD7C.protein_primary.faa.gz
+  curl -O $url_base/vulgaris/annotations/5-593.gnm1.ann1.3FBJ/phavu.5-593.gnm1.ann1.3FBJ.protein_primary.faa.gz
+  curl -O $url_base/vulgaris/annotations/G19833.gnm1.ann1.pScz/phavu.G19833.gnm1.ann1.pScz.protein_primary.faa.gz
+  curl -O $url_base/vulgaris/annotations/G19833.gnm2.ann1.PB8d/phavu.G19833.gnm2.ann1.PB8d.protein_primary.faa.gz
+  curl -O $url_base/vulgaris/annotations/LaborOvalle.gnm1.ann1.L1DY/phavu.LaborOvalle.gnm1.ann1.L1DY.protein_primary.faa.gz
+  curl -O $url_base/vulgaris/annotations/UI111.gnm1.ann1.8L4N/phavu.UI111.gnm1.ann1.8L4N.protein_primary.faa.gz
+
+
 # Fix the forms of chromosome IDs, if necessary
   # Not necessary for Phaseolus
 #  for file in *; do gunzip $file & done
