@@ -682,12 +682,12 @@ echo "  Report orthogroup composition statistics for the three main cluster-calc
       let "largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1)"
       printf '  %-20s\t%s\n' "largest_cluster" $largest >> ${stats_file}
   
-      let "mode=$(awk "{print NF-1}" $clustfile | \
+      let "mode=$(awk -v CT=$CTceil "(NF-1)>=CT {print NF-1}" $clustfile | \
         uniq -c | sort -n | tail -1 | awk '{print $2}')"
       printf '  %-20s\t%d\n' "modal_clst_size>=$CTceil" $mode >> ${stats_file}
       export mode
   
-      let "num_at_mode=$(awk -v MODE=$mode '(NF-1) == 8 {ct++} END{print ct}' $clustfile)"
+      let "num_at_mode=$(awk -v MODE=$mode '(NF-1)==MODE {ct++} END{print ct}' $clustfile)"
       printf '  %-20s\t%d\n' "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
   
       let "seqs_clustered=$(awk '{sum+=NF-1} END{print sum}' $clustfile)"
