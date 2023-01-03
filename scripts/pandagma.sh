@@ -620,8 +620,7 @@ run_summarize() {
               24_syn_pan_core_posn_trim_cds.fna 24_syn_pan_core_posn_trim_protein.faa \
               observed_chr_pairs.tsv ; do
     if [ -f ${WORK_DIR}/$file ]; then
-      #cp ${WORK_DIR}/$file ${full_out_dir}/
-      echo
+      cp ${WORK_DIR}/$file ${full_out_dir}/
     else 
       echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
     fi
