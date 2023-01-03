@@ -195,7 +195,7 @@ run_ingest() {
       echo "Extra:  $file_base" >> stats/tmp.fasta_list
       # calc basic sequence stats
       printf "  Extra: " >> stats/tmp.fasta_seqstats
-      cat_or_zcat "${fasta_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
+      cat_or_zcat "${fasta_files_extra[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
     done
   fi
 
