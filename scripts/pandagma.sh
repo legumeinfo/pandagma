@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2022
 #
 scriptname=`basename "$0"`
-version="2023-01-02"
+version="2023-01-03"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
@@ -600,9 +600,10 @@ run_summarize() {
     1) ST="PEP" ;;
   esac
 
-  param_string="${ST}.id${clust_iden}.cov${clust_cov}.cns${consen_iden}.ext${extra_iden}.I${mcl_inflation}"
-  full_out_dir=$(echo "$out_dir_base.$param_string" | perl -pe 's/0\.(\d+)/$1/g')
-  stats_file=${full_out_dir}/stats.$param_string.txt
+  #param_string="${ST}.id${clust_iden}.cov${clust_cov}.cns${consen_iden}.ext${extra_iden}.I${mcl_inflation}"
+  conf_base=`basename $CONF .conf`
+  full_out_dir="${out_dir_base}_$conf_base"
+  stats_file=${full_out_dir}/stats.$conf_base.txt
   export ANN_REX=${annot_str_regex}
 
   cd "${submit_dir}"
