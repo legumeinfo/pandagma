@@ -677,24 +677,24 @@ echo "  Report orthogroup composition statistics for the three main cluster-calc
         printf "  Cluster file: $clustering.clust.tsv\n" >> ${stats_file}
       fi
 
-      let "clusters=$(wc -l < $clustfile)"
+      (( clusters=$(wc -l < $clustfile) ))
       printf '  %-20s\t%s\n' "num_of_clusters" $clusters >> ${stats_file}
   
-      let "largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1)"
+      (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
       printf '  %-20s\t%s\n' "largest_cluster" $largest >> ${stats_file}
   
-      let "mode=$(awk -v CT=$CTceil "(NF-1)>=CT {print NF-1}" $clustfile |
-        sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}')"
+      (( mode=$(awk -v CT=$CTceil "(NF-1)>=CT {print NF-1}" $clustfile |
+        sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
       printf '  %-20s\t%d\n' "modal_clst_size>=$CTceil" $mode >> ${stats_file}
       export mode
   
-      let "num_at_mode=$(awk -v MODE=$mode '(NF-1)==MODE {ct++} END{print ct}' $clustfile)"
+      (( num_at_mode=$(awk -v MODE=$mode '(NF-1)==MODE {ct++} END{print ct}' $clustfile) ))
       printf '  %-20s\t%d\n' "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
   
-      let "seqs_clustered=$(awk '{sum+=NF-1} END{print sum}' $clustfile)"
+      (( seqs_clustered=$(awk '{sum+=NF-1} END{print sum}' $clustfile) ))
       printf '  %-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
   
-      let clustcount=$((clustcount+1))
+      (( clustcount=$((clustcount+1)) ))
     else
       printf "File $clustfile is not available; skipping\n"
       printf "File $clustfile is not available; skipping\n" >> ${stats_file}
