@@ -652,7 +652,16 @@ echo "  Report threshold for inclusion in \"core\""
   max_annot_ct=$(cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv |
                        awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
   core_threshold=$(bc -l <<< "$min_core_prop * $max_annot_ct")
-  export CTceil=$(echo $core_threshold | awk '{print int($1+0.5)}')
+
+  CTceil=$(echo $core_threshold | awk '{print int($1+0.5)}')
+  # When the number of main annotation sets is small (<4), the core-threshold-ceiling may be lower than 
+  # the largest number of clusters. In that case, set $CTceil=2 to the smallest cluster size ($CTceil=2)
+  (( largest=$(awk '{print NF-1}' ${full_out_dir}/06_syn_pan.clust.tsv | sort -n | tail -1) ))
+  if [[ $CTceil>$largest ]]; then
+    let "$CTceil = 2";
+    echo "  Adjusted core-threshold ceiling (CTceil) because of limited number of main annotation sets: $CTceil"
+  fi
+  export CTceil
 
 echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
   printf "\nThe core set consists of orthogroups with at least %.0f genes per OG (>= %f * %d sets).\n" \
