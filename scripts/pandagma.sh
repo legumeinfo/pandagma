@@ -2,16 +2,16 @@
 #
 # Configuration and run script which, with other scripts in this package, generates pan-gene 
 # clusters using the programs mmseqs, dagchainer, and mcl. 
-# Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2022
+# Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-01-03"
+version="2023-01-09"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 export NPROC=${NPROC:-1}
 export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
-export CONF=${CONF:-${PWD}/pandagma.conf}
-export WORK_DIR=${WORK_DIR:-${PWD}/work}
+#xx export CONF=${CONF:-${PWD}/pandagma.conf}
+#xx export WORK_DIR=${WORK_DIR:-${PWD}/work}
 
 # mmseqs uses a significant number of threads on its own. Set a maximum, which may be below NPROC.
 MMSEQSTHREADS=$(( 10 < ${NPROC} ? 10 : ${NPROC} ))
@@ -21,34 +21,27 @@ pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation 
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
-TOP_DOC="""Compute pan-gene clusters using the programs mmseqs, dagchainer, and mcl, and
-additional pre- and post-refinement steps.
+HELP_DOC="""Compute pan-gene clusters using a combination of synteny and homology,
+using the programs mmseqs, dagchainer, and mcl, and additional pre- and post-refinement steps.
 
 Usage:
-        pandagma.sh SUBCOMMAND [SUBCOMMAND_OPTIONS]
+  $scriptname -c CONFIG_FILE -w WORK_DIR [options]
 
-Primary coding sequence (fasta) and annotation (GFF3 or BED) files must be listed in the
-fasta_files and annotation_files variables defined in pandagma.conf, which by default must exist
-within the working directory from where this script is called.
+  Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
+           -v (version)
+           -h (help)
+           -m (more information)
 
-Optionally, a file specified in the expected_chr_matches variable can be specified in pandagma.conf,
-which provides anticipated chromosome pairings, e.g.
-  01 01
-  02 02
-  ...
-  11 13  # allows for translocation between 11 and 13
-  12 12
-These pairings are used in a regular expression to identify terminal portions of molecule IDs, e.g.
-  glyma.Wm82.gnm2.Gm01  glyso.PI483463.gnm1.Gs01
-  glyma.Wm82.gnm2.Gm13  glyso.W05.gnm1.Chr11
-If an expected_chr_matches file is not provided, then no such filtering will be done.
+  Required:
+           -c (path to the config file)
+           -w (working directory, for temporary and intermediate files)
 
-At the end of the process, remaining genes will be added to initial clusters, based on homology.
-Remaining genes may be those falling on unanchored scaffolds, or on chromosomes by not part of
-synteny blocks and so not making it into the synteny-based clusters.
+Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
+config file, in the arrays fasta_files, annotation_files, and protein_files. See example files.
 
 Subommands (in order they are usually run):
-            version - Report installed package version
+                all - Run all of the steps below
+                        (Or equivalently: omit the -s flag; \"all\" is default)
          run ingest - Prepare the assembly and annotation files for analysis
          run mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
          run filter - Filter the synteny results for chromosome pairings, returning gene pairs.
@@ -62,6 +55,20 @@ Subommands (in order they are usually run):
  run filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
  run calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
       run summarize - Move results into output directory, and report summary statistics.
+"""
+
+MORE_INFO="""
+Optionally, a file specified in the expected_chr_matches variable can be specified in pandagma.conf,
+which provides anticipated chromosome pairings, e.g.
+  01 01
+  02 02
+  ...
+  11 13  # allows for translocation between 11 and 13
+  12 12
+These pairings are used in a regular expression to identify terminal portions of molecule IDs, e.g.
+  glyma.Wm82.gnm2.Gm01  glyso.PI483463.gnm1.Gs01
+  glyma.Wm82.gnm2.Gm13  glyso.W05.gnm1.Chr11
+If an expected_chr_matches file is not provided, then no such filtering will be done.
 
 Variables in pandagma config file (Set the config with the CONF environment variable)
     dagchainer_args - Argument for DAGchainer command
@@ -81,16 +88,18 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         This is used for picking representative IDs+sequence from an orthogroup, when
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
-
-Environment variables:
-               CONF - Path of the pandagma config file, default: \"${CONF}\"
-           WORK_DIR - Location of working files, default: \"${WORK_DIR}\"
-              NPROC - Number of processors to use (default 1)
 """
-#
+
+##########
 # Helper functions begin here
-#
+
+version() {
+  echo $scriptname $version
+}
+
 canonicalize_paths() {
+  echo "Entering canonicalize_paths. Fasta files: ${fasta_files[@]}"
+
   fasta_files=($(realpath --canonicalize-existing "${fasta_files[@]}"))
   annotation_files=($(realpath --canonicalize-existing "${annotation_files[@]}"))
   protein_files=($(realpath --canonicalize-existing "${protein_files[@]}"))
@@ -139,7 +148,8 @@ calc_seq_stats () {
           }'
 }
 
-### run functions ###
+##########
+# run functions 
 
 run_ingest() {
 # Add positional information from GFF3 or 4- or 6-column BED to FASTA IDs
@@ -640,7 +650,7 @@ run_summarize() {
     echo "Sequence type: protein" >> ${stats_file}
   fi
 
-echo "  Report parameters from config file"
+  echo "  Report parameters from config file"
   printf "Parameter  \tvalue\n" >> ${stats_file}
   for key in ${pandagma_conf_params}; do
     printf '%-15s\t%s\n' ${key} "${!key}" >> ${stats_file}
@@ -648,12 +658,12 @@ echo "  Report parameters from config file"
 
 printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
 
-echo "  Report threshold for inclusion in \"core\""
+  echo "  Report threshold for inclusion in \"core\""
   max_annot_ct=$(cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv |
                        awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
   core_threshold=$(bc -l <<< "$min_core_prop * $max_annot_ct")
 
-echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
+  echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
 
   printf '\n  %-20s\t%s\n' "Statistic" "value" >> ${stats_file}
   printf "The global mode may be for a smaller OG size. Modes below are greater than the specified core threshold.\n" \
@@ -709,7 +719,7 @@ echo "  Report orthogroup composition statistics for the three main cluster-calc
     fi
   done
 
-echo "  Print sequence composition statistics for each annotation set"
+  echo "  Print sequence composition statistics for each annotation set"
   printf "\n== Sequence stats for CDS files\n" >> ${stats_file}
   printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
   if [ -f ${WORK_DIR}/stats/tmp.fasta_seqstats ]; then
@@ -734,7 +744,7 @@ echo "  Print sequence composition statistics for each annotation set"
     printf "  Trim:  " >> ${stats_file}
     cat_or_zcat "${WORK_DIR}/24_syn_pan_core_posn_trim_cds.fna" | calc_seq_stats >> ${stats_file}
 
-echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
+  echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
   #   tmp.gene_count_start was generated during run_ingest
   printf "\n== Proportion of initial genes retained in the \"aug_extra\" and \"core\" sets:\n" \
     >> ${stats_file}
@@ -753,7 +763,7 @@ echo "  Print per-annotation-set coverage stats (sequence counts, sequences reta
     awk 'BEGIN{print "  Start\tEnd_all\tEnd_core\tPct_kept_all\tPct_kept_core\tAnnotation_name"} 
         { printf "  %i\t%i\t%i\t%2.1f\t%2.1f\t%s\n", $2, $4, $6, 100*($4/$2), 100*($6/$2), $1 }'  >> ${stats_file}
 
-echo "  Print counts per accession"
+  echo "  Print counts per accession"
   if [ -f ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv ]; then
     printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" \
       >> ${stats_file}
@@ -771,7 +781,7 @@ echo "  Print counts per accession"
         >> ${stats_file}
   fi
 
-echo "  Print histograms"
+  echo "  Print histograms"
   if [ -f ${full_out_dir}/06_syn_pan.clust.tsv ]; then
     printf "\nCounts of initial clusters by cluster size, file 06_syn_pan.clust.tsv:\n" >> ${stats_file}
     awk '{print NF-1}' ${full_out_dir}/06_syn_pan.clust.tsv |
@@ -789,87 +799,61 @@ echo "  Print histograms"
     awk '{print NF-1}' ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv |
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
   fi
-
 }
 
-#
-# top-level command functions
-#
+##########
+# Command-line interpreter
 
-run() {
-  RUN_DOC="""Run an analysis step
+CONFIG="null"
+WORK="null"
+step="all"
 
-Usage:
-   $scriptname run [STEP]
+while getopts "c:w:s:vhm" opt
+do
+  case $opt in
+    c) CONFIG=$OPTARG; echo "Config: $CONFIG"; ;;
+    w) WORK=$OPTARG; echo "Work dir: $WORK"; ;;
+    s) step=$OPTARG; ;;
+    v) version ;;
+    h) printf >&2 "$HELP_DOC\n" && exit 0; ;;
+    m) printf >&2 "$HELP_DOC\n$MORE_INFO\n" && exit 0; ;;
+    *) printf >&2 "$HELP_DOC\n" && exit 1; ;;
+  esac
+done
 
-Steps:
-   If STEP is not set, the following steps will be run in order,
-   otherwise the step is run by itself:
-              ingest - Get info from matching GFF and FNA files
-              mmseqs - Run mmseqs for all gene sets
-              filter - Select gene matches from indicated chromosome pairings
-          dagchainer - Compute Directed Acyclic Graphs
-                 mcl - Calculate Markov clusters
-            consense - Calculate a consensus sequences from each pan-gene set, 
-                       adding sequences missed in the first clustering round.
-           add_extra - Add other gene model sets to the primary clusters. Useful for adding
-                       annotation sets that may be of lower or uncertain quality.
-       name_pangenes - Assign pan-gene names with consensus chromosome and position information.
-      filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
-      calc_chr_pairs - Calculate observed chromosome pairs.
-           summarize - Compute synteny stats.
-"""
-  commandlist="ingest mmseqs filter dagchainer mcl consense add_extra \
-               filter_to_core name_pangenes calc_chr_pairs summarize"
-  . "${CONF}"
-  canonicalize_paths
-  if [ "$#" -eq 0 ]; then # run the whole list
-    for package in $commandlist; do
-      echo "RUNNING PACKAGE run_$package"
-      run_$package
-      echo
-    done
-  else
-    command="$1"
-    shift 1
-    case $commandlist in
-    *"$command"*)
-      run_$command $@
-      ;;
-    $commandlist)
-      echo >&2 "$RUN_DOC"
-      if [ "$command" == "-h" ]; then
-        exit 0
-      fi
-      echo >&2 "ERROR -- unrecognized run step \"$1\""
-      exit 1
-      ;;
-    esac
-  fi
-}
-#
-version() {
-  echo $scriptname $version
-}
-#
-# Command-line interpreter.
-#
 if [ "$#" -eq 0 ]; then
-  echo >&2 "$TOP_DOC"
-  exit 0
+  printf >&2 "$HELP_DOC\n\n" && exit 0;
 fi
-#
-command="$1"
-shift 1
-case $command in
-"run")
-  run $@
-  ;;
-"version")
-  version $@
-  ;;
-*)
-  echo >&2 "ERROR -- command \"$command\" not recognized."
-  exit 1
-  ;;
-esac
+
+shift $(expr $OPTIND - 1)
+
+if [ $CONFIG == "null" ] || [ $WORK == "null" ]; then
+  printf "\nThe following arguments must be provided: -c CONFIG -w WORK_DIR\n" >&2
+  printf "\nRun \"$scriptname -h\" for help.\n\n" >&2
+  exit 1;
+else
+  export CONF=${CONFIG}
+  export WORK_DIR=${WORK}
+fi
+
+##########
+# Main program
+
+# First step to run, regardless of others; paths are used by several of the steps.
+. "${CONF}"
+canonicalize_paths
+
+# Run all specified steps
+commandlist="ingest mmseqs filter dagchainer mcl consense add_extra \
+             filter_to_core name_pangenes calc_chr_pairs summarize"
+
+if [[ $step =~ "all" ]]; then
+  for command in $commandlist; do
+    echo "RUNNING STEP run_$command"
+    run_$command
+    echo
+  done
+else
+  run_${step};
+fi
+
