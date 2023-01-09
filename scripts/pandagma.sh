@@ -8,17 +8,6 @@ scriptname=`basename "$0"`
 version="2023-01-09"
 set -o errexit -o errtrace -o nounset -o pipefail
 
-export NPROC=${NPROC:-1}
-export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
-#xx export CONF=${CONF:-${PWD}/pandagma.conf}
-#xx export WORK_DIR=${WORK_DIR:-${PWD}/work}
-
-# mmseqs uses a significant number of threads on its own. Set a maximum, which may be below NPROC.
-MMSEQSTHREADS=$(( 10 < ${NPROC} ? 10 : ${NPROC} ))
-
-pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation min_core_prop
-                      dagchainer_args out_dir_base consen_prefix annot_str_regex preferred_annot'
-
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
 HELP_DOC="""Compute pan-gene clusters using a combination of synteny and homology,
@@ -27,14 +16,15 @@ using the programs mmseqs, dagchainer, and mcl, and additional pre- and post-ref
 Usage:
   $scriptname -c CONFIG_FILE -w WORK_DIR [options]
 
-  Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
-           -v (version)
-           -h (help)
-           -m (more information)
-
   Required:
            -c (path to the config file)
            -w (working directory, for temporary and intermediate files)
+
+  Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
+           -n (number of processors to use. Default 10)
+           -v (version)
+           -h (help)
+           -m (more information)
 
 Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
 config file, in the arrays fasta_files, annotation_files, and protein_files. See example files.
@@ -804,16 +794,18 @@ printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
 ##########
 # Command-line interpreter
 
+NPROC=10
 CONFIG="null"
 WORK="null"
 step="all"
 
-while getopts "c:w:s:vhm" opt
+while getopts "c:w:s:n:vhm" opt
 do
   case $opt in
     c) CONFIG=$OPTARG; echo "Config: $CONFIG"; ;;
     w) WORK=$OPTARG; echo "Work dir: $WORK"; ;;
     s) step=$OPTARG; ;;
+    n) NPROC=$OPTARG; ;;
     v) version ;;
     h) printf >&2 "$HELP_DOC\n" && exit 0; ;;
     m) printf >&2 "$HELP_DOC\n$MORE_INFO\n" && exit 0; ;;
@@ -838,6 +830,15 @@ fi
 
 ##########
 # Main program
+
+export NPROC=${NPROC:-1}
+export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
+
+# mmseqs uses a significant number of threads on its own. Set a maximum, which may be below NPROC.
+MMSEQSTHREADS=$(( 10 < ${NPROC} ? 10 : ${NPROC} ))
+
+pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation min_core_prop
+                      dagchainer_args out_dir_base consen_prefix annot_str_regex preferred_annot'
 
 # First step to run, regardless of others; paths are used by several of the steps.
 . "${CONF}"
