@@ -653,55 +653,54 @@ echo "  Report threshold for inclusion in \"core\""
                        awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
   core_threshold=$(bc -l <<< "$min_core_prop * $max_annot_ct")
 
-  CTceil=$(echo $core_threshold | awk '{print int($1+0.5)}')
-  # When the number of main annotation sets is small (<4), the core-threshold-ceiling may be lower than 
-  # the largest number of clusters. In that case, set $CTceil=2 to the smallest cluster size ($CTceil=2)
-  (( largest=$(awk '{print NF-1}' ${full_out_dir}/06_syn_pan.clust.tsv | sort -n | tail -1) ))
-  if [[ $CTceil>$largest ]]; then
-    let "$CTceil = 2";
-    echo "  Adjusted core-threshold ceiling (CTceil) because of limited number of main annotation sets: $CTceil"
-  fi
-  export CTceil
-
 echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
-  printf "\nThe core set consists of orthogroups with at least %.0f genes per OG (>= %f * %d sets).\n" \
-     $CTceil $min_core_prop $max_annot_ct >> ${stats_file}
-  printf "The global mode may be for a smaller OG size. Modes below are greater than the specified core threshold.\n" \
-    >> ${stats_file}
 
   printf '\n  %-20s\t%s\n' "Statistic" "value" >> ${stats_file}
+  printf "The global mode may be for a smaller OG size. Modes below are greater than the specified core threshold.\n" \
 
   clustcount=1
+  # When the number of main annotation sets is small (<4), the core-threshold-ceiling may be lower than 
+  # the largest number of clusters. In that case, set $CTceil=2 to the smallest cluster size ($CTceil=2)
   for clustering in 06_syn_pan 12_syn_pan_aug 18_syn_pan_aug_extra; do
     clustfile=${full_out_dir}/$clustering.clust.tsv
     if [[ -f $clustfile ]]; then
       if [[ $clustcount == 1 ]]; then
         printf "\n== Initial clusters (containing only genes within synteny blocks)\n" >> ${stats_file}
-        printf "  Cluster file: $clustering.clust.tsv\n" >> ${stats_file}
+        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
+        (( mode=$(awk "{print NF-1}" $clustfile |
+          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
       elif [[ $clustcount == 2 ]]; then
         printf "\n== Augmented clusters (unanchored sequences added to the initial clusters)\n" >> ${stats_file}
-        printf "  Cluster file: $clustering.clust.tsv\n" >> ${stats_file}
+        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
+        (( mode=$(awk "{print NF-1}" $clustfile |
+          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
       elif [[ $clustcount == 3 ]]; then
         printf "\n== Augmented-extra clusters (with sequences from extra annotation sets)\n" >> ${stats_file}
-        printf "  Cluster file: $clustering.clust.tsv\n" >> ${stats_file}
+        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
+        CTceil=$(echo $core_threshold | awk '{print int($1+0.5)}')
+        if (( $CTceil>$largest )); then let "CTceil=2"; fi; export CTceil
+        (( mode=$(awk -v CT=$CTceil "(NF-1)>=CT {print NF-1}" $clustfile |
+          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
+        printf "    The core set consists of orthogroups with at least %.0f genes per OG (>= %f * %d sets).\n" \
+           $CTceil $min_core_prop $max_annot_ct >> ${stats_file} >> ${stats_file}
       fi
 
-      (( clusters=$(wc -l < $clustfile) ))
-      printf '  %-20s\t%s\n' "num_of_clusters" $clusters >> ${stats_file}
-  
-      (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
-      printf '  %-20s\t%s\n' "largest_cluster" $largest >> ${stats_file}
-  
-      (( mode=$(awk -v CT=$CTceil "(NF-1)>=CT {print NF-1}" $clustfile |
-        sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
-      printf '  %-20s\t%d\n' "modal_clst_size>=$CTceil" $mode >> ${stats_file}
       export mode
-  
+      (( clusters=$(wc -l < $clustfile) ))
       (( num_at_mode=$(awk -v MODE=$mode '(NF-1)==MODE {ct++} END{print ct}' $clustfile) ))
-      printf '  %-20s\t%d\n' "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
-  
       (( seqs_clustered=$(awk '{sum+=NF-1} END{print sum}' $clustfile) ))
-      printf '  %-20s\t%d\n' "seqs_clustered" $seqs_clustered >> ${stats_file}
+
+      printf "  %-20s\t%s\n" "Cluster file" "$clustering.clust.tsv" >> ${stats_file}
+      printf "  %-20s\t%s\n" "num_of_clusters" $clusters >> ${stats_file}
+      printf "  %-20s\t%s\n" "largest_cluster" $largest >> ${stats_file}
+      if (( $clustcount<3 )); then
+        printf "  %-20s\t%d\n" "modal_clst_size" $mode >> ${stats_file}
+        printf "  %-20s\t%d\n" "num_at_mode" $num_at_mode >> ${stats_file}
+      else
+        printf "  %-20s\t%d\n" "modal_clst_size>=$CTceil" $mode >> ${stats_file}
+        printf "  %-20s\t%d\n" "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
+      fi
+      printf "  %-20s\t%d\n" "seqs_clustered" $seqs_clustered >> ${stats_file}
   
       (( clustcount=$((clustcount+1)) ))
     else
