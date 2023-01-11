@@ -29,12 +29,13 @@ To build a [Singularity](https://singularity.hpcng.org/) container image from th
 
 Where the `--remote` option is used if building the image as an unprivileged user using (by default) the [Sylabs Cloud Remote Builder](https://cloud.sylabs.io/builder).
 
-To run pandamga using singularity, use `singularity run pandagma.sif [run command]`, optionally setting environment variables, e.g.:
+To run pandamga using singularity, use `singularity run pandagma.sif [run command]`, e.g.:
 
-    singularity run pandagma.sif init
+  NOTE: THE FOLLOWING STEPS NEED TO BE TESTED AND MODIFIED IN 2023
+    singularity pandagma.sif init
     ... modify config/Example.conf ...
     mkdir /path/to/pandagma/work_dir # create work dir on fast, node-local storage
-    singularity run --env NPROC=<number of cpus> --env WORK_DIR=/path/to/work/dir pandagma.sif run
+    singularity pandagma.sif -c $CONF -w $WD &
 
 ### Installation method 2: manual installation of bin and dependencies
 
@@ -103,16 +104,16 @@ synteny blocks and so not making it into the synteny-based clusters.
 
 Subommands (in order they are usually run):
             version - Get installed package version
-         run ingest - Prepare the assembly and annotation files for analysis
-         run mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
-         run filter - Filter the synteny results for chromosome pairings, returning gene pairs.
-     run dagchainer - Run DAGchainer to filter for syntenic blocks
-            run mcl - Derive clusters, with Markov clustering
-       run consense - calculate a consensus sequences from each pan-gene set,
+             ingest - Prepare the assembly and annotation files for analysis
+             mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
+             filter - Filter the synteny results for chromosome pairings, returning gene pairs.
+         dagchainer - Run DAGchainer to filter for syntenic blocks
+                mcl - Derive clusters, with Markov clustering
+           consense - calculate a consensus sequences from each pan-gene set,
                        If possible add sequences missed in the first clustering round.
-      run add_extra - Add other gene model sets to the primary clusters. Useful for adding
+          add_extra - Add other gene model sets to the primary clusters. Useful for adding
                        annotation sets that may be of lower or uncertain quality.
-      run summarize - Move results into output directory, and report summary statistics.
+          summarize - Move results into output directory, and report summary statistics.
 
 Variables in pandagma config file:
     dagchainer_args - Argument for DAGchainer command
@@ -177,21 +178,7 @@ Variables in pandagma config file:
     only homology information. Currently, the program is constructed to use at least one "extra" annotation.
     Future versions of the program may remove this requirement.
 
-6. Set environment variables.
-    The script learns about the work directory, the number of processors, the config file, and the helper bin,
-    via environment variables.
-
-    If dependencies are manually installed and the script is called directly:
-
-          export NPROC=10
-          export WORK_DIR=$PWD/../work_Zea
-          export CONF=config/Zea_7_2_nuc.conf
-          export PATH=$PWD/bin:$PATH
-        
-    If the dependencies and script are called via Singularity image: set the environment variables as 
-    part of the singularity invocation (see next step)
-    
-7. Start the run. The examples below assume a run using pandagma_Zea_7_2_nuc.conf.
+6. Start the run. The examples below assume a run using pandagma_Zea_7_2_nuc.conf.
        
     Calling the program directly:
 
@@ -204,13 +191,14 @@ Variables in pandagma config file:
 
     Using a Singularity image:
 
+  NOTE: THE FOLLOWING STEPS NEED TO BE TESTED AND MODIFIED IN 2023
          pandagma_sing_img=$YOURPATH/pandagma-v_YOUR_VERSION
          nohup singularity exec --env NPROC=$(( ${SLURM_JOB_CPUS_PER_NODE}/5 ))  \
                       --env WORK_DIR=$PWD/../work_Zea \
                       --env CONF=config/pandagma_Zea_7_2_nuc.conf \
                       --cleanenv $pandagma_sing_img ./pandagma.sh -c $CONF -w $WD &
 
-8. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
+7. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
     Output will go into a directory composed from a provided prefix name (default "out") and
     information about key parameter values, e.g.
 
