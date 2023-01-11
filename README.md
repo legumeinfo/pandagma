@@ -36,11 +36,11 @@ To run pandamga using singularity, use `singularity run pandagma.sif [run comman
     mkdir /path/to/pandagma/work_dir # create work dir on fast, node-local storage
     singularity run --env NPROC=<number of cpus> --env WORK_DIR=/path/to/work/dir pandagma.sif run
 
-### Installation method 2: manual installation of scripts and dependencies
+### Installation method 2: manual installation of bin and dependencies
 
-The scripts should be added to your path - either by copying them to a directory that is in your path 
-(e.g. `cp scripts/* ~/bin/`), or by adding the script directory to your path 
-(e.g. `export PATH=$PATH:~/src/pandagma/scripts` ... if that is where you have them).
+The bin should be added to your path - either by copying them to a directory that is in your path 
+(e.g. `cp bin/* ~/bin/`), or by adding the script directory to your path 
+(e.g. `export PATH=$PATH:~/src/pandagma/bin` ... if that is where you have them).
 
 Also, these dependencies are required: 
   bioperl, mmseqs, dagchainer, and mcl.
@@ -61,19 +61,12 @@ For example, using conda:
 
 ~~~
 Usage: 
-       pandagma.sh run
+       ./pandagma.sh -c CONFIG_FILE -w WORK_DIR [options]
    or
-       pandagma.sh run SUBCOMMAND
+       ./pandagma.sh -c CONFIG_FILE -w WORK_DIR -s SUBCOMMAND [options]
 
-Add the scripts directory to your PATH
-Export these environment variables:
-  WORK_DIR
-  CONF
-  NPROC
-
-Primary coding sequence (fasta) and annotation (GFF3 or BED) files must be listed in the
-fasta_files and annotation_files variables defined in GENUS.conf, which by default must exist
-within the working directory from where this script is called.
+Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
+config file, in the arrays fasta_files, annotation_files, and protein_files. See example files.
 
 FASTA deflines are assumed to be formatted with the ID separated from any additional fields by a space:
 
@@ -132,10 +125,6 @@ Variables in pandagma config file:
         mcl_threads - Threads to use in Markov clustering [default: processors/5]
             version - version of this script at config time
 
-Environment variables:
-               CONF - Path of the pandagma config file (default ${PWD})
-           WORK_DIR - Location of working files (default ${PWD}/work)
-              NPROC - Number of processors to use (default 1)
 ~~~
 
 ## Detailed instructions <a name="details"></a>
@@ -145,14 +134,14 @@ Environment variables:
       I typically rename the downloaded repository to the genus name that I am working on, e.g.
     
             git clone https://github.com/legumeinfo/pandagma.git
-            mv pandagma zea
-            cd zea
+            mv pandagma Zea
+            cd Zea
 
 2. Make a work directory. I typically make this in the same area as the pandagma directory, e.g.
 
-            mkdir ../work_zea
+            mkdir ../work_Zea
             ls ..
-              work_zea  zea
+              work_Zea  zea
 
 3. Get into a suitable work environment (computation node), and load dependencies.
     The script has these third-party dependencies: **bioperl, mcl, mmseqs2, DAGchainer**
@@ -169,7 +158,7 @@ Environment variables:
     
 4. Download the annotation data from a remote source (CDS or peptide, and GFF or BED), and transform if needed.
     I do this with a simple shell script that executes curl commands and then applies some transformations.
-    See the files in get_data/ for examples. There are scripts for Glycine, Medicago, Vigna, and Zea.
+    See the files in get_data/ for examples. There are bin for Glycine, Medicago, Vigna, and Zea.
     
           ./get_data/get_Zea.sh
             # This puts the data first into data_orig/, 
@@ -189,15 +178,15 @@ Environment variables:
     Future versions of the program may remove this requirement.
 
 6. Set environment variables.
-    The script learns about the work directory, the number of processors, the config file, and the helper scripts,
+    The script learns about the work directory, the number of processors, the config file, and the helper bin,
     via environment variables.
 
     If dependencies are manually installed and the script is called directly:
 
           export NPROC=10
-          export WORK_DIR=$PWD/../work_zea
+          export WORK_DIR=$PWD/../work_Zea
           export CONF=config/Zea_7_2_nuc.conf
-          export PATH=$PWD/scripts:$PATH
+          export PATH=$PWD/bin:$PATH
         
     If the dependencies and script are called via Singularity image: set the environment variables as 
     part of the singularity invocation (see next step)
@@ -206,21 +195,26 @@ Environment variables:
        
     Calling the program directly:
 
-         nohup pandagma.sh run > nohup_7_2.out &
+      CONF="$PWD/config/Zea_7_2.conf"
+      WD="/scratch/scannon/pandagma/work_Zea"
+      conda activate pandagma
+
+      nohup ./pandagma.sh -c $CONF -w $WD &
+
 
     Using a Singularity image:
 
-         pandagma_sing_img=$YOURPATH/pandagma-v2021-11-16.sif
+         pandagma_sing_img=$YOURPATH/pandagma-v_YOUR_VERSION
          nohup singularity exec --env NPROC=$(( ${SLURM_JOB_CPUS_PER_NODE}/5 ))  \
-                      --env WORK_DIR=$PWD/../work_zea \
+                      --env WORK_DIR=$PWD/../work_Zea \
                       --env CONF=config/pandagma_Zea_7_2_nuc.conf \
-                      --cleanenv $pandagma_sing_img pandagma.sh run > nohup_7_2.out &
+                      --cleanenv $pandagma_sing_img ./pandagma.sh -c $CONF -w $WD &
 
 8. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
     Output will go into a directory composed from a provided prefix name (default "out") and
     information about key parameter values, e.g.
 
-          out_7_2.NUC.id95.cov60.cns80.ext80.I2/
+          out_Zea_7_2/
 
     The summary of the run is given in the file stats.[parameters].txt .
     Look at the modal values in the histograms, the report of proportion of each assembly with matches, etc.

@@ -72,7 +72,7 @@ echo "  For sativa, split it into five files: scaffolds in one, and .1 .2 .3 .4 
     cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].4/' > medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.cds.bed
     rm medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed
 
-    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna | ../scripts/fasta_to_table.awk > medsa.XJDY.fna1
+    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna | ../bin/fasta_to_table.awk > medsa.XJDY.fna1
     cat medsa.XJDY.fna1 | awk '$2!~/chr/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_sc.gnm1.ann1.RKB9.cds.fna
     cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].1/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_1.gnm1.ann1.RKB9.cds.fna
     cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].2/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.cds.fna
