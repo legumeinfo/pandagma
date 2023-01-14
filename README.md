@@ -35,7 +35,7 @@ To run pandamga using singularity, use `singularity run pandagma.sif [run comman
     singularity pandagma.sif init
     ... modify config/Example.conf ...
     mkdir /path/to/pandagma/work_dir # create work dir on fast, node-local storage
-    singularity pandagma.sif -c $CONF -w $WD &
+    singularity pandagma.sif -c CONFIG_FILE &
 
 ### Installation method 2: manual installation of bin and dependencies
 
@@ -62,9 +62,9 @@ For example, using conda:
 
 ~~~
 Usage: 
-       ./pandagma.sh -c CONFIG_FILE -w WORK_DIR [options]
+       ./pandagma.sh -c CONFIG_FILE [options]
    or
-       ./pandagma.sh -c CONFIG_FILE -w WORK_DIR -s SUBCOMMAND [options]
+       ./pandagma.sh -c CONFIG_FILE -s SUBCOMMAND [options]
 
 Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
 config file, in the arrays fasta_files, annotation_files, and protein_files. See example files.
@@ -117,14 +117,23 @@ Subommands (in order they are usually run):
 
 Variables in pandagma config file:
     dagchainer_args - Argument for DAGchainer command
-         clust_iden - Minimum identity threshold for mmseqs clustering [0.98]
-          clust_cov - Minimum coverage for mmseqs clustering [0.75]
-        consen_iden - Minimum identity threshold for vsearch consensus generation [0.80]
-         pan_prefix - Prefix to use as a prefix for pangene clusters [default: pan]
-       out_dir_base - base name for the output directory [default: './${pkg}_out']
+         clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
+          clust_cov - Minimum coverage for mmseqs clustering [0.60]
+        consen_iden - Minimum identity threshold for consensus generation [0.80]
+         extra_iden - Minimum identity threshold for mmseqs addition of "extra" annotations [90]
+      min_core_prop - Minimum fraction of annotation sets for an orthogroup to be "core" [0.333333333333333]
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
-        mcl_threads - Threads to use in Markov clustering [default: processors/5]
-            version - version of this script at config time
+      consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
+       out_dir_base - Base name for the output directory [default: './out']
+    annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
+                        "([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+" 
+                          for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1
+                        or "(\D+\d+\D+)\d+.+" for Zea assembly+annot string, e.g. Zm00032ab
+    preferred_annot - String to match and select an annotation set, from a gene ID.
+                        This is used for picking representative IDs+sequence from an orthogroup, when
+                        this annotation is among those with the median length for the orthogroup.
+                        Otherwise, one is selected at random from those with median length.
+           work_dir - Working directory, for temporary and intermediate files. 
 
 ~~~
 
@@ -182,21 +191,16 @@ Variables in pandagma config file:
        
     Calling the program directly:
 
-      CONF="$PWD/config/Zea_7_2.conf"
-      WD="/scratch/scannon/pandagma/work_Zea"
       conda activate pandagma
 
-      nohup ./pandagma.sh -c $CONF -w $WD &
+      nohup ./pandagma.sh -c config/Zea_7_2.conf &
 
 
     Using a Singularity image:
 
   NOTE: THE FOLLOWING STEPS NEED TO BE TESTED AND MODIFIED IN 2023
          pandagma_sing_img=$YOURPATH/pandagma-v_YOUR_VERSION
-         nohup singularity exec --env NPROC=$(( ${SLURM_JOB_CPUS_PER_NODE}/5 ))  \
-                      --env WORK_DIR=$PWD/../work_Zea \
-                      --env CONF=config/pandagma_Zea_7_2_nuc.conf \
-                      --cleanenv $pandagma_sing_img ./pandagma.sh -c $CONF -w $WD &
+         nohup singularity exec --cleanenv $pandagma_sing_img ./pandagma.sh -c config/Zea_7_2.conf &
 
 7. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
     Output will go into a directory composed from a provided prefix name (default "out") and
@@ -210,19 +214,19 @@ Variables in pandagma config file:
     This can indicate possible translocations among genomes in the input data. For example, in Zea, the values
     for one run are:
 
-           1   1 39596   <== Main chromosome correspondences
-           5   5 30158
-           2   2 30038
-           3   3 27658
-           4   4 25902
-           8   8 23759
-           6   6 20969
-           7   7 19769
-           9   9 19112
-          10  10 16833
-           9  10   740  <== corresponding with a known translocation in Oh7B
-           1   5   544
-           1   3   522
+           1  1  39612   <== Main chromosome correspondences
+           5  5  30156
+           2  2  30074
+           3  3  27673
+           4  4  25903
+           8  8  23763
+           6  6  20986
+           7  7  19743
+           9  9  19090
+          10 10  16841
+           9 10    748  <== corresponding with a known translocation in Oh7B
+           1  3    527
+           1  2    515
 
     These values can be used to constrain matches in a subsequent run, via the file data/expected_chr_matches.tsv
     (For the Zea run, these values were already provided, generated by get_data/get_Zea.sh 
