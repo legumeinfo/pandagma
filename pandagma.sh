@@ -14,13 +14,14 @@ HELP_DOC="""Compute pan-gene clusters using a combination of synteny and homolog
 using the programs mmseqs, dagchainer, and mcl, and additional pre- and post-refinement steps.
 
 Usage:
-  ./$scriptname -c CONFIG_FILE -w WORK_DIR [options]
+  ./$scriptname -c CONFIG_FILE [options]
 
   Required:
            -c (path to the config file)
-           -w (working directory, for temporary and intermediate files)
 
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
+           -w (working directory, for temporary and intermediate files. 
+                Must be specified in config file if not specified here.)
            -n (number of processors to use. Default 10)
            -b (bin directory. Default \$PWD/bin)
            -v (version)
@@ -28,7 +29,7 @@ Usage:
            -m (more information)
 
 Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
-config file, in the arrays fasta_files, annotation_files, and protein_files. See example files.
+config file, in the arrays cds_files, annotation_files, and protein_files. See example files.
 
 Subommands (in order they are usually run):
                 all -     all of the steps below
@@ -79,44 +80,54 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         This is used for picking representative IDs+sequence from an orthogroup, when
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
+           work_dir - Working directory, for temporary and intermediate files. 
 """
 
-##########
+########################################
 # Helper functions begin here
 
 version() {
   echo $scriptname $version
 }
 
+##########
 canonicalize_paths() {
-  echo "Entering canonicalize_paths. Fasta files: ${fasta_files[@]}"
+  echo "Entering canonicalize_paths. Fasta files: ${cds_files[@]}"
 
-  fasta_files=($(realpath --canonicalize-existing "${fasta_files[@]}"))
+  cds_files=($(realpath --canonicalize-existing "${cds_files[@]}"))
   annotation_files=($(realpath --canonicalize-existing "${annotation_files[@]}"))
   protein_files=($(realpath --canonicalize-existing "${protein_files[@]}"))
-  if (( ${#fasta_files_extra[@]} > 0 ))
+  if (( ${#cds_files_extra[@]} > 0 ))
   then
-    fasta_files_extra=($(realpath --canonicalize-existing "${fasta_files_extra[@]}"))
+    cds_files_extra=($(realpath --canonicalize-existing "${cds_files_extra[@]}"))
     annotation_files_extra=($(realpath --canonicalize-existing "${annotation_files_extra[@]}"))
   fi
   readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
   readonly submit_dir=${PWD}
 
-  fasta_file=$(basename "${fasta_files[0]}" .gz)
+  fasta_file=$(basename "${cds_files[0]}" .gz)
   fna="${fasta_file##*.}"
+
+  export ANN_REX=${annot_str_regex}
 }
+
+##########
 cat_or_zcat() {
   case ${1} in
     *.gz) gzip -dc "$@" ;;
        *) cat "$@" ;;
   esac
 }
+
+##########
 check_seq_type () {
   someseq=${1}
   export proportion_nuc=$(echo $someseq | fold -w1 | 
                           awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
   perl -le '$PN=$ENV{"proportion_nuc"}; if ($PN>0.9){print 3} else {print 1}'
 }
+
+##########
 calc_seq_stats () {
   # Given fasta file on STDIN and an environment variable "annot_name", report:
   # seqs  min  max  N50  ave  annotation_set
@@ -139,7 +150,7 @@ calc_seq_stats () {
           }'
 }
 
-##########
+########################################
 # run functions 
 
 run_ingest() {
@@ -160,43 +171,43 @@ run_ingest() {
 
   export ANN_REX=${annot_str_regex}
 
-  for (( file_num = 0; file_num < ${#fasta_files[@]} ; file_num++ )); do
-    file_base=$(basename ${fasta_files[file_num]%.*})
+  for (( file_num = 0; file_num < ${#cds_files[@]} ; file_num++ )); do
+    file_base=$(basename ${cds_files[file_num]%.*})
     echo "  Adding positional information to fasta file $file_base"
     cat_or_zcat "${annotation_files[file_num]}" | 
       $BIN_DIR/gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
-      $BIN_DIR/hash_into_fasta_id.pl -nodef -fasta "${fasta_files[file_num]}" \
+      $BIN_DIR/hash_into_fasta_id.pl -nodef -fasta "${cds_files[file_num]}" \
                           -hash 01_posn_hsh/$file_base.hsh \
                           -out 02_fasta_nuc/$file_base
     annot_name=$(head -1 02_fasta_nuc/$file_base | perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | 
       perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
-    cat_or_zcat "${fasta_files[file_num]}" | 
+    cat_or_zcat "${cds_files[file_num]}" | 
       awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
     echo "Main:   $file_base" >> stats/tmp.fasta_list
     # calc basic sequence stats
     printf "  Main:  " >> stats/tmp.fasta_seqstats
-    cat_or_zcat "${fasta_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
+    cat_or_zcat "${cds_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
   done
 
   # Also get position information from the "extra" annotation sets, if any.
-  if (( ${#fasta_files_extra[@]} > 0 ))
+  if (( ${#cds_files_extra[@]} > 0 ))
   then
-    for (( file_num = 0; file_num < ${#fasta_files_extra[@]} ; file_num++ )); do
-      file_base=$(basename ${fasta_files_extra[file_num]%.*})
+    for (( file_num = 0; file_num < ${#cds_files_extra[@]} ; file_num++ )); do
+      file_base=$(basename ${cds_files_extra[file_num]%.*})
       echo "  Adding positional information to extra fasta file $file_base"
       cat_or_zcat "${annotation_files_extra[file_num]}" | 
         $BIN_DIR/gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
-      $BIN_DIR/hash_into_fasta_id.pl -nodef -fasta "${fasta_files_extra[file_num]}" \
+      $BIN_DIR/hash_into_fasta_id.pl -nodef -fasta "${cds_files_extra[file_num]}" \
                             -hash 01_posn_hsh/$file_base.hsh \
                             -out 02_fasta_nuc/$file_base
       annot_name=$(head -1 02_fasta_nuc/$file_base | perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | 
          perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
-      cat_or_zcat "${fasta_files_extra[file_num]}" | 
+      cat_or_zcat "${cds_files_extra[file_num]}" | 
         awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
       echo "Extra:  $file_base" >> stats/tmp.fasta_list
       # calc basic sequence stats
       printf "  Extra: " >> stats/tmp.fasta_seqstats
-      cat_or_zcat "${fasta_files_extra[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
+      cat_or_zcat "${cds_files_extra[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
     done
   fi
 
@@ -219,10 +230,10 @@ run_mmseqs() {
   #
 
   mkdir -p 03_mmseqs 03_mmseqs_tmp
-  for (( file1_num = 0; file1_num < ${#fasta_files[@]} ; file1_num++ )); do
-    qry_base=$(basename ${fasta_files[file1_num]%.*} .$fna)
-    for (( file2_num = $( expr $file1_num + 1 ); file2_num < ${#fasta_files[@]} ; file2_num++ )); do
-      sbj_base=$(basename ${fasta_files[file2_num]%.*} .$fna)
+  for (( file1_num = 0; file1_num < ${#cds_files[@]} ; file1_num++ )); do
+    qry_base=$(basename ${cds_files[file1_num]%.*} .$fna)
+    for (( file2_num = $( expr $file1_num + 1 ); file2_num < ${#cds_files[@]} ; file2_num++ )); do
+      sbj_base=$(basename ${cds_files[file2_num]%.*} .$fna)
       echo "  Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       { cat 02_fasta_nuc/$qry_base.$fna 02_fasta_nuc/$sbj_base.$fna ; } |
@@ -309,8 +320,8 @@ run_consense() {
   mkdir -p 07_pan_fasta lists
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-  echo "    Fasta file:" "${fasta_files[@]}"
-  $BIN_DIR/get_fasta_from_family_file.pl "${fasta_files[@]}" -fam 06_syn_pan.clust.tsv -out 07_pan_fasta
+  echo "    Fasta file:" "${cds_files[@]}"
+  $BIN_DIR/get_fasta_from_family_file.pl "${cds_files[@]}" -fam 06_syn_pan.clust.tsv -out 07_pan_fasta
 
   cat /dev/null > 07_pan_fasta_cds.fna
   for path in 07_pan_fasta/*; do
@@ -327,7 +338,7 @@ run_consense() {
   cat 07_pan_fasta_cds.fna | $BIN_DIR/pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_cds.fna
 
   echo "  Get sorted list of all genes, from the original fasta files"
-  cat_or_zcat "${fasta_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
+  cat_or_zcat "${cds_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
 
   echo "  Get sorted list of all clustered genes"
   awk '$1~/^>/ {print $1}' 07_pan_fasta/* | sed 's/>//' | sort > lists/09_all_clustered_genes
@@ -336,7 +347,7 @@ run_consense() {
   comm -13 lists/09_all_clustered_genes lists/09_all_genes > lists/09_genes_not_in_clusters
 
   echo "  Retrieve the non-clustered genes"
-  cat_or_zcat "${fasta_files[@]}" |
+  cat_or_zcat "${cds_files[@]}" |
     $BIN_DIR/get_fasta_subset.pl -in /dev/stdin -clobber -lis lists/09_genes_not_in_clusters \
                         -out 09_genes_not_in_clusters.fna 
 
@@ -361,7 +372,7 @@ run_consense() {
 
   echo "  Retrieve sequences for the leftover genes"
   mkdir -p 11_pan_leftovers
-  $BIN_DIR/get_fasta_from_family_file.pl "${fasta_files[@]}" \
+  $BIN_DIR/get_fasta_from_family_file.pl "${cds_files[@]}" \
     -fam 11_syn_pan_leftovers.clust.tsv -out 11_pan_leftovers/
 
   echo "  Make augmented cluster sets"
@@ -373,7 +384,7 @@ run_consense() {
 }
 
 run_add_extra() {
-  if (( ${#fasta_files_extra[@]} > 0 ))
+  if (( ${#cds_files_extra[@]} > 0 ))
   then # handle the "extra" annotation files
     echo; echo "== Add extra annotation sets to the augmented clusters, by homology =="
     echo "  Search non-clustered genes against pan-gene consensus sequences"
@@ -381,7 +392,7 @@ run_add_extra() {
     mkdir -p 13_extra_out_dir 13_pan_aug_fasta
 
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    $BIN_DIR/get_fasta_from_family_file.pl "${fasta_files[@]}" -fam 12_syn_pan_aug.clust.tsv -out 13_pan_aug_fasta
+    $BIN_DIR/get_fasta_from_family_file.pl "${cds_files[@]}" -fam 12_syn_pan_aug.clust.tsv -out 13_pan_aug_fasta
     
     cat /dev/null > 13_pan_aug_fasta.fna
     for path in 13_pan_aug_fasta/*; do
@@ -397,7 +408,7 @@ run_add_extra() {
     SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
     echo "SEQTYPE is: $SEQTYPE"
 
-    for path in "${fasta_files_extra[@]}"; do
+    for path in "${cds_files_extra[@]}"; do
       fasta_file=`basename ${path%.*}`
       echo "Extra: $fasta_file"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
@@ -420,7 +431,7 @@ run_add_extra() {
   
     echo "  Retrieve sequences for the extra genes"
     mkdir -p 16_pan_leftovers_extra
-    $BIN_DIR/get_fasta_from_family_file.pl "${fasta_files_extra[@]}" \
+    $BIN_DIR/get_fasta_from_family_file.pl "${cds_files_extra[@]}" \
        -fam 14_syn_pan_extra.clust.tsv -out 16_pan_leftovers_extra/
   
     echo "  Make augmented cluster sets"
@@ -471,7 +482,7 @@ run_filter_to_core() {
   cd "${WORK_DIR}"
 
   echo "  Calculate matrix of gene counts per orthogroup and annotation set"
-  $BIN_DIR/calc_pan_stats.pl -pan 18_syn_pan_aug_extra.clust.tsv -out 18_syn_pan_aug_extra.counts.tsv
+  $BIN_DIR/calc_pan_stats.pl -annot_regex $ANN_REX -pan 18_syn_pan_aug_extra.clust.tsv -out 18_syn_pan_aug_extra.counts.tsv
   max_annot_ct=$(cat 18_syn_pan_aug_extra.counts.tsv | 
                        awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
 
@@ -796,7 +807,7 @@ printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
 
 NPROC=10
 CONFIG="null"
-WORK="null"
+work_dir="null"
 BIN_DIR="$PWD/bin"
 step="all"
 
@@ -804,7 +815,7 @@ while getopts "c:w:s:n:b:vhm" opt
 do
   case $opt in
     c) CONFIG=$OPTARG; echo "Config: $CONFIG"; ;;
-    w) WORK=$OPTARG; echo "Work dir: $WORK"; ;;
+    w) work_dir=$OPTARG; echo "Work dir: $work_dir"; ;;
     s) step=$OPTARG; ;;
     n) NPROC=$OPTARG; ;;
     b) BIN_DIR=$OPTARG; ;;
@@ -821,21 +832,7 @@ fi
 
 shift $(expr $OPTIND - 1)
 
-if [ $CONFIG == "null" ] || [ $WORK == "null" ]; then
-  printf "\nThe following arguments must be provided: -c CONFIG -w WORK_DIR\n" >&2
-  printf "\nRun \"$scriptname -h\" for help.\n\n" >&2
-  exit 1;
-else
-  export CONF=${CONFIG}
-  export WORK_DIR=${WORK}
-fi
-
-if [ ! -d $BIN_DIR ]; then 
-  echo "Bin directory $BIN_DIR was not found. Please specify path with option -b" >&2
-  exit 1;
-fi
-
-##########
+########################################
 # Main program
 
 export NPROC=${NPROC:-1}
@@ -845,11 +842,39 @@ export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 MMSEQSTHREADS=$(( 10 < ${NPROC} ? 10 : ${NPROC} ))
 
 pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation min_core_prop
-                      dagchainer_args out_dir_base consen_prefix annot_str_regex preferred_annot'
+             dagchainer_args out_dir_base consen_prefix annot_str_regex preferred_annot work_dir'
 
-# First step to run, regardless of others; paths are used by several of the steps.
+if [ $CONFIG == "null" ]; then
+  printf "\nPlease provide the path to a config file: -c CONFIG\n" >&2
+  printf "\nRun \"$scriptname -h\" for help.\n\n" >&2
+  exit 1;
+else
+  export CONF=${CONFIG}
+fi
+
+# Add shell variables from config file
 . "${CONF}"
+
+# Get paths to the fasta and annotation files
 canonicalize_paths
+
+# Check for existence of script directory
+if [ ! -d $BIN_DIR ]; then 
+  echo "Bin directory $BIN_DIR was not found. Please specify path with option -b" >&2
+  exit 1;
+fi
+
+# Check for existence of work directory
+if [ $work_dir == "null" ]; then
+  echo "\nPlease provide the path to a work directory, for intermediate files," >&2
+  echo "either in the config file (work_dir=) or with option -w" >&2
+  printf "\nRun \"$scriptname -h\" for help.\n\n" >&2
+  exit 1;
+elif [ $work_dir != "null" ] && [ ! -d $work_dir ]; then
+  echo "Work directory $work_dir was not found. Please specify path in the config file or with option -w." >&2
+else
+  export WORK_DIR=${work_dir}
+fi
 
 # Run all specified steps
 commandlist="ingest mmseqs filter dagchainer mcl consense add_extra \
