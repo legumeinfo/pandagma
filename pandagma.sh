@@ -171,8 +171,10 @@ run_ingest() {
 
   export ANN_REX=${annot_str_regex}
 
+  cat /dev/null > 02_all_cds.fna # Collect all starting sequences, for later comparisons
   for (( file_num = 0; file_num < ${#cds_files[@]} ; file_num++ )); do
     file_base=$(basename ${cds_files[file_num]%.*})
+    cat_or_zcat "${cds_files[file_num]}" >> 02_all_cds.fna # Collect original seqs for later comparisons
     echo "  Adding positional information to fasta file $file_base"
     cat_or_zcat "${annotation_files[file_num]}" | 
       $BIN_DIR/gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
@@ -194,6 +196,7 @@ run_ingest() {
   then
     for (( file_num = 0; file_num < ${#cds_files_extra[@]} ; file_num++ )); do
       file_base=$(basename ${cds_files_extra[file_num]%.*})
+      cat_or_zcat "${cds_files_extra[file_num]}" >> 02_all_cds.fna  # Collect original seqs for later comparisons
       echo "  Adding positional information to extra fasta file $file_base"
       cat_or_zcat "${annotation_files_extra[file_num]}" | 
         $BIN_DIR/gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
@@ -476,6 +479,13 @@ run_add_extra() {
     cp 08_pan_fasta_clust_rep_cds.fna 21_pan_fasta_clust_rep_cds.fna
     perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_cds.fna
   fi
+
+  echo "  Retrieve genes present in the original CDS files but absent from 18_syn_pan_aug_extra"
+  cut -f2 18_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.18_syn_pan_aug_extra
+  cat 02_fasta_nuc/*.fna > 02_all_cds.fna
+  get_fasta_subset.pl -in 02_all_cds.fna -out 18_syn_pan_aug_extra_complement.fna \
+    -lis lists/lis.18_syn_pan_aug_extra -xclude -clobber
+
 }
 
 run_filter_to_core() {
@@ -519,8 +529,10 @@ run_name_pangenes() {
     $BIN_DIR/consen_pangene_order.pl -pre ${consen_prefix}.chr -make_new > consen_${consen_prefix}.tsv
 
   echo "  Reshape defline into a hash, e.g. pan47789	Glycine.pan3.chr01__Glycine.pan3.chr01_000100__45224__45786"
+  echo "  Note: these \"positions\" and sizes are artificial, representing only inferred relative positions."
   cat consen_${consen_prefix}.tsv | 
-    perl -pe 's/^(\S+)\t([^.]+\.[^.]+)\.(chr\d+)_(\d+)\t(\d+)\t(\d+)/$1\t$1__$2.$3_$4__$5__$6/' > consen_posn.hsh
+    perl -pe 's/^(\S+)\t(\S+)\.(\D+\d+)(_0*)([123456789]\d+)/$1\t$2.$3$4$5\t$5/' | 
+      awk '{print $1 "\t" $1 "__" $2 "__" $3*100 "__" $3*100+1000}' > consen_posn.hsh
 
   echo "  Hash position information into fasta file"
   $BIN_DIR/hash_into_fasta_id.pl -fasta 22_pan_fasta_rep_core_cds.fna -hash consen_posn.hsh |
@@ -627,6 +639,7 @@ run_summarize() {
   for file in 06_syn_pan.clust.tsv 06_syn_pan.hsh.tsv \
               12_syn_pan_aug.clust.tsv 12_syn_pan_aug.hsh.tsv \
               18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv 18_syn_pan_aug_extra.counts.tsv \
+              18_syn_pan_aug_extra_complement.fna \
               21_pan_fasta_clust_rep_cds.fna 22_syn_pan_aug_extra_core_posn.hsh.tsv \
               23_syn_pan_core_posn_cds.fna 23_syn_pan_core_posn_protein.faa \
               24_syn_pan_core_posn_trim_cds.fna 24_syn_pan_core_posn_trim_protein.faa \
