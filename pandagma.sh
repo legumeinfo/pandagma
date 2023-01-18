@@ -515,8 +515,8 @@ run_name_pangenes() {
     sort -k1,1 -k2,2 > 22_syn_pan_aug_extra_core_posn.hsh.tsv
 
   echo "  Calculate consensus pan-gene positions"
-  cat 22_syn_pan_aug_extra_core_posn.hsh.tsv | $BIN_DIR/consen_pangene_posn.pl -pre ${consen_prefix}.chr |
-    sort -k2,2 -k3n,3n | $BIN_DIR/name_ordered_genes.awk > consen_${consen_prefix}.tsv
+  cat 22_syn_pan_aug_extra_core_posn.hsh.tsv | 
+    $BIN_DIR/consen_pangene_order.pl -pre ${consen_prefix}.chr -make_new > consen_${consen_prefix}.tsv
 
   echo "  Reshape defline into a hash, e.g. pan47789	Glycine.pan3.chr01__Glycine.pan3.chr01_000100__45224__45786"
   cat consen_${consen_prefix}.tsv | 
