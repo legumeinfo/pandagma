@@ -43,8 +43,8 @@ Subommands (in order they are usually run):
                       adding sequences missed in the first clustering round.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
-      name_pangenes - Assign pan-gene names with consensus chromosomes and ordinal positions.
      filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
+      name_pangenes - Assign pan-gene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
 """
@@ -279,7 +279,8 @@ run_dagchainer() {
   # Identify syntenic blocks, using DAGchainer
   cd "${WORK_DIR}"
   echo; echo "Run DAGchainer, using args \"${dagchainer_args}\""
-  for match_path in 04_dag/*_matches.tsv; do
+  for match_path in ${WORK_DIR}/04_dag/*_matches.tsv; do
+    #echo "basename $match_path _matches.tsv"
     align_file=`basename $match_path _matches.tsv`
     echo "Running DAGchainer on comparison: $align_file"
     echo "  run_DAG_chainer.pl $dagchainer_args -i $match_path"; echo
@@ -288,7 +289,7 @@ run_dagchainer() {
     (
       tmpdir=$(mktemp -d)
       cd "${tmpdir}"
-      run_DAG_chainer.pl $dagchainer_args -i "${OLDPWD}/${match_path}" 1>/dev/null
+      run_DAG_chainer.pl $dagchainer_args -i ${match_path} 1>/dev/null
       rmdir ${tmpdir}
     ) &
     # allow to execute up to $NPROC in parallel
@@ -296,8 +297,8 @@ run_dagchainer() {
   done
   wait # wait for last jobs to finish
 
-  awk '$1!~/^#/ {print $2 "\t" $6}' 04_dag/*_matches.tsv > 05_homology_pairs.tsv
-  awk '$1!~/^#/ {print $2 "\t" $6}' 04_dag/*.aligncoords > 05_synteny_pairs.tsv
+  awk '$1!~/^#/ {print $2 "\t" $6}' ${WORK_DIR}/04_dag/*_matches.tsv > 05_homology_pairs.tsv
+  awk '$1!~/^#/ {print $2 "\t" $6}' ${WORK_DIR}/04_dag/*.aligncoords > 05_synteny_pairs.tsv
 }
 
 run_mcl() {
@@ -482,10 +483,8 @@ run_add_extra() {
 
   echo "  Retrieve genes present in the original CDS files but absent from 18_syn_pan_aug_extra"
   cut -f2 18_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.18_syn_pan_aug_extra
-  cat 02_fasta_nuc/*.fna > 02_all_cds.fna
   get_fasta_subset.pl -in 02_all_cds.fna -out 18_syn_pan_aug_extra_complement.fna \
     -lis lists/lis.18_syn_pan_aug_extra -xclude -clobber
-
 }
 
 run_filter_to_core() {
@@ -504,7 +503,6 @@ run_filter_to_core() {
   echo "  Get a fasta subset with only genes from at least min_core_prop*max_annot_ct annotation sets"
   $BIN_DIR/get_fasta_subset.pl -in 21_pan_fasta_clust_rep_cds.fna -list lists/lis.18_syn_pan_aug_extra.core \
                       -clobber -out 22_pan_fasta_rep_core_cds.fna
-
 
   echo "  Get a clust.tsv file with orthogroups with at least min_core_prop*max_annot_ct annotation sets"
   join <(LC_ALL=C sort -k1,1 lists/lis.18_syn_pan_aug_extra.core) \
