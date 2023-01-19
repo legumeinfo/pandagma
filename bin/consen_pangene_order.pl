@@ -26,7 +26,7 @@ Usage: cat PANGENE_TABLE | consen_pangene_order.pl [options]
     -prefix   Characters used to prefix the consensus chromosome names; default "chr"
                 Examples: Glycine.pan3.chr, Medicago.pan1.chr
     -make_new_id  Make new gene IDs based on chromosome + order, e.g. Prefix01_000100
-    -verbose  For some debugging info, to STDOUT
+    -verbose  For some debugging info, to STDOUT. For even more output, call again: -v -v
     -help     This message. 
 EOS
 
@@ -37,7 +37,7 @@ GetOptions (
   "outfile:s" => \$outfile,
   "prefix:s" =>  \$prefix,
   "make_new" =>  \$make_new,
-  "verbose" =>   \$verbose,
+  "verbose+" =>  \$verbose,
   "help" =>      \$help,
 );
 
@@ -61,10 +61,14 @@ while (<>) {
   # Split third field, a annot.chr string, into annot and chr
   $ann_chr =~ /(\S+)\.(\D+\w+\D+)(\d+)$/;
   my ($ann, $chr_pre, $chr) = ($1, $2, $3);
+  if ( !defined $chr_pre || !defined $chr ){
+    if ($verbose){ say "For pan-gene consensus, skipping unrecognized annotation-prefix-chr pattern: $ann_chr" }
+    next;
+  }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  if ($chr_pre =~ /chloro|chl|CP|mito|MT|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i){
-    if ($verbose){ say "Skipping [$chr_pre $chr]\t$gene" }
+  if ( $chr_pre =~ /chloro|chl|CP|mito|MT|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+    if ($verbose){ say "For pan-gene consensus, skipping non-chromosome gene [$chr_pre $chr]\t$gene" }
   }
   else {
     $chr =~ s/^0*([^0]+)/$1/;
@@ -88,7 +92,7 @@ my @pangene_table_ordered;
 my %seen_chr;
 foreach my $row ( @sorted_table ) {
   my ($panID, $gene, $ann, $chr, $start, $end) = @$row;
-  #say "$panID, $gene, $ann, $chr, $start, $end";
+  #say "AA: $panID, $gene, $ann, $chr, $start, $end";
   unless ( $seen_chr{$chr} ){ $seen_chr{$chr}++ }
   if ($ann eq $prAnn && $chr == $prChr){
     $ord++;
@@ -112,9 +116,9 @@ my $num_chrs = keys %seen_chr;
 # Find the most frequent chromosome for each pan-gene set
 my %top_chr;
 my %chr_ct_top_chr;
-if ($verbose) {print "#pangeneID\tchr:count ...\n"}
+if ($verbose>1) {print "#pangeneID\tchr:count ...\n"}
 foreach my $panID (sort keys %HoH_panID_chr) {
-  if ($verbose){ $logstr .= "$panID\t" }
+  if ($verbose>1){ $logstr .= "$panID\t" }
   # Sort chromosomes by count of chromosomes seen for this panID
   foreach my $chr ( sort { $HoH_panID_chr{$panID}{$b} <=> $HoH_panID_chr{$panID}{$a} } 
                             keys %{$HoH_panID_chr{$panID}} ) {
@@ -124,17 +128,17 @@ foreach my $panID (sort keys %HoH_panID_chr) {
       $top_chr{$panID} = $chr; 
       $chr_ct_top_chr{$panID} = $chr_ct;
     }
-    if ($verbose){ $logstr .= "$chr:$chr_ct " }
+    if ($verbose>1){ $logstr .= "$chr:$chr_ct " }
   }
-  if ($verbose){ $logstr .= "\n" }
+  if ($verbose>1){ $logstr .= "\n" }
 }
-if ($verbose){ print "$logstr\n" }
+if ($verbose>1){ print "$logstr\n" }
 
-if ($verbose) {print "#pangeneID\ttop_chr:count\n"}
+if ($verbose>1) {print "#pangeneID\ttop_chr:count\n"}
 foreach my $panID (sort keys %top_chr) {
-  if ($verbose){ printf "%s\t%s:%s\n", $panID, $top_chr{$panID}, $chr_ct_top_chr{$panID} }
+  if ($verbose>1){ printf "%s\t%s:%s\n", $panID, $top_chr{$panID}, $chr_ct_top_chr{$panID} }
 }
-if ($verbose) {print "\n"}
+if ($verbose>1) {print "\n"}
 
 #say Dumper(\@pangene_table_ordered);
 
@@ -144,7 +148,7 @@ my %starts_per_top_chr_HoA;
 my %ends_per_top_chr_HoA;
 foreach my $row ( @pangene_table_ordered ) {
   my ( $panID, $ann, $chr, $order, $start, $end ) = @$row;
-  #say "$panID, $ann, $chr, $order, $start, $end";
+  #say "BB: $panID, $ann, $chr, $order, $start, $end";
   if ($chr eq $top_chr{$panID}){
     push @{ $orders_per_top_chr_HoA{$panID} }, $order;
     push @{ $starts_per_top_chr_HoA{$panID} }, $start;
