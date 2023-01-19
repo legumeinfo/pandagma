@@ -108,7 +108,9 @@ curl -O $url_base/Zm-W22-REFERENCE-NRGENE-2.0/Zm-W22-REFERENCE-NRGENE-2.0_Zm0000
 
 
 echo "Pick longest CDS for several annotation sets, and exclude provisional"
+echo "  For GRAMENE-4.0_Zm00001d, also remove 178 GRMZM5 gene models"
   zcat Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.cds.fa.gz | ../bin/fasta_to_table.awk |
+    grep -v GRMZM5 |
     perl -pe 's/_T(\d+) ?/\tT$1\t/' |
     awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
     sort -k1,1 -k2nr,2nr | ../bin/top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
@@ -134,7 +136,9 @@ echo "Pick longest CDS for several annotation sets, and exclude provisional"
 
 
 echo "Pick longest proteins for several annotation sets, and exclude provisional"
+echo "  For GRAMENE-4.0_Zm00001d, also remove 178 GRMZM5 gene models"
   zcat Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.protein.fa.gz | ../bin/fasta_to_table.awk |
+    grep -v GRMZM5 |
     perl -pe 's/_P(\d+) ?/\tP$1\t/' |
     awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
     sort -k1,1 -k2nr,2nr | ../bin/top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
