@@ -1,12 +1,10 @@
 # pandagma
-Generate pan-gene sets, given coding sequences and corresponding gene models, from a set of related accessions or species.
-
-Pandagma is a workflow that derives pan-gene sets, given input of sequences (CDS or peptide) and
+Pandagma is a workflow that derives pan-gene sets, given input of gene sequences (CDS and peptide) and
 annotations (BED or GFF) from several annotations. It is designed to be suitable for constructing
 pan-genes for annotations across several different species within a genus, or annotations within
 one species.
 
-Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2021.
+Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023.
 
 The workflow is essentially as follows:
 * Add positional information to the gene IDs
@@ -15,13 +13,13 @@ The workflow is essentially as follows:
 * Cluster (mcl)
 * Add back the genes that were excluded to this point 
 * Add "extra" annotation sets by homology 
+* Identify a representative sequence for each pan-gene
+* Calculate consensus order of the pan-genes
 * Calculate and report statistics
-
 
 ## Installation methods <a name="installation"></a>
 
 ### Installation method 1 (recommended): by creating a Singularity container image
-
 
 To build a [Singularity](https://singularity.hpcng.org/) container image from the provided [Singularity definition file](https://singularity.hpcng.org/user-docs/master/definition_files.html) (`singularity.def`):
 
@@ -62,9 +60,9 @@ For example, using conda:
 
 ~~~
 Usage: 
-       ./pandagma.sh -c CONFIG_FILE [options]
+       nohup ./pandagma.sh -c CONFIG_FILE [options] &
    or
-       ./pandagma.sh -c CONFIG_FILE -s SUBCOMMAND [options]
+       nohup ./pandagma.sh -c CONFIG_FILE -s SUBCOMMAND [options] &
 
 Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
 config file, in the arrays fasta_files, annotation_files, and protein_files. See example files.
@@ -109,10 +107,13 @@ Subommands (in order they are usually run):
              filter - Filter the synteny results for chromosome pairings, returning gene pairs.
          dagchainer - Run DAGchainer to filter for syntenic blocks
                 mcl - Derive clusters, with Markov clustering
-           consense - calculate a consensus sequences from each pan-gene set,
+           consense - Calculate a consensus sequences from each pan-gene set,
                        If possible add sequences missed in the first clustering round.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                        annotation sets that may be of lower or uncertain quality.
+     filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
+      name_pangenes - Assign pan-gene names with consensus chromosomes and ordinal positions.
+     calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
 
 Variables in pandagma config file:
@@ -151,7 +152,7 @@ Variables in pandagma config file:
 
             mkdir ../work_Zea
             ls ..
-              work_Zea  zea
+              work_Zea  Zea
 
 3. Get into a suitable work environment (computation node), and load dependencies.
     The script has these third-party dependencies: **bioperl, mcl, mmseqs2, DAGchainer**
