@@ -114,69 +114,40 @@ echo "  For GRAMENE-4.0_Zm00001d, also remove 178 GRMZM5 gene models"
     perl -pe 's/_T(\d+) ?/\tT$1\t/' |
     awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
     sort -k1,1 -k2nr,2nr | ../bin/top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
-    cat > ../data/Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.canonical.cds.fa
+    cat | gzip -c  > ../data/Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.canonical.cds.fa.gz
 
   zcat Zm-W22-REFERENCE-NRGENE-2.0_Zm00004b.1.cds.fa.gz | ../bin/fasta_to_table.awk |
     perl -pe 's/_T(\d+) ?/\tT$1\t/' |
     awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
     sort -k1,1 -k2nr,2nr | ../bin/top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
-    cat > ../data/Zm-W22-REFERENCE-NRGENE-2.0_Zm00004b.1.canonical.cds.fa
+    cat | gzip -c  > ../data/Zm-W22-REFERENCE-NRGENE-2.0_Zm00004b.1.canonical.cds.fa.gz
 
   zcat Zm-CML69-REFERENCE-NAM-1.0_Zm00020ab.1.cds.fa.gz | ../bin/fasta_to_table.awk |
     perl -pe 's/_T(\d+) ?/\tT$1\t/' |
     awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
     sort -k1,1 -k2nr,2nr | ../bin/top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
-    cat > ../data/Zm-CML69-REFERENCE-NAM-1.0_Zm00020ab.1.canonical.cds.fa
+    cat | gzip -c  > ../data/Zm-CML69-REFERENCE-NAM-1.0_Zm00020ab.1.canonical.cds.fa.gz
 
   zcat Zm-PH207-REFERENCE_NS-UIUC_UMN-1.0_Zm00008a.1.cds.fa.gz | ../bin/fasta_to_table.awk |
     perl -pe 's/_T(\d+) ?/\tT$1\t/' |
     awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
     sort -k1,1 -k2nr,2nr | ../bin/top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
-    cat > ../data/Zm-PH207-REFERENCE_NS-UIUC_UMN-1.0_Zm00008a.1.canonical.cds.fa
+    cat | gzip -c > ../data/Zm-PH207-REFERENCE_NS-UIUC_UMN-1.0_Zm00008a.1.canonical.cds.fa.gz
 
+echo "Copy existing canonical cds files from data_orig/ to data/"
+  cp *canonical.cds.fa.gz ../data/
 
-echo "Pick longest proteins for several annotation sets, and exclude provisional"
-echo "  For GRAMENE-4.0_Zm00001d, also remove 178 GRMZM5 gene models"
-  zcat Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.protein.fa.gz | ../bin/fasta_to_table.awk |
-    grep -v GRMZM5 |
-    perl -pe 's/_P(\d+) ?/\tP$1\t/' |
-    awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
-    sort -k1,1 -k2nr,2nr | ../bin/top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
-    cat > ../data/Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.canonical.protein.fa
-
-  zcat Zm-W22-REFERENCE-NRGENE-2.0_Zm00004b.1.protein.fa.gz | ../bin/fasta_to_table.awk |
-    perl -pe 's/_P(\d+) ?/\tP$1\t/' |
-    awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
-    sort -k1,1 -k2nr,2nr | ../bin/top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
-    cat > ../data/Zm-W22-REFERENCE-NRGENE-2.0_Zm00004b.1.canonical.protein.fa
-
-  zcat Zm-CML69-REFERENCE-NAM-1.0_Zm00020ab.1.protein.fa.gz | ../bin/fasta_to_table.awk |
-    perl -pe 's/_P(\d+) ?/\tP$1\t/' |
-    awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
-    sort -k1,1 -k2nr,2nr | ../bin/top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
-    cat > ../data/Zm-CML69-REFERENCE-NAM-1.0_Zm00020ab.1.canonical.protein.fa
-
-  zcat Zm-PH207-REFERENCE_NS-UIUC_UMN-1.0_Zm00008a.1.protein.fa.gz | ../bin/fasta_to_table.awk |
-    perl -pe 's/_P(\d+) ?/\tP$1\t/' |
-    awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
-    sort -k1,1 -k2nr,2nr | ../bin/top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
-    cat > ../data/Zm-PH207-REFERENCE_NS-UIUC_UMN-1.0_Zm00008a.1.canonical.protein.fa
-
-  echo "Copy protein files from data_orig to data ..."
-  echo "in the process, converting from e.g. Zm00004b003353_P001 to Zm00004b003353_T001,"
-  echo "to allow ID matches between CDS and protein sequences."
+echo "Pick longest proteins for several annotation sets. In the process, convert"
+  echo "from e.g. Zm00004b003353_P001 to Zm00004b003353_T001, to allow ID matches between CDS and protein sequences."
+  echo "Also exclude provisional genes. For GRAMENE-4.0_Zm00001d, also remove 178 GRMZM5 gene models"
   for file in *protein.fa.gz; do 
-    base=`basename $file .gz`
-    echo "  Copying $base, with ID modification"
-    zcat $file | perl -pe 's/>(\S+)_P(\d+)/>$1_T$2/' > ../data/$base
+    base=`basename $file .protein.fa.gz`
+    echo "  Copying protein file $base, with ID modification"
+    zcat $file |  perl -pe 's/>(\S+)_P(\d+)/>$1_T$2/' | ../bin/fasta_to_table.awk |
+    awk -v FS="\t" -v OFS="\t" '$1!~/GRMZM5/ && $1!~/provisional/ {print $1, length($2), $2}' |
+    sort -k1,1 -k2nr,2nr | ../bin/top_line.awk | awk -v FS="\t" '{print ">" $1; print $3}' |
+    cat | gzip -c > ../data/$base.canonical.protein.fa.gz
   done
-
-echo "Copy existing canonical files from data_orig/ to data/"
-  for file in *canonical.*.fa.gz; do 
-    gunzip $file &
-  done
-  wait
-  cp *canonical.cds.fa ../data/
 
 echo "Derive BED from GFF. "
 echo "Add annotation name (e.g. Zm-W22_NRGENE-2) as prefix to the chromosome/scaffold names."
@@ -186,12 +157,15 @@ echo "Add annotation name (e.g. Zm-W22_NRGENE-2) as prefix to the chromosome/sca
     export annot_name=$(echo $base | perl -pe 's/(.+)-REFERENCE[-_](.+\d)\.\d_Z\w\d+.+/$1_$2/')
     zcat $path | ../bin/gff_to_bed6_mRNA.awk | 
       perl -pe '$prefix=$ENV{'annot_name'}; s/^(\D+)/$prefix.$1/; s/transcript://' |
-       cat > ../data/$base.bed &
+       cat | gzip -c > ../data/$base.bed.gz &
   done
   wait
 
 echo "Change chromosome strings in Zm-B73-REFERENCE-GRAMENE-4.0"
-  perl -pi -e 's/Chr/chr/' ../data/Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.gff3.bed
+  zcat ../data/Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.gff3.bed.gz |
+  perl -pe 's/Chr/chr/' > tmp.bed
+  cat tmp.bed | gzip -cf > ../data/Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.gff3.bed.gz
+  rm tmp.bed
 
 echo "Re-compress files"
   for file in *.fa *.gff3; do
