@@ -18,6 +18,7 @@ cd $base_dir/data/
   curl -O $url_base/angularis/annotations/Gyeongwon.gnm3.ann1.3Nz5/vigan.Gyeongwon.gnm3.ann1.3Nz5.cds_primary.fna.gz
   curl -O $url_base/angularis/annotations/Shumari.gnm1.ann1.8BRS/vigan.Shumari.gnm1.ann1.8BRS.cds_primary.fna.gz
   curl -O $url_base/radiata/annotations/VC1973A.gnm6.ann1.M1Qs/vigra.VC1973A.gnm6.ann1.M1Qs.cds.fna.gz
+  curl -O $url_base/radiata/annotations/VC1973A.gnm7.ann1.RWBG/vigra.VC1973A.gnm7.ann1.RWBG.cds.fna.gz
   curl -O $url_base/unguiculata/annotations/CB5-2.gnm1.ann1.0GKC/vigun.CB5-2.gnm1.ann1.0GKC.cds_primary.fna.gz
   curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann1.zb5D/vigun.IT97K-499-35.gnm1.ann1.zb5D.cds_primary.fna.gz
   curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann2.FD7K/vigun.IT97K-499-35.gnm1.ann2.FD7K.cds_primary.fna.gz
@@ -31,6 +32,7 @@ cd $base_dir/data/
   curl -O $url_base/angularis/annotations/Gyeongwon.gnm3.ann1.3Nz5/vigan.Gyeongwon.gnm3.ann1.3Nz5.protein_primary.faa.gz
   curl -O $url_base/angularis/annotations/Shumari.gnm1.ann1.8BRS/vigan.Shumari.gnm1.ann1.8BRS.protein_primary.faa.gz
   curl -O $url_base/radiata/annotations/VC1973A.gnm6.ann1.M1Qs/vigra.VC1973A.gnm6.ann1.M1Qs.protein.faa.gz
+  curl -O $url_base/radiata/annotations/VC1973A.gnm7.ann1.RWBG/vigra.VC1973A.gnm7.ann1.RWBG.protein.faa.gz
   curl -O $url_base/unguiculata/annotations/CB5-2.gnm1.ann1.0GKC/vigun.CB5-2.gnm1.ann1.0GKC.protein_primary.faa.gz
   curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann1.zb5D/vigun.IT97K-499-35.gnm1.ann1.zb5D.protein_primary.faa.gz
   curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann2.FD7K/vigun.IT97K-499-35.gnm1.ann2.FD7K.protein_primary.faa.gz
@@ -44,6 +46,7 @@ cd $base_dir/data/
   curl -O $url_base/angularis/annotations/Gyeongwon.gnm3.ann1.3Nz5/vigan.Gyeongwon.gnm3.ann1.3Nz5.cds.bed.gz
   curl -O $url_base/angularis/annotations/Shumari.gnm1.ann1.8BRS/vigan.Shumari.gnm1.ann1.8BRS.cds.bed.gz
   curl -O $url_base/radiata/annotations/VC1973A.gnm6.ann1.M1Qs/vigra.VC1973A.gnm6.ann1.M1Qs.cds.bed.gz
+  curl -O $url_base/radiata/annotations/VC1973A.gnm7.ann1.RWBG/vigra.VC1973A.gnm7.ann1.RWBG.cds.bed.gz
   curl -O $url_base/unguiculata/annotations/CB5-2.gnm1.ann1.0GKC/vigun.CB5-2.gnm1.ann1.0GKC.cds.bed.gz
   curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann1.zb5D/vigun.IT97K-499-35.gnm1.ann1.zb5D.cds.bed.gz
   curl -O $url_base/unguiculata/annotations/IT97K-499-35.gnm1.ann2.FD7K/vigun.IT97K-499-35.gnm1.ann2.FD7K.cds.bed.gz
