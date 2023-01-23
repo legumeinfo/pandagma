@@ -289,7 +289,7 @@ run_dagchainer() {
     (
       tmpdir=$(mktemp -d)
       cd "${tmpdir}"
-      run_DAG_chainer.pl $dagchainer_args -i ${match_path} 1>/dev/null
+      run_DAG_chainer.pl $dagchainer_args -i "${OLDPWD}/${match_path}" 1>/dev/null
       rmdir ${tmpdir}
     ) &
     # allow to execute up to $NPROC in parallel
