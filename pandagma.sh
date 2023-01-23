@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-01-19"
+version="2023-01-23"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -31,7 +31,7 @@ Usage:
 Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
 config file, in the arrays cds_files, annotation_files, and protein_files. See example files.
 
-Subommands (in order they are usually run):
+Subcommands (in order they are usually run):
                 all -     all of the steps below
                         (Or equivalently: omit the -s flag; \"all\" is default)
              ingest - Prepare the assembly and annotation files for analysis
@@ -279,7 +279,9 @@ run_dagchainer() {
   # Identify syntenic blocks, using DAGchainer
   cd "${WORK_DIR}"
   echo; echo "Run DAGchainer, using args \"${dagchainer_args}\""
-  for match_path in ${WORK_DIR}/04_dag/*_matches.tsv; do
+  # Check and preemptively remove malformed \*_matches.file, which can result from an aborted run
+  if [ -f 04_dag/\*_matches.tsv ]; then rm 04_dag/\*_matches.tsv; fi
+  for match_path in 04_dag/*_matches.tsv; do
     #echo "basename $match_path _matches.tsv"
     align_file=`basename $match_path _matches.tsv`
     echo "Running DAGchainer on comparison: $align_file"
@@ -297,8 +299,8 @@ run_dagchainer() {
   done
   wait # wait for last jobs to finish
 
-  awk '$1!~/^#/ {print $2 "\t" $6}' ${WORK_DIR}/04_dag/*_matches.tsv > 05_homology_pairs.tsv
-  awk '$1!~/^#/ {print $2 "\t" $6}' ${WORK_DIR}/04_dag/*.aligncoords > 05_synteny_pairs.tsv
+  awk '$1!~/^#/ {print $2 "\t" $6}' 04_dag/*_matches.tsv > 05_homology_pairs.tsv
+  awk '$1!~/^#/ {print $2 "\t" $6}' 04_dag/*.aligncoords > 05_synteny_pairs.tsv
 }
 
 run_mcl() {
@@ -838,7 +840,7 @@ do
 done
 
 if [ "$#" -eq 0 ]; then
-  printf >&2 "$HELP_DOC\n\n" && exit 0;
+  printf >&2 "$HELP_DOC\n" && exit 0;
 fi
 
 shift $(expr $OPTIND - 1)
@@ -885,6 +887,19 @@ elif [ $work_dir != "null" ] && [ ! -d $work_dir ]; then
   echo "Work directory $work_dir was not found. Please specify path in the config file or with option -w." >&2
 else
   export WORK_DIR=${work_dir}
+fi
+
+# Check for existence of third-party executables
+missing_req=0
+for program in mmseqs dagchainer mcl run_DAG_chainer.pl; do
+  if ! command -v $program &> /dev/null; then
+    echo "Warning: executable $program is not on your PATH."
+    missing_req=$((missing_req+1))
+  fi
+done
+if [ "$missing_req" -gt 0 ]; then 
+  printf "\nPlease add the programs above to your environment and try again.\n\n"
+  exit 1; 
 fi
 
 # Run all specified steps
