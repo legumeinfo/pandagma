@@ -675,7 +675,7 @@ printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
   echo "  Report threshold for inclusion in \"core\""
   max_annot_ct=$(cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv |
                        awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
-  core_threshold=$(bc -l <<< "$min_core_prop * $max_annot_ct")
+  core_threshold=$(awk -v MCP=$min_core_prop -v MAC=$max_annot_ct 'BEGIN{print MCP*MAC}')
 
   echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
 
