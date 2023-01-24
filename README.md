@@ -19,7 +19,7 @@ The workflow is essentially as follows:
 
 ## Installation methods <a name="installation"></a>
 
-### Installation method 1 (recommended): by creating a Singularity container image
+### Installation method 1: by creating a Singularity container image
 
 To build a [Singularity](https://singularity.hpcng.org/) container image from the provided [Singularity definition file](https://singularity.hpcng.org/user-docs/master/definition_files.html) (`singularity.def`):
 
@@ -27,23 +27,21 @@ To build a [Singularity](https://singularity.hpcng.org/) container image from th
 
 Where the `--remote` option is used if building the image as an unprivileged user using (by default) the [Sylabs Cloud Remote Builder](https://cloud.sylabs.io/builder).
 
-To run pandamga using singularity, use `singularity run pandagma.sif [run command]`, e.g.:
+To run pandamga using singularity, use `singularity exec pandagma.sif [options]`, e.g.:
 
-  NOTE: THE FOLLOWING STEPS NEED TO BE TESTED AND MODIFIED IN 2023
     singularity pandagma.sif init
     ... modify config/Example.conf ...
     mkdir /path/to/pandagma/work_dir # create work dir on fast, node-local storage
-    singularity pandagma.sif -c CONFIG_FILE &
+    nohup singularity exec pandagma.sif -c CONFIG_FILE &
 
 ### Installation method 2: manual installation of bin and dependencies
 
-The bin should be added to your path - either by copying them to a directory that is in your path 
-(e.g. `cp bin/* ~/bin/`), or by adding the script directory to your path 
-(e.g. `export PATH=$PATH:~/src/pandagma/bin` ... if that is where you have them).
-
-Also, these dependencies are required: 
-  bioperl, mmseqs, dagchainer, and mcl.
+These dependencies are required: 
+```  bioperl, mmseqs, dagchainer, and mcl. ```
 These need to be installed and available in the script's environment.
+
+Once those are available on your PATH, the program can be called directly with its options.
+(see Usage below).
 
 Installing the dependencies is up to you. They can be installed via a suitable package manager. 
 For example, using conda: 
