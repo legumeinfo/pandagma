@@ -34,7 +34,7 @@ To run pandamga using singularity, use `singularity exec pandagma.sif [options]`
     mkdir /path/to/pandagma/work_dir # create work dir on fast, node-local storage
     nohup singularity exec pandagma.sif -c CONFIG_FILE &
 
-### Installation method 2: manual installation of bin and dependencies
+### Installation method 2: manual installation of scripts and dependencies
 
 These dependencies are required: 
 ```  bioperl, mmseqs, dagchainer, and mcl. ```
@@ -136,7 +136,7 @@ Variables in pandagma config file:
 
 ~~~
 
-## Detailed instructions <a name="details"></a>
+## Example run <a name="example"></a>
 
 1. Clone the program and associated files from github:
       clone https://github.com/legumeinfo/pandagma
@@ -158,16 +158,16 @@ Variables in pandagma config file:
     These can be loaded using a module-loading system, or with a package manager such as conda, or
     via a Singularity image. 
       
-          pandagma_sing_img=$YOURPATH/pandagma-v2021-11-16.sif
+          pandagma_sing_img=$YOURPATH/pandagma-v2023-01-23.sif
     
     OR:
     
           conda activate pandagma    
-            # pandagma is the conda environment where I've installed the dependencies above.
+            # pandagma is the name of the conda environment where I've installed the dependencies above.
     
-4. Download the annotation data from a remote source (CDS or peptide, and GFF or BED), and transform if needed.
+4. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if needed.
     I do this with a simple shell script that executes curl commands and then applies some transformations.
-    See the files in get_data/ for examples. There are bin for Glycine, Medicago, Vigna, and Zea.
+    See the files in get_data/ for examples. There are \"get_data\" scripts for Glycine, Medicago, Phaseolus, Vigna, and Zea.
     
           ./get_data/get_Zea.sh
             # This puts the data first into data_orig/, 
@@ -197,9 +197,8 @@ Variables in pandagma config file:
 
     Using a Singularity image:
 
-  NOTE: THE FOLLOWING STEPS NEED TO BE TESTED AND MODIFIED IN 2023
          pandagma_sing_img=$YOURPATH/pandagma-v_YOUR_VERSION
-         nohup singularity exec --cleanenv $pandagma_sing_img ./pandagma.sh -c config/Zea_7_2.conf &
+         nohup singularity exec $pandagma_sing_img ./pandagma.sh -c config/Zea_7_2.conf &
 
 7. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
     Output will go into a directory composed from a provided prefix name (default "out") and
