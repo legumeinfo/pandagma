@@ -68,7 +68,6 @@ Variables in pandagma config file (Set the config with the CONF environment vari
           clust_cov - Minimum coverage for mmseqs clustering [0.60]
         consen_iden - Minimum identity threshold for consensus generation [0.80]
          extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [90]
-      min_core_prop - Minimum fraction of annotation sets for an orthogroup to be \"core\" [0.333333333333333]
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
       consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
        out_dir_base - Base name for the output directory [default: './out']
@@ -497,35 +496,41 @@ run_filter_to_core() {
   max_annot_ct=$(cat 18_syn_pan_aug_extra.counts.tsv | 
                        awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
 
-  echo "  Select orthogroups with genes from at least min_core_prop*max_annot_ct annotation sets"
-  cat 18_syn_pan_aug_extra.counts.tsv | 
-    awk -v MINCORE=$min_core_prop -v ANNCT=$max_annot_ct '$2>=ANNCT*MINCORE && $1!~/^#/ {print $1}' |
-      cat > lists/lis.18_syn_pan_aug_extra.core
+  echo "  Select orthogroups with genes from at least 0.3, 0.6, and 0.9*max_annot_ct annotation sets"
 
-  echo "  Get a fasta subset with only genes from at least min_core_prop*max_annot_ct annotation sets"
-  $BIN_DIR/get_fasta_subset.pl -in 21_pan_fasta_clust_rep_cds.fna -list lists/lis.18_syn_pan_aug_extra.core \
-                      -clobber -out 22_pan_fasta_rep_core_cds.fna
+  for min_core_prop in 0.3 0.6 0.9; do
+    core_prop_display=$(echo $min_core_prop | perl -pe 's/\.//')
 
-  echo "  Get a clust.tsv file with orthogroups with at least min_core_prop*max_annot_ct annotation sets"
-  join <(LC_ALL=C sort -k1,1 lists/lis.18_syn_pan_aug_extra.core) \
-       <(LC_ALL=C sort -k1,1 18_syn_pan_aug_extra.clust.tsv) |
-          cat > 22_syn_pan_aug_extra_core.clust.tsv
+    cat 18_syn_pan_aug_extra.counts.tsv | 
+      awk -v MINCORE=$min_core_prop -v ANNCT=$max_annot_ct '$2>=ANNCT*MINCORE && $1!~/^#/ {print $1}' |
+        cat > lists/lis.18_syn_pan_aug_extra.core_${core_prop_display}
+
+    echo "  Get a fasta subset with only genes from at least min_core_prop*max_annot_ct annotation sets"
+    $BIN_DIR/get_fasta_subset.pl -in 21_pan_fasta_clust_rep_cds.fna \
+                        -list lists/lis.18_syn_pan_aug_extra.core_${core_prop_display} \
+                        -clobber -out 22_pan_fasta_rep_core_${core_prop_display}_cds.fna
+
+    echo "  Get a clust.tsv file with orthogroups with at least min_core_prop*max_annot_ct annotation sets"
+    join <(LC_ALL=C sort -k1,1 lists/lis.18_syn_pan_aug_extra.core_${core_prop_display}) \
+         <(LC_ALL=C sort -k1,1 18_syn_pan_aug_extra.clust.tsv) |
+            cat > 22_syn_pan_aug_extra_core${core_prop_display}.clust.tsv
+  done
 }
 
 run_name_pangenes() {
   cd "${WORK_DIR}"
 
   echo "  Reshape from mcl output format, clustered IDs on one line, to a hash format"
-  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 22_syn_pan_aug_extra_core.clust.tsv |
-    cat > 22_syn_pan_aug_extra_core.hsh.tsv
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 22_syn_pan_aug_extra_core03.clust.tsv |
+    cat > 22_syn_pan_aug_extra_core03.hsh.tsv
 
   echo "  Add positional information to the hash output."
-  join -a 1 -1 2 -2 1 <(sort -k2,2 22_syn_pan_aug_extra_core.hsh.tsv) <(cat 01_posn_hsh/*hsh | sort -k1,1) | 
+  join -a 1 -1 2 -2 1 <(sort -k2,2 22_syn_pan_aug_extra_core03.hsh.tsv) <(cat 01_posn_hsh/*hsh | sort -k1,1) | 
     perl -pe 's/__/\t/g; s/ /\t/g' | awk -v OFS="\t" '{print $2, $1, $3, $5, $6}' |
-    sort -k1,1 -k2,2 > 22_syn_pan_aug_extra_core_posn.hsh.tsv
+    sort -k1,1 -k2,2 > 22_syn_pan_aug_extra_core03_posn.hsh.tsv
 
   echo "  Calculate consensus pan-gene positions"
-  cat 22_syn_pan_aug_extra_core_posn.hsh.tsv | 
+  cat 22_syn_pan_aug_extra_core03_posn.hsh.tsv | 
     $BIN_DIR/consen_pangene_order.pl -pre ${consen_prefix}.chr -make_new -v -out consen_${consen_prefix}.tsv
 
   echo "  Reshape defline into a hash, e.g. pan47789	Glycine.pan3.chr01__Glycine.pan3.chr01_000100__45224__45786"
@@ -535,17 +540,17 @@ run_name_pangenes() {
       awk '{print $1 "\t" $1 "__" $2 "__" $3*100 "__" $3*100+1000}' > consen_posn.hsh
 
   echo "  Hash position information into fasta file"
-  $BIN_DIR/hash_into_fasta_id.pl -fasta 22_pan_fasta_rep_core_cds.fna -hash consen_posn.hsh |
-    grep -v "HASH UNDEFINED" > 22_pan_fasta_rep_core_posn_cdsTMP.fna
+  $BIN_DIR/hash_into_fasta_id.pl -fasta 22_pan_fasta_rep_core03_cds.fna -hash consen_posn.hsh |
+    grep -v "HASH UNDEFINED" > 22_pan_fasta_rep_core03_posn_cdsTMP.fna
 
   echo "  Reshape defline, and sort by position"
-  $BIN_DIR/fasta_to_table.awk 22_pan_fasta_rep_core_posn_cdsTMP.fna | sed 's/__/\t/g; s/ /\t/' | 
+  $BIN_DIR/fasta_to_table.awk 22_pan_fasta_rep_core03_posn_cdsTMP.fna | sed 's/__/\t/g; s/ /\t/' | 
     perl -pe 's/^(\w+)\s+(.+)\.(chr\d+)_(\d+)\s+/$1\t$2\t$3\t$4\t/' | sed 's/chr//' | sort -k3n -k4n |
     awk '{print ">" $2 ".chr" $3 "_" $4 " " $1 " " $5 " " $6 " " $7; print $8}' |
-      cat > 23_syn_pan_core_posn_cds.fna
+      cat > 23_syn_pan_core03_posn_cds.fna
  
   echo "  Re-cluster, to identify neighboring genes that are highly similar"
-    mmseqs easy-cluster 23_syn_pan_core_posn_cds.fna 24_pan_fasta 03_mmseqs_tmp \
+    mmseqs easy-cluster 23_syn_pan_core03_posn_cds.fna 24_pan_fasta 03_mmseqs_tmp \
     --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
   echo "  Parse mmseqs clusters into pairs of genes that are similar and ordinally close"
@@ -560,28 +565,28 @@ run_name_pangenes() {
   echo "  Keep the first gene from the cluster and discard the rest."
   cat 24_pan_fasta_cluster.close.clst | awk '{$1=""}1' | awk '{$1=$1}1' | tr ' ' '\n' | 
     sort -u > lists/lis.clust_genes_remove
-  $BIN_DIR/get_fasta_subset.pl -in 23_syn_pan_core_posn_cds.fna -xclude -clobber \
-    -lis lists/lis.clust_genes_remove -out 24_syn_pan_core_posn_trim_cds.fna 
+  $BIN_DIR/get_fasta_subset.pl -in 23_syn_pan_core03_posn_cds.fna -xclude -clobber \
+    -lis lists/lis.clust_genes_remove -out 24_syn_pan_core03_posn_trim_cds.fna 
 
-  echo "  Also get all corresponding protein sequences for genes in lists/lis.18_syn_pan_aug_extra.core"
+  echo "  Also get all corresponding protein sequences for genes in lists/lis.18_syn_pan_aug_extra.core03"
   cat /dev/null > 20_pan_fasta_prot.faa
   for filepath in 02_fasta_prot/*.gz; do 
     zcat $filepath >> 20_pan_fasta_prot.faa
   done
-  cat 23_syn_pan_core_posn_cds.fna | awk '$1~/^>/ {print $5}' > lists/lis.23_syn_pan_core_posn
-  $BIN_DIR/get_fasta_subset.pl -in 20_pan_fasta_prot.faa -list lists/lis.23_syn_pan_core_posn \
-                      -clobber -out 23_syn_pan_core_posn_proteinTMP.faa
+  cat 23_syn_pan_core03_posn_cds.fna | awk '$1~/^>/ {print $5}' > lists/lis.23_syn_pan_core03_posn
+  $BIN_DIR/get_fasta_subset.pl -in 20_pan_fasta_prot.faa -list lists/lis.23_syn_pan_core03_posn \
+                      -clobber -out 23_syn_pan_core03_posn_proteinTMP.faa
 
   echo "  Hash pan-ID into protein fasta file"
-  cat 23_syn_pan_core_posn_cds.fna | 
-    awk '$1~/^>/ {print $5 "\t" substr($1, 2) "__" $2 "__" $3 "__" $4}' > lists/23_syn_pan_core_posn.hsh
-  $BIN_DIR/hash_into_fasta_id.pl -hash lists/23_syn_pan_core_posn.hsh -swap_IDs -nodef \
-    -fasta 23_syn_pan_core_posn_proteinTMP.faa |
-    perl -pe 's/__/ /g' > 23_syn_pan_core_posn_protein.faa
+  cat 23_syn_pan_core03_posn_cds.fna | 
+    awk '$1~/^>/ {print $5 "\t" substr($1, 2) "__" $2 "__" $3 "__" $4}' > lists/23_syn_pan_core03_posn.hsh
+  $BIN_DIR/hash_into_fasta_id.pl -hash lists/23_syn_pan_core03_posn.hsh -swap_IDs -nodef \
+    -fasta 23_syn_pan_core03_posn_proteinTMP.faa |
+    perl -pe 's/__/ /g' > 23_syn_pan_core03_posn_protein.faa
   
   # also get trimmed version of protein file
-  $BIN_DIR/get_fasta_subset.pl -in 23_syn_pan_core_posn_protein.faa -xclude -clobber \
-    -lis lists/lis.clust_genes_remove -out 24_syn_pan_core_posn_trim_protein.faa 
+  $BIN_DIR/get_fasta_subset.pl -in 23_syn_pan_core03_posn_protein.faa -xclude -clobber \
+    -lis lists/lis.clust_genes_remove -out 24_syn_pan_core03_posn_trim_protein.faa 
 }
 
 run_calc_chr_pairs() {
@@ -593,7 +598,7 @@ run_calc_chr_pairs() {
     --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
   echo "   Extract chromosome-chromosome correspondences"
-  cut -f2,3 22_syn_pan_aug_extra_core_posn.hsh.tsv | sort -k1,1 > 22_syn_pan_aug_extra_core_posn.gene_chr.hsh
+  cut -f2,3 22_syn_pan_aug_extra_core03_posn.hsh.tsv | sort -k1,1 > 22_syn_pan_aug_extra_core03_posn.gene_chr.hsh
 
   echo "   From mmseqs cluster table, prune gene pairs, keeping only those in the same pangene cluster"
   cat 24_pan_fasta_clust_cluster.tsv | perl -pe 's/__/\t/g' | awk '$1==$3' |
@@ -601,8 +606,8 @@ run_calc_chr_pairs() {
 
   echo "   Join chromosome numbers to gene pairs and count chromosome correspondences among the pairs."
   join <(perl -pe 's/pan\d+__//g' 24_pan_fasta_cluster_pruned.tsv | sort -k1,1) \
-       22_syn_pan_aug_extra_core_posn.gene_chr.hsh | perl -pe 's/ /\t/g' | sort -k2,2 | 
-     join -1 2 -2 1 - 22_syn_pan_aug_extra_core_posn.gene_chr.hsh | 
+       22_syn_pan_aug_extra_core03_posn.gene_chr.hsh | perl -pe 's/ /\t/g' | sort -k2,2 | 
+     join -1 2 -2 1 - 22_syn_pan_aug_extra_core03_posn.gene_chr.hsh | 
      awk 'BEGIN{IGNORECASE=1; OFS="\t"} 
           $3!~/cont|scaff|sc|pilon|ctg|contig|tig|mito|mt$|cp$|pt$|chl|unanchor|unkn/ && \
           $4!~/cont|scaff|sc|pilon|ctg|contig|tig|mito|mt$|cp$|pt$|chl|unanchor|unkn/ \
@@ -640,9 +645,11 @@ run_summarize() {
               12_syn_pan_aug.clust.tsv 12_syn_pan_aug.hsh.tsv \
               18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv 18_syn_pan_aug_extra.counts.tsv \
               18_syn_pan_aug_extra_complement.fna \
-              21_pan_fasta_clust_rep_cds.fna 22_syn_pan_aug_extra_core_posn.hsh.tsv \
-              23_syn_pan_core_posn_cds.fna 23_syn_pan_core_posn_protein.faa \
-              24_syn_pan_core_posn_trim_cds.fna 24_syn_pan_core_posn_trim_protein.faa \
+              21_pan_fasta_clust_rep_cds.fna \
+              22_pan_fasta_rep_core03_cds.fna 22_pan_fasta_rep_core06_cds.fna 22_pan_fasta_rep_core09_cds.fna \
+              22_syn_pan_aug_extra_core03_posn.hsh.tsv \
+              23_syn_pan_core03_posn_cds.fna 23_syn_pan_core03_posn_protein.faa \
+              24_syn_pan_core03_posn_trim_cds.fna 24_syn_pan_core03_posn_trim_protein.faa \
               observed_chr_pairs.tsv ; do
     if [ -f ${WORK_DIR}/$file ]; then
       cp ${WORK_DIR}/$file ${full_out_dir}/
@@ -672,10 +679,10 @@ run_summarize() {
 
 printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
 
-  echo "  Report threshold for inclusion in \"core\""
+  echo "  Report threshold for inclusion in \"core03\""
   max_annot_ct=$(cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv |
                        awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
-  core_threshold=$(awk -v MCP=$min_core_prop -v MAC=$max_annot_ct 'BEGIN{print MCP*MAC}')
+  core03_threshold=$(awk -v MCP=0.3 -v MAC=$max_annot_ct 'BEGIN{print MCP*MAC}')
 
   echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
 
@@ -701,12 +708,12 @@ printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
       elif [[ $clustcount == 3 ]]; then
         printf "\n== Augmented-extra clusters (with sequences from extra annotation sets)\n" >> ${stats_file}
         (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
-        CTceil=$(echo $core_threshold | awk '{print int($1+0.5)}')
+        CTceil=$(echo $core03_threshold | awk '{print int($1+0.5)}')
         if (( $CTceil>$largest )); then let "CTceil=2"; fi; export CTceil
         (( mode=$(awk -v CT=$CTceil "(NF-1)>=CT {print NF-1}" $clustfile |
           sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
-        printf "    The core set consists of orthogroups with at least %.0f genes per OG (>= %f * %d sets).\n" \
-           $CTceil $min_core_prop $max_annot_ct >> ${stats_file} >> ${stats_file}
+        printf "    The core03 set consists of orthogroups with at least %.0f genes per OG (>= %f * %d sets).\n" \
+           $CTceil 0.3 $max_annot_ct >> ${stats_file} >> ${stats_file}
       fi
 
       export mode
@@ -751,29 +758,29 @@ printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
 
   printf "\n== Sequence stats for final pangene CDS files -- core and core-trimmed\n" >> ${stats_file}
   printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
-  annot_name=23_syn_pan_core_posn_cds.fna
-    printf "  Core:  " >> ${stats_file}
-    cat_or_zcat "${WORK_DIR}/23_syn_pan_core_posn_cds.fna" | calc_seq_stats >> ${stats_file}
-  annot_name=24_syn_pan_core_posn_trim_cds.fna
+  annot_name=23_syn_pan_core03_posn_cds.fna
+    printf "  core03:  " >> ${stats_file}
+    cat_or_zcat "${WORK_DIR}/23_syn_pan_core03_posn_cds.fna" | calc_seq_stats >> ${stats_file}
+  annot_name=24_syn_pan_core03_posn_trim_cds.fna
     printf "  Trim:  " >> ${stats_file}
-    cat_or_zcat "${WORK_DIR}/24_syn_pan_core_posn_trim_cds.fna" | calc_seq_stats >> ${stats_file}
+    cat_or_zcat "${WORK_DIR}/24_syn_pan_core03_posn_trim_cds.fna" | calc_seq_stats >> ${stats_file}
 
   echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
   #   tmp.gene_count_start was generated during run_ingest
-  printf "\n== Proportion of initial genes retained in the \"aug_extra\" and \"core\" sets:\n" \
+  printf "\n== Proportion of initial genes retained in the \"aug_extra\" and \"core03\" sets:\n" \
     >> ${stats_file}
 
   cut -f2 ${WORK_DIR}/18_syn_pan_aug_extra.hsh.tsv | 
     perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' |
     sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_all_end
 
-  cut -f2 ${WORK_DIR}/22_syn_pan_aug_extra_core.hsh.tsv | 
+  cut -f2 ${WORK_DIR}/22_syn_pan_aug_extra_core03.hsh.tsv | 
     perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' |
-    sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_core_end
+    sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_core03_end
 
   paste ${WORK_DIR}/stats/tmp.gene_count_start \
         ${WORK_DIR}/stats/tmp.gene_count_all_end \
-        ${WORK_DIR}/stats/tmp.gene_count_core_end | 
+        ${WORK_DIR}/stats/tmp.gene_count_core03_end | 
     awk 'BEGIN{print "  Start\tEnd_all\tEnd_core\tPct_kept_all\tPct_kept_core\tAnnotation_name"} 
         { printf "  %i\t%i\t%i\t%2.1f\t%2.1f\t%s\n", $2, $4, $6, 100*($4/$2), 100*($6/$2), $1 }'  >> ${stats_file}
 
@@ -854,8 +861,8 @@ export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 # mmseqs uses a significant number of threads on its own. Set a maximum, which may be below NPROC.
 MMSEQSTHREADS=$(( 10 < ${NPROC} ? 10 : ${NPROC} ))
 
-pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation min_core_prop
-             dagchainer_args out_dir_base consen_prefix annot_str_regex preferred_annot work_dir'
+pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation 
+      dagchainer_args out_dir_base consen_prefix annot_str_regex preferred_annot work_dir'
 
 if [ $CONFIG == "null" ]; then
   printf "\nPlease provide the path to a config file: -c CONFIG\n" >&2
