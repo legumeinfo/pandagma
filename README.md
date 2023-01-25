@@ -27,12 +27,12 @@ To build a [Singularity](https://singularity.hpcng.org/) container image from th
 
 Where the `--remote` option is used if building the image as an unprivileged user using (by default) the [Sylabs Cloud Remote Builder](https://cloud.sylabs.io/builder).
 
-To run pandamga using singularity, use `singularity exec pandagma.sif [options]`, e.g.:
+To run pandamga using singularity, use `singularity exec --cleanenv pandagma.sif [options]`, e.g.:
 
     singularity pandagma.sif init
     ... modify config/Example.conf ...
     mkdir /path/to/pandagma/work_dir # create work dir on fast, node-local storage
-    nohup singularity exec pandagma.sif -c CONFIG_FILE &
+    nohup singularity exec --cleanenv pandagma.sif -c CONFIG_FILE &
 
 ### Installation method 2: manual installation of scripts and dependencies
 
@@ -198,7 +198,7 @@ Variables in pandagma config file:
     Using a Singularity image:
 
          pandagma_sing_img=$YOURPATH/pandagma-v_YOUR_VERSION
-         nohup singularity exec $pandagma_sing_img ./pandagma.sh -c config/Zea_7_2.conf &
+         nohup singularity exec --cleanenv $pandagma_sing_img ./pandagma.sh -c config/Zea_7_2.conf &
 
 7. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
     Output will go into a directory composed from a provided prefix name (default "out") and
