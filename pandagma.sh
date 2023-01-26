@@ -503,15 +503,15 @@ run_filter_to_core() {
 
     cat 18_syn_pan_aug_extra.counts.tsv | 
       awk -v MINCORE=$min_core_prop -v ANNCT=$max_annot_ct '$2>=ANNCT*MINCORE && $1!~/^#/ {print $1}' |
-        cat > lists/lis.18_syn_pan_aug_extra.core_${core_prop_display}
+        cat > lists/lis.18_syn_pan_aug_extra.core${core_prop_display}
 
     echo "  Get a fasta subset with only genes from at least min_core_prop*max_annot_ct annotation sets"
     $BIN_DIR/get_fasta_subset.pl -in 21_pan_fasta_clust_rep_cds.fna \
-                        -list lists/lis.18_syn_pan_aug_extra.core_${core_prop_display} \
-                        -clobber -out 22_pan_fasta_rep_core_${core_prop_display}_cds.fna
+                        -list lists/lis.18_syn_pan_aug_extra.core${core_prop_display} \
+                        -clobber -out 22_pan_fasta_rep_core${core_prop_display}_cds.fna
 
     echo "  Get a clust.tsv file with orthogroups with at least min_core_prop*max_annot_ct annotation sets"
-    join <(LC_ALL=C sort -k1,1 lists/lis.18_syn_pan_aug_extra.core_${core_prop_display}) \
+    join <(LC_ALL=C sort -k1,1 lists/lis.18_syn_pan_aug_extra.core${core_prop_display}) \
          <(LC_ALL=C sort -k1,1 18_syn_pan_aug_extra.clust.tsv) |
             cat > 22_syn_pan_aug_extra_core${core_prop_display}.clust.tsv
   done
