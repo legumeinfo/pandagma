@@ -16,22 +16,24 @@ The deflines should have the form
   >pan00001__gene_ID
 The defline should be structured with as: pan-geneID and gene ID, separated by "__".
 
-Usage: cat FAMILY_FILE.fa |  pick_family_rep.pl [options]
+Usage: cat FAMILY_FILE.fa | pick_family_rep.pl [options]
    Input has two fields, separated by "__"
      panID__geneID
 
   OPTIONS:
     -prefer   Pattern for matching ID(s) to be selected as representative, if that ID is available
               with near-modal length.
+    -nostop   Ignore sequences that contain internal stop codons (assumes protein sequence).
     -outfile  Specify OUT_FH; otherwise, default to STDOUT.
     -verbose  For some debugging info, to STDOUT
     -help     This message. 
 EOS
 
-my ($prefer, $outfile, $verbose, $help);
+my ($prefer, $outfile, $nostop, $verbose, $help);
 
 GetOptions (
   "prefer:s" =>  \$prefer,
+  "nostop"    => \$nostop,
   "outfile:s" => \$outfile,
   "verbose" =>   \$verbose,
   "help" =>      \$help,
@@ -54,10 +56,28 @@ while (my $seqobj = $seqin->next_seq() ) {
   my ($panID, $gene_ID) = split(/__/, $display_id);
   my $len = $seqobj->length;
   my $seq = $seqobj->seq;
+  my $type = $seqobj->alphabet;
 
-  push @{$HoA_PI_lengths{$panID}}, $len;
-  $geneID_seq{$display_id} = $seq;
-  $geneID_len{$display_id} = $len;
+  if ($nostop){
+    if ($type eq 'dna'){
+      die "Option -nostop was selected, but the sequence of $gene_ID appears to be nucleotide\n";
+    }
+    else {
+      if ($seq =~ /\*.+/){
+        warn "Skipping sequence $gene_ID due to an internal stop codon: \n$seq\n";
+      }
+      else { # protein sequence looks OK
+        push @{$HoA_PI_lengths{$panID}}, $len;
+        $geneID_seq{$display_id} = $seq;
+        $geneID_len{$display_id} = $len;
+      }
+    }
+  }
+  else { # Option -nostop was not selected, so handle the sequence without evaluating stops
+    push @{$HoA_PI_lengths{$panID}}, $len;
+    $geneID_seq{$display_id} = $seq;
+    $geneID_len{$display_id} = $len;
+  }
 }
 
 my (%count_PI, %min_PI, %median_PI, %max_PI);
@@ -163,3 +183,4 @@ __END__
 2021-11-15 Initial version.
 2022-12-23 Rewrite: Take fasta input on STDIN, and take in an optional "preferred" ID regex
 2022-12-25 Print to either stdout or out-file
+2023-01-27 Add option to check for stop codons in protein sequence
