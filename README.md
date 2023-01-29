@@ -98,22 +98,30 @@ At the end of the process, remaining genes will be added to initial clusters, ba
 Remaining genes may be those falling on unanchored scaffolds, or on chromosomes by not part of
 synteny blocks and so not making it into the synteny-based clusters.
 
-Subommands (in order they are usually run):
-            version - Get installed package version
+Subcommands (in order they are usually run):
+                all - All of the steps below, except for clean and ReallyClean
+                        (Or equivalently: omit the -s flag; "all" is default)
              ingest - Prepare the assembly and annotation files for analysis
              mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
              filter - Filter the synteny results for chromosome pairings, returning gene pairs.
          dagchainer - Run DAGchainer to filter for syntenic blocks
                 mcl - Derive clusters, with Markov clustering
            consense - Calculate a consensus sequences from each pan-gene set,
-                       If possible add sequences missed in the first clustering round.
+                      adding sequences missed in the first clustering round.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
-                       annotation sets that may be of lower or uncertain quality.
-     pick_exemplars - Pick representative (exemplar) sequence for each pan-gene set (protein and CDS)
+                      annotation sets that may be of lower or uncertain quality.
+     pick_exemplars - Pick representative sequence for each pan-gene
      filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
       name_pangenes - Assign pan-gene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
+
+  Run either of the following subcommands separately if you wish:
+              clean - Clean (delete) files in the working directory that are not needed
+                        for later addition of data using add_extra and subsequent run commands.
+        ReallyClean - Do complete clean-up of files in the working directory.
+                        Use this if you want to start over, OR if you are satisified with the results and
+                        don't anticipate adding other annotation sets to this pan-gene set.
 
 Variables in pandagma config file:
     dagchainer_args - Argument for DAGchainer command

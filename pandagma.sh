@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-01-28"
+version="2023-01-29"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -32,7 +32,7 @@ Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) f
 config file, in the arrays cds_files, annotation_files, and protein_files. See example files.
 
 Subcommands (in order they are usually run):
-                all -     all of the steps below
+                all - All of the steps below, except for clean and ReallyClean
                         (Or equivalently: omit the -s flag; \"all\" is default)
              ingest - Prepare the assembly and annotation files for analysis
              mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
@@ -48,6 +48,13 @@ Subcommands (in order they are usually run):
       name_pangenes - Assign pan-gene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
+
+  Run either of the following subcommands separately if you wish:
+              clean - Clean (delete) files in the working directory that are not needed 
+                        for later addition of data using add_extra and subsequent run commands.
+        ReallyClean - Do complete clean-up of files in the working directory.
+                        Use this if you want to start over, OR if you are satisified with the results and
+                        don't anticipate adding other annotation sets to this pan-gene set.
 """
 
 MORE_INFO="""
@@ -215,7 +222,7 @@ run_ingest() {
     done
   fi
 
-  # Also protein files, if available
+  # Also protein files
   if (( ${#protein_files[@]} > 0 ))
   then
     for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
@@ -874,26 +881,63 @@ run_summarize() {
 }
 
 ##########
+run_clean() {
+  echo "Clean (delete) files in the working directory that are not needed with subsequent add_extra"
+  cd "${WORK_DIR}"
+  rm -rf MMTEMP/*
+  rm 13_extra_out_dir/* &
+  rm 16_pan_leftovers_extra/* &
+  rm 13_pan_aug_fasta.fna 
+  for filestart in 14 18 19 20 21 22 23 24 consen; do
+    rm $filestart*
+  done
+  wait
+  cd $OLDPWD
+}
+
+##########
+run_ReallyClean() {
+  echo "Doing complete clean-up of files in the working directory (remove all files and directories)"
+  if [ -d ${WORK_DIR} ]; then
+    cd "${WORK_DIR}"
+    if [ -d 01_posn_hsh ]; then
+      echo "Expected directory 01_posn_hsh exists in the work_dir (${WORK_DIR}),"
+      echo "so proceeding with complete clean-up from that location."
+      for dir in *; do
+        rm -rf $dir &
+      done
+    else 
+      echo "Expected directory 01_posn_hsh is not present in the work_dir (${WORK_DIR}),"
+      echo "so aborting the -K ReallyClean step. Please do this manually if you wish."
+      cd $OLDPWD
+      exit 1;
+    fi
+  fi
+  wait
+  cd $OLDPWD
+}
+
+##########
 # Command-line interpreter
 
 NPROC=10
 CONFIG="null"
-work_dir="null"
+optarg_work_dir="null"
 BIN_DIR="$PWD/bin"
 step="all"
 
 while getopts "c:w:s:n:b:vhm" opt
 do
   case $opt in
-    c) CONFIG=$OPTARG; echo "Config: $CONFIG"; ;;
-    w) work_dir=$OPTARG; echo "Work dir: $work_dir"; ;;
-    s) step=$OPTARG; ;;
-    n) NPROC=$OPTARG; ;;
-    b) BIN_DIR=$OPTARG; ;;
+    c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
+    w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
+    s) step=$OPTARG ;;
+    n) NPROC=$OPTARG ;;
+    b) BIN_DIR=$OPTARG ;;
     v) version ;;
-    h) printf >&2 "$HELP_DOC\n" && exit 0; ;;
-    m) printf >&2 "$HELP_DOC\n$MORE_INFO\n" && exit 0; ;;
-    *) printf >&2 "$HELP_DOC\n" && exit 1; ;;
+    h) printf >&2 "$HELP_DOC\n" && exit 0 ;;
+    m) printf >&2 "$HELP_DOC\n$MORE_INFO\n" && exit 0 ;;
+    *) printf >&2 "$HELP_DOC\n" && exit 1 ;;
   esac
 done
 
@@ -926,6 +970,27 @@ fi
 # Add shell variables from config file
 . "${CONF}"
 
+# Check for existence of work directory.
+# work_dir provided via cli argument takes precedence over the variable specified in the conf file
+if [ $optarg_work_dir == "null" ] && [ -z ${work_dir+x} ]; then
+  echo "\nPlease provide the path to a work directory, for intermediate files," >&2
+  echo "either in the config file (work_dir=) or with option -w" >&2
+  printf "\nRun \"$scriptname -h\" for help.\n\n" >&2
+  exit 1;
+elif [ $optarg_work_dir != "null" ] && [ -d $optarg_work_dir ]; then
+  work_dir=$optarg_work_dir
+elif [ ! -d $work_dir ]; then
+  echo "Work directory $work_dir was not found. Please specify path in the config file or with option -w." >&2
+else 
+  export WORK_DIR=${work_dir}
+fi
+
+if [[ $step == "clean" ]] || [[ $step == "ReallyClean" ]] ; then
+  run_${step}
+  echo "Command \"$step\" was run for cleanup in the work directory: $WORK_DIR."
+  exit 0;
+fi
+
 # Get paths to the fasta and annotation files
 canonicalize_paths
 
@@ -933,18 +998,6 @@ canonicalize_paths
 if [ ! -d $BIN_DIR ]; then 
   echo "Bin directory $BIN_DIR was not found. Please specify path with option -b" >&2
   exit 1;
-fi
-
-# Check for existence of work directory
-if [ $work_dir == "null" ]; then
-  echo "\nPlease provide the path to a work directory, for intermediate files," >&2
-  echo "either in the config file (work_dir=) or with option -w" >&2
-  printf "\nRun \"$scriptname -h\" for help.\n\n" >&2
-  exit 1;
-elif [ $work_dir != "null" ] && [ ! -d $work_dir ]; then
-  echo "Work directory $work_dir was not found. Please specify path in the config file or with option -w." >&2
-else
-  export WORK_DIR=${work_dir}
 fi
 
 # Check for existence of third-party executables
@@ -960,7 +1013,7 @@ if [ "$missing_req" -gt 0 ]; then
   exit 1; 
 fi
 
-# Run all specified steps
+# Run all specified steps (except clean and ReallyClean, which can be run separately).
 commandlist="ingest mmseqs filter dagchainer mcl consense add_extra \
        pick_exemplars filter_to_core name_pangenes calc_chr_pairs summarize"
 
