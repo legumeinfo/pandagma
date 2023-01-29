@@ -109,6 +109,7 @@ Subommands (in order they are usually run):
                        If possible add sequences missed in the first clustering round.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                        annotation sets that may be of lower or uncertain quality.
+     pick_exemplars - Pick representative (exemplar) sequence for each pan-gene set (protein and CDS)
      filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
       name_pangenes - Assign pan-gene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
@@ -117,11 +118,10 @@ Subommands (in order they are usually run):
 Variables in pandagma config file:
     dagchainer_args - Argument for DAGchainer command
          clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
-          clust_cov - Minimum coverage for mmseqs clustering [0.60]
+          clust_cov - Minimum coverage for mmseqs clustering [0.50]
         consen_iden - Minimum identity threshold for consensus generation [0.80]
-         extra_iden - Minimum identity threshold for mmseqs addition of "extra" annotations [90]
-      min_core_prop - Minimum fraction of annotation sets for an orthogroup to be "core" [0.333333333333333]
-      mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
+         extra_iden - Minimum identity threshold for mmseqs addition of "extra" annotations [80]
+      mcl_inflation - Inflation parameter, for Markov clustering [default: 2]
       consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
        out_dir_base - Base name for the output directory [default: './out']
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 

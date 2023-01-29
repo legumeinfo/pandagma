@@ -43,8 +43,12 @@ my $usage = <<EOS;
                           ** = required
 EOS
 
-die "\n$usage\n" 
-  if ($help or scalar(@ARGV)==0 or !defined($out_dir) or !defined($family_file) );
+if (scalar(@ARGV)==0){
+  print "\n$usage\n";
+  print "\nPlease provide FASTA_FILE[S] as the first argument.\n";
+}
+
+die "\n$usage\n" if ($help or !defined($out_dir) or !defined($family_file) );
 
 # Read fasta file(s) into ID-sequence hash
 my %seq_hsh;
@@ -103,6 +107,7 @@ while (<$FAM_FH>) {
 __END__
 VERSIONS
 
-v01 2017-07-02 Initial version
-v02 2021-07-09 Takes fasta FILES in via stdin. Add option for program to assign fam IDs.
-v03 2021-08-09 Process gzipped fasta files.
+2017-07-02 Initial version
+2021-07-09 Takes fasta FILES in via stdin. Add option for program to assign fam IDs.
+2021-08-09 Process gzipped fasta files.
+2023-01-27 Add more usage feedback if required params aren't provided.
