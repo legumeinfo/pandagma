@@ -6,7 +6,7 @@
 #    cat INPUT_FILE | n50stats.sh 
 #
 # AUTHOR
-#     Steven Cannon <steven.cannon@ars.usda.gov>
+#     Steven Cannon <steven.cannon@usda.gov>
 
 awk 'BEGIN { ORS="" } \
      /^>/ && NR==1 { print $0"\n" } \
