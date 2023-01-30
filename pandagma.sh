@@ -884,12 +884,14 @@ run_summarize() {
 run_clean() {
   echo "Clean (delete) files in the working directory that are not needed with subsequent add_extra"
   cd "${WORK_DIR}"
-  rm -rf MMTEMP/*
-  rm 13_extra_out_dir/* &
-  rm 16_pan_leftovers_extra/* &
-  rm 13_pan_aug_fasta.fna 
-  for filestart in 14 18 19 20 21 22 23 24 consen; do
-    rm $filestart*
+  echo "  work_dir: $PWD"
+  if [ -d MMTEMP ]; then rm -rf MMTEMP/*; fi
+  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_pan_aug_leftover_merged_prot; do
+    if [ -d $dir ]; then echo "  Removing directory $dir"; rm -rf $dir &
+    fi
+  done
+  for file in 10* 11* 14* 18* 19* 20* 21* 22* 23* 24* consen*; do
+    if [ -f $file ]; then echo "  Removing file $file"; rm $file; fi
   done
   wait
   cd $OLDPWD
@@ -900,6 +902,7 @@ run_ReallyClean() {
   echo "Doing complete clean-up of files in the working directory (remove all files and directories)"
   if [ -d ${WORK_DIR} ]; then
     cd "${WORK_DIR}"
+    echo "  work_dir: $PWD"
     if [ -d 01_posn_hsh ]; then
       echo "Expected directory 01_posn_hsh exists in the work_dir (${WORK_DIR}),"
       echo "so proceeding with complete clean-up from that location."
@@ -977,17 +980,22 @@ if [ $optarg_work_dir == "null" ] && [ -z ${work_dir+x} ]; then
   echo "either in the config file (work_dir=) or with option -w" >&2
   printf "\nRun \"$scriptname -h\" for help.\n\n" >&2
   exit 1;
-elif [ $optarg_work_dir != "null" ] && [ -d $optarg_work_dir ]; then
-  work_dir=$optarg_work_dir
 elif [ ! -d $work_dir ]; then
   echo "Work directory $work_dir was not found. Please specify path in the config file or with option -w." >&2
-else 
+  exit 1;
+elif [ $optarg_work_dir != "null" ] && [ -d $optarg_work_dir ]; then
+  work_dir=$optarg_work_dir
   export WORK_DIR=${work_dir}
+elif [ $optarg_work_dir == "null" ] && [ -d $work_dir ]; then
+  export WORK_DIR=${work_dir}
+else 
+  echo "Check odd condition: optarg_work_dir: $optarg_work_dir; work_dir: $work_dir"
+  exit 1;
 fi
 
 if [[ $step == "clean" ]] || [[ $step == "ReallyClean" ]] ; then
-  run_${step}
-  echo "Command \"$step\" was run for cleanup in the work directory: $WORK_DIR."
+  run_$step
+  echo "Command \"$step\" was run for cleanup in the work directory: $WORK_DIR"
   exit 0;
 fi
 
