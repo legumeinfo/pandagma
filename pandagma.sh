@@ -1035,9 +1035,9 @@ fi
 if [[ $step =~ "all" ]] && [[ $retain == "yes" ]]; then
   echo "Flag -r (retain) was set, so skipping clean-up of the work directory."
   echo "If you wish to do a cleanupt separately, you can call "
-  echo ".pandagma.sh -c $CONF -s clean";
-else
-  echo "Calling the medium cleanup function \"clean\" ..."
-  clean  
+  echo "  .pandagma.sh -c $CONF -s clean";
+elsif [[ $step =~ "all" ]] && [[ $retain == "no" ]]; then
+  echo "Calling the medium cleanup function \"run_clean\" ..."
+  run_clean  
 fi
 
