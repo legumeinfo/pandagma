@@ -345,10 +345,8 @@ run_consense() {
   cat /dev/null > 07_pan_fasta_cds.fna
   for path in 07_pan_fasta/*; do
     pan_file=`basename $path`
-    cat $path | awk -v panID=$pan_file '
-                      $1~/^>/ {print ">" panID "__" substr($0,2) }
-                      $1!~/^>/ {print $1}
-                    ' >> 07_pan_fasta_cds.fna
+    cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
+                      $1!~/^>/ {print $1} ' >> 07_pan_fasta_cds.fna 
   done
 
   echo "  Pick a representative seq. for each orthogroup - as a sequence with the median length for that OG."
@@ -415,10 +413,8 @@ run_add_extra() {
   cat /dev/null > 13_pan_aug_fasta.fna
   for path in 13_pan_aug_fasta/*; do
     pan_file=`basename $path`
-    cat $path | awk -v panID=$pan_file '
-                      $1~/^>/ {print ">" panID "__" substr($0,2) }
-                      $1!~/^>/ {print $1}
-                    ' >> 13_pan_aug_fasta.fna
+    cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
+                      $1!~/^>/ {print $1} ' >> 13_pan_aug_fasta.fna 
   done
 
   if (( ${#cds_files_extra[@]} > 0 ))
@@ -475,10 +471,8 @@ run_add_extra() {
     cat /dev/null > 19_pan_aug_leftover_merged_cds.fna
     for path in 19_pan_aug_leftover_merged_cds/*; do
       pan_file=`basename $path`
-      cat $path | awk -v panID=$pan_file '
-                        $1~/^>/ {print ">" panID "__" substr($0,2) }
-                        $1!~/^>/ {print $1}
-                      ' >> 19_pan_aug_leftover_merged_cds.fna
+      cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
+                        $1!~/^>/ {print $1} ' >> 19_pan_aug_leftover_merged_cds.fna 
     done
 
   else  
@@ -515,10 +509,8 @@ run_pick_exemplars() {
   cat /dev/null > 19_pan_aug_leftover_merged_prot.faa
   for path in 19_pan_aug_leftover_merged_prot/*; do
     pan_file=`basename $path`
-    cat $path | awk -v panID=$pan_file '
-                      $1~/^>/ {print ">" panID "__" substr($0,2) }
-                      $1!~/^>/ {print $1}
-                    ' >> 19_pan_aug_leftover_merged_prot.faa
+    cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
+                      $1!~/^>/ {print $1} ' >> 19_pan_aug_leftover_merged_prot.faa 
   done
 
   echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
