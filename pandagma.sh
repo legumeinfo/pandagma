@@ -24,12 +24,14 @@ Usage:
                 Must be specified in config file if not specified here.)
            -n (number of processors to use. Default 10)
            -b (bin directory. Default \$PWD/bin)
+           -r (retain. Don't do subcommand \"clean\" after running \"all\".)
            -v (version)
            -h (help)
            -m (more information)
 
 Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
 config file, in the arrays cds_files, annotation_files, and protein_files. See example files.
+Note that the annotation and CDS files need to be listed in CORRESPONDING ORDER in the config.
 
 Subcommands (in order they are usually run):
                 all - All of the steps below, except for clean and ReallyClean
@@ -52,6 +54,7 @@ Subcommands (in order they are usually run):
   Run either of the following subcommands separately if you wish:
               clean - Clean (delete) files in the working directory that are not needed 
                         for later addition of data using add_extra and subsequent run commands.
+                        By default, \"clean\" is run as part of \"all\" unless the -r flag is set.
         ReallyClean - Do complete clean-up of files in the working directory.
                         Use this if you want to start over, OR if you are satisified with the results and
                         don't anticipate adding other annotation sets to this pan-gene set.
@@ -920,8 +923,9 @@ CONFIG="null"
 optarg_work_dir="null"
 BIN_DIR="$PWD/bin"
 step="all"
+retain="no"
 
-while getopts "c:w:s:n:b:vhm" opt
+while getopts "c:w:s:n:b:rvhm" opt
 do
   case $opt in
     c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
@@ -929,6 +933,7 @@ do
     s) step=$OPTARG ;;
     n) NPROC=$OPTARG ;;
     b) BIN_DIR=$OPTARG ;;
+    r) retain="yes" ;;
     v) version ;;
     h) printf >&2 "$HELP_DOC\n" && exit 0 ;;
     m) printf >&2 "$HELP_DOC\n$MORE_INFO\n" && exit 0 ;;
@@ -1013,9 +1018,9 @@ if [ "$missing_req" -gt 0 ]; then
   exit 1; 
 fi
 
-# Run all specified steps (except clean and ReallyClean, which can be run separately).
-commandlist="ingest mmseqs filter dagchainer mcl consense add_extra \
-       pick_exemplars filter_to_core name_pangenes calc_chr_pairs summarize"
+# Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
+commandlist="ingest mmseqs filter dagchainer mcl consense add_extra pick_exemplars \
+             filter_to_core name_pangenes calc_chr_pairs summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do
@@ -1025,5 +1030,14 @@ if [[ $step =~ "all" ]]; then
   done
 else
   run_${step};
+fi
+
+if [[ $step =~ "all" ]] && [[ $retain == "yes" ]]; then
+  echo "Flag -r (retain) was set, so skipping clean-up of the work directory."
+  echo "If you wish to do a cleanupt separately, you can call "
+  echo ".pandagma.sh -c $CONF -s clean";
+else
+  echo "Calling the medium cleanup function \"clean\" ..."
+  clean  
 fi
 

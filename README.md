@@ -62,21 +62,33 @@ Usage:
    or
        nohup ./pandagma.sh -c CONFIG_FILE -s SUBCOMMAND [options] &
 
+  Required:
+           -c (path to the config file)
+
+  Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
+           -w (working directory, for temporary and intermediate files.
+                Must be specified in config file if not specified here.)
+           -n (number of processors to use. Default 10)
+           -b (bin directory. Default \$PWD/bin)
+           -r (retain. Don't do subcommand \"clean\" after running \"all\".)
+           -v (version)
+           -h (help)
+           -m (more information)
+
 Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
-config file, in the arrays fasta_files, annotation_files, and protein_files. See example files.
+config file, in the arrays cds_files, annotation_files, and protein_files. See example files.
+Note that the annotation and CDS files need to be listed in CORRESPONDING ORDER in the config.
 
 FASTA deflines are assumed to be formatted with the ID separated from any additional fields by a space:
 
     >id1 ...optional fields...
 
-GFF annotation files must have corresponding IDs specified in mRNA feature ID attributes.
+BED or GFF annotation files must have corresponding IDs specified in mRNA feature ID attributes.
 CDS coordinates are derived from CDS features:
 
     Chr1	.	mRNA	1111	6666	.	.	.	ID=id1
     Chr1	.	CDS	2222	3333	.	.	.	Parent=id1
     Chr1	.	CDS	4444	5555	.	.	.	Parent=id1
-
-GFF files are not required to be sorted.
 
 BED files are assumed to contain a single feature for each primary coding sequence specified, where the coordinates represent the minimum start (0-based) and maximum end positions of the the primary coding sequence in the reference:
 
@@ -119,6 +131,7 @@ Subcommands (in order they are usually run):
   Run either of the following subcommands separately if you wish:
               clean - Clean (delete) files in the working directory that are not needed
                         for later addition of data using add_extra and subsequent run commands.
+                        By default, \"clean\" is run as part of \"all\" unless the -r flag is set.
         ReallyClean - Do complete clean-up of files in the working directory.
                         Use this if you want to start over, OR if you are satisified with the results and
                         don't anticipate adding other annotation sets to this pan-gene set.
