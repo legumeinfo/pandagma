@@ -69,11 +69,12 @@ Usage:
            -w (working directory, for temporary and intermediate files.
                 Must be specified in config file if not specified here.)
            -n (number of processors to use. Default 10)
-           -b (bin directory. Default \$PWD/bin)
            -r (retain. Don't do subcommand \"clean\" after running \"all\".)
            -v (version)
            -h (help)
            -m (more information)
+
+The bin/ directory should be added to your PATH, to make the scripts there accessible.
 
 Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
 config file, in the arrays cds_files, annotation_files, and protein_files. See example files.
