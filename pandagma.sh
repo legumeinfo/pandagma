@@ -813,13 +813,13 @@ run_summarize() {
                  }' >> ${stats_file}
   fi
 
-  printf "\n== Sequence stats for final pangene CDS files -- core and core-trimmed\n" >> ${stats_file}
-  printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
+  printf "\n== Sequence stats for final pangene CDS files -- pctl${pctl_low} and trimmed\n" >> ${stats_file}
+  printf "  Class:   seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
   annot_name=23_syn_pan_pctl${pctl_low}_posn_cds.fna
-    printf "  pctl${pctl_low}:  " >> ${stats_file}
+    printf "  pctl${pctl_low}: " >> ${stats_file}
     cat_or_zcat "${WORK_DIR}/23_syn_pan_pctl${pctl_low}_posn_cds.fna" | calc_seq_stats >> ${stats_file}
   annot_name=24_syn_pan_pctl${pctl_low}_posn_trim_cds.fna
-    printf "  Trim:  " >> ${stats_file}
+    printf "  Trim:   " >> ${stats_file}
     cat_or_zcat "${WORK_DIR}/24_syn_pan_pctl${pctl_low}_posn_trim_cds.fna" | calc_seq_stats >> ${stats_file}
 
   echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
