@@ -581,8 +581,7 @@ run_name_pangenes() {
 
   echo "  Calculate consensus pan-gene positions"
   cat 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv | 
-    #consen_pangene_order.pl -pre ${consen_prefix}.chr -make_new -v -out consen_${consen_prefix}.tsv
-    consen_pangene_order.pl -pre ${consen_prefix}.chr -make_new -out consen_${consen_prefix}.tsv
+    consen_pangene_order.pl -pre ${consen_prefix}.chr -make_new -v -out consen_${consen_prefix}.tsv
 
   echo "  Reshape defline into a hash, e.g. pan47789	Glycine.pan3.chr01__Glycine.pan3.chr01_000100__45224__45786"
   echo "  Note: these \"positions\" and sizes are artificial, representing only inferred relative positions."
