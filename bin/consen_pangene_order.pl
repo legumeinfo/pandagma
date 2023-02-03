@@ -30,8 +30,9 @@ Usage: cat PANGENE_TABLE | consen_pangene_order.pl [options]
     -help     This message. 
 EOS
 
-my ($outfile, $make_new, $verbose, $help);
+my ($outfile, $make_new, $help);
 my $prefix="chr";
+my $verbose="";
 
 GetOptions (
   "outfile:s" => \$outfile,
