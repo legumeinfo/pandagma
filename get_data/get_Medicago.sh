@@ -92,7 +92,7 @@ echo "  For sativa, split it into five files: scaffolds in one, and .1 .2 .3 .4 
     cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].2/' > medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.cds.bed
     cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].3/' > medsa.XinJiangDaYe_3.gnm1.ann1.RKB9.cds.bed
     cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].4/' > medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.cds.bed
-    rm medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed
+    #rm medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed
 
     cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna | ../bin/fasta_to_table.awk > medsa.XJDY.fna1
     cat medsa.XJDY.fna1 | awk '$2!~/chr/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_sc.gnm1.ann1.RKB9.cds.fna
@@ -100,18 +100,28 @@ echo "  For sativa, split it into five files: scaffolds in one, and .1 .2 .3 .4 
     cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].2/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.cds.fna
     cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].3/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_3.gnm1.ann1.RKB9.cds.fna
     cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].4/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.cds.fna
-    rm medsa.XJDY.fna1
-    rm medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna
+    #rm medsa.XJDY.fna1
+    #rm medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna
+
+    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.protein.faa | perl -pe 's/ \[translate_table: standard\]//' | 
+      ../bin/fasta_to_table.awk > medsa.XJDY.faa1
+    cat medsa.XJDY.faa1 | awk '$2!~/chr/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_sc.gnm1.ann1.RKB9.protein.faa
+    cat medsa.XJDY.faa1 | awk '$2~/chr[1-8].1/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_1.gnm1.ann1.RKB9.protein.faa
+    cat medsa.XJDY.faa1 | awk '$2~/chr[1-8].2/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.protein.faa
+    cat medsa.XJDY.faa1 | awk '$2~/chr[1-8].3/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_3.gnm1.ann1.RKB9.protein.faa
+    cat medsa.XJDY.faa1 | awk '$2~/chr[1-8].4/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.protein.faa
+    #rm medsa.XJDY.faa1
+    #rm medsa.XinJiangDaYe.gnm1.ann1.RKB9.protein.faa
 
 echo "  Then shorten the chr names from e.g. chr8.1 to chr8, because we want them co-equal (chr1.1 can match chr1.4)"
     perl -pi -e 's/(chr\d)\.\d/$1/' medsa.XinJiangDaYe_?.gnm1.ann1.RKB9.cds.bed
 
-echo "  Name the sativa subgenome prefixes in both the chromosome and gene name fields, in bed files"
-  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_1.gnm1/g' medsa.XinJiangDaYe_1.gnm1.ann1.RKB9.cds.bed
-  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_2.gnm1/g' medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.cds.bed
-  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_3.gnm1/g' medsa.XinJiangDaYe_3.gnm1.ann1.RKB9.cds.bed
-  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_4.gnm1/g' medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.cds.bed
-  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_sc.gnm1/g' medsa.XinJiangDaYe_sc.gnm1.ann1.RKB9.cds.bed
+echo "  Name the sativa subgenome prefixes in both the chromosome and gene name fields, in all medsa.XinJiangDaYe files"
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_1.gnm1/g' medsa.XinJiangDaYe_1.gnm1.ann1.*
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_2.gnm1/g' medsa.XinJiangDaYe_2.gnm1.ann1.*
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_3.gnm1/g' medsa.XinJiangDaYe_3.gnm1.ann1.*
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_4.gnm1/g' medsa.XinJiangDaYe_4.gnm1.ann1.*
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_sc.gnm1/g' medsa.XinJiangDaYe_sc.gnm1.ann1.*
 
 echo "  Fix a gene-name discrepancy in medtr.A17_HM341.gnm4.ann2"
     # bed file has gene names like this:    medtr.A17_HM341.gnm4.ann2.mRNA:MtrunA17Chr2g0284411
