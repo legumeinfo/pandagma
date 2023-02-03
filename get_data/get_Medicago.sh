@@ -85,33 +85,33 @@ echo "  Tweak chromosome names for medtr.A17_HM341.gnm4.ann2.G3ZY.cds.bed"
     perl -pi -e 's/MtrunA17Chr0c/scaff_/' medtr.A17_HM341.gnm4.ann2.G3ZY.cds.bed
     perl -pi -e 's/MtrunA17Chr/chr/; s/MtrunA17CP/CP/; s/MtrunA17MT/MT/' medtr.A17_HM341.gnm4.ann2.G3ZY.cds.bed
 
-#echo "  For sativa, split it into five files: scaffolds in one, and .1 .2 .3 .4 chromosomes into four others."
-#    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1!~/chr/' | 
-#      perl -pe 's/(medsa.XinJiangDaYe.gnm1).(\d+)/$1.scaff$2/' > medsa.XinJiangDaYe_sc.gnm1.ann1.RKB9.cds.bed
-#    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].1/' > medsa.XinJiangDaYe_1.gnm1.ann1.RKB9.cds.bed
-#    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].2/' > medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.cds.bed
-#    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].3/' > medsa.XinJiangDaYe_3.gnm1.ann1.RKB9.cds.bed
-#    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].4/' > medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.cds.bed
-#    rm medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed
-#
-#    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna | ../bin/fasta_to_table.awk > medsa.XJDY.fna1
-#    cat medsa.XJDY.fna1 | awk '$2!~/chr/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_sc.gnm1.ann1.RKB9.cds.fna
-#    cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].1/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_1.gnm1.ann1.RKB9.cds.fna
-#    cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].2/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.cds.fna
-#    cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].3/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_3.gnm1.ann1.RKB9.cds.fna
-#    cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].4/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.cds.fna
-#    rm medsa.XJDY.fna1
-#    rm medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna
-#
-#echo "  Then shorten the chr names from e.g. chr8.1 to chr8, because we want them co-equal (chr1.1 can match chr1.4)"
-#    perl -pi -e 's/(chr\d)\.\d/$1/' medsa.XinJiangDaYe_?.gnm1.ann1.RKB9.cds.bed
-#
-#echo "  Make sativa subgenome names unique in chromosome field, in bed files"
-#  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_1.gnm1/' medsa.XinJiangDaYe_1.gnm1.ann1.RKB9.cds.bed
-#  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_2.gnm1/' medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.cds.bed
-#  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_3.gnm1/' medsa.XinJiangDaYe_3.gnm1.ann1.RKB9.cds.bed
-#  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_4.gnm1/' medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.cds.bed
-#  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_sc.gnm1/' medsa.XinJiangDaYe_sc.gnm1.ann1.RKB9.cds.bed
+echo "  For sativa, split it into five files: scaffolds in one, and .1 .2 .3 .4 chromosomes into four others."
+    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1!~/chr/' | 
+      perl -pe 's/(medsa.XinJiangDaYe.gnm1).(\d+)/$1.scaff$2/' > medsa.XinJiangDaYe_sc.gnm1.ann1.RKB9.cds.bed
+    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].1/' > medsa.XinJiangDaYe_1.gnm1.ann1.RKB9.cds.bed
+    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].2/' > medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.cds.bed
+    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].3/' > medsa.XinJiangDaYe_3.gnm1.ann1.RKB9.cds.bed
+    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed | awk '$1~/chr[1-8].4/' > medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.cds.bed
+    rm medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.bed
+
+    cat medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna | ../bin/fasta_to_table.awk > medsa.XJDY.fna1
+    cat medsa.XJDY.fna1 | awk '$2!~/chr/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_sc.gnm1.ann1.RKB9.cds.fna
+    cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].1/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_1.gnm1.ann1.RKB9.cds.fna
+    cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].2/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.cds.fna
+    cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].3/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_3.gnm1.ann1.RKB9.cds.fna
+    cat medsa.XJDY.fna1 | awk '$2~/chr[1-8].4/ {print ">" $1 " " $2 "\n" $3}' > medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.cds.fna
+    rm medsa.XJDY.fna1
+    rm medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna
+
+echo "  Then shorten the chr names from e.g. chr8.1 to chr8, because we want them co-equal (chr1.1 can match chr1.4)"
+    perl -pi -e 's/(chr\d)\.\d/$1/' medsa.XinJiangDaYe_?.gnm1.ann1.RKB9.cds.bed
+
+echo "  Name the sativa subgenome prefixes in both the chromosome and gene name fields, in bed files"
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_1.gnm1/g' medsa.XinJiangDaYe_1.gnm1.ann1.RKB9.cds.bed
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_2.gnm1/g' medsa.XinJiangDaYe_2.gnm1.ann1.RKB9.cds.bed
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_3.gnm1/g' medsa.XinJiangDaYe_3.gnm1.ann1.RKB9.cds.bed
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_4.gnm1/g' medsa.XinJiangDaYe_4.gnm1.ann1.RKB9.cds.bed
+  perl -pi -e 's/XinJiangDaYe.gnm1/XinJiangDaYe_sc.gnm1/g' medsa.XinJiangDaYe_sc.gnm1.ann1.RKB9.cds.bed
 
 echo "  Fix a gene-name discrepancy in medtr.A17_HM341.gnm4.ann2"
     # bed file has gene names like this:    medtr.A17_HM341.gnm4.ann2.mRNA:MtrunA17Chr2g0284411
@@ -121,17 +121,25 @@ echo "  Fix a gene-name discrepancy in medtr.A17_HM341.gnm4.ann2"
       perl -pi -e 's/MtrunA17/MtrunA17_/' medtr.A17_HM341.gnm4.ann2.G3ZY.cds.bed
       perl -pi -e 's/chr0c/MtrunA17_Chr0c/' medtr.A17_HM341.gnm4.ann2.G3ZY.cds.bed
 
+echo "  Fix funky scaffold names in  medtr.A17.gnm5.ann1_6.L2RX.cds.bed"
+      perl -pi -e 's/MtrunA17Chr0c/scaff_/' medtr.A17.gnm5.ann1_6.L2RX.cds.bed
+
 
 echo "  Check chromosome names. For some of these tests, the results should be empty."
       echo "Checking chromosome names:"; echo
 
-      for file in *bed; do echo $file; cat $file | awk '$1!~/contig|scaf|Sc/' | head -4; echo; done
+echo "Check: Which annotations have chromosomes identifiers?"
+      for file in *bed; do echo $file; cat $file | awk 'tolower($1) !~ /contig|scaf|sc/' | head -4; echo; done
 
-      for file in *bed; do echo $file; cat $file | awk '$1!~/contig|scaf|Sc|chr/' | head -4; echo; done
+echo "Check: Which annotations have something weird (not contig|scaf|sc|chr)?"
+      for file in *bed; do echo $file; cat $file | awk 'tolower($1) !~ /contig|scaf|sc|chr/' | head -4; echo; done
 
-      for file in *bed; do echo $file; cat $file | awk '$1~/chr/ {print $1}' | sort | uniq -c ; echo; done
+echo "Check: how many chromosome-based features are in each annotation?"
+      for file in *bed; do echo $file; cat $file | awk 'tolower($1) ~ /chr/ {print $1}' | sort | uniq -c ; echo; done
 
-      for file in *bed; do echo $file; cat $file | awk '$1~/chr/ {print $1}' | sort | uniq | wc -l ; echo; done
+echo "Check: how many CHROMOSOMES are in each annotation?"
+      for file in *bed; do echo $file; cat $file | awk 'tolower($1) ~ /chr/ {print $1}' | sort | uniq | wc -l; echo; done 
+       # awk -v OFS="" '$1~/^med/ {print $1} $1~/[^123456789]/ {print "\t" $1} NF==0 {print "\n"}'
 
 
 echo  "  Re-compress the files"
@@ -139,18 +147,18 @@ echo  "  Re-compress the files"
     done
 
 # Skip chromosome correspondences, because most of the assemblies/annotations have no chromosome assignments.
-#cat<<DATA >expected_chr_matches.tsv
-## Expected chromosome matches for Medicago truncatula and Medicago sativa
-#1 1
-#2 2
-#3 3
-#4 4
-#5 5
-#6 6
-#7 7
-#8 8
-#4 8
-#DATA
+cat<<DATA >expected_chr_matches.tsv
+# Expected chromosome matches for Medicago truncatula and Medicago sativa
+1 1
+2 2
+3 3
+4 4
+5 5
+6 6
+7 7
+8 8
+4 8
+DATA
 
 cd $base_dir
 
