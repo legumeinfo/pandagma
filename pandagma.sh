@@ -581,7 +581,8 @@ run_name_pangenes() {
 
   echo "  Calculate consensus pan-gene positions"
   cat 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv | 
-    consen_pangene_order.pl -pre ${consen_prefix}.chr -make_new -v -out consen_${consen_prefix}.tsv
+    #consen_pangene_order.pl -pre ${consen_prefix}.chr -make_new -v -out consen_${consen_prefix}.tsv
+    consen_pangene_order.pl -pre ${consen_prefix}.chr -make_new -out consen_${consen_prefix}.tsv
 
   echo "  Reshape defline into a hash, e.g. pan47789	Glycine.pan3.chr01__Glycine.pan3.chr01_000100__45224__45786"
   echo "  Note: these \"positions\" and sizes are artificial, representing only inferred relative positions."
@@ -983,14 +984,17 @@ if [ $optarg_work_dir == "null" ] && [ -z ${work_dir+x} ]; then
   echo "either in the config file (work_dir=) or with option -w" >&2
   printf "\nRun \"$scriptname -h\" for help.\n\n" >&2
   exit 1;
-elif [ ! -d $work_dir ]; then
-  echo "Work directory $work_dir was not found. Please specify path in the config file or with option -w." >&2
-  exit 1;
 elif [ $optarg_work_dir != "null" ] && [ -d $optarg_work_dir ]; then
   work_dir=$optarg_work_dir
   export WORK_DIR=${work_dir}
 elif [ $optarg_work_dir == "null" ] && [ -d $work_dir ]; then
   export WORK_DIR=${work_dir}
+elif [ ! -d $work_dir ] && [ ! -d $optarg_work_dir ]; then
+  echo "Neither work directory $work_dir nor $optarg_work_dir was not found. Please specify path in the config file or with option -w." >&2
+  exit 1;
+elif [ ! -d $work_dir ]; then
+  echo "Work directory $work_dir was not found. Please specify path in the config file or with option -w." >&2
+  exit 1;
 else 
   echo "Check odd condition: optarg_work_dir: $optarg_work_dir; work_dir: $work_dir"
   exit 1;
@@ -1015,6 +1019,13 @@ for program in mmseqs dagchainer mcl run_DAG_chainer.pl; do
 done
 if [ "$missing_req" -gt 0 ]; then 
   printf "\nPlease add the programs above to your environment and try again.\n\n"
+  exit 1; 
+fi
+
+# Check that the bin directory is in the PATH
+if ! command pick_family_rep.pl &> /dev/null; then
+  printf "\nPlease add the pandagma bin directory to your PATH and try again. Try the following:\n"
+  printf "\n  PATH=$PWD/bin:\$PATH\n\n"
   exit 1; 
 fi
 
