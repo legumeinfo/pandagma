@@ -28,8 +28,15 @@ Usage:
            -h (help)
            -m (more information)
 
+Environment requirements: The following packages need to be available in your PATH:
+    mmseqs dagchainer mcl
+
+Also, please add the pandagma utility programs in the bin directory adjacent to pandagma.sh, e.g.
+    PATH=$PWD/bin:\$PATH
+
 Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
 config file, in the arrays cds_files, annotation_files, and protein_files. See example files.
+
 Note that the annotation and CDS files need to be listed in CORRESPONDING ORDER in the config.
 
 Subcommands (in order they are usually run):
