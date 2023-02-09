@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-02-03"
+version="2023-02-06"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -184,13 +184,13 @@ run_ingest() {
     # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_core.
     # This is captured from the gene IDs using the annot_str_regex set in the config file.
     cat /dev/null > stats/tmp.gene_count_start
-    cat /dev/null > stats/tmp.fasta_list
     cat /dev/null > stats/tmp.fasta_seqstats
     start_time=`date`
     printf "Run started at: $start_time\n" > stats/tmp.timing
 
   export ANN_REX=${annot_str_regex}
 
+  echo "  Get position information from the main annotation sets."
   cat /dev/null > 02_all_cds.fna # Collect all starting sequences, for later comparisons
   for (( file_num = 0; file_num < ${#cds_files[@]} ; file_num++ )); do
     file_base=$(basename ${cds_files[file_num]%.*})
@@ -201,17 +201,13 @@ run_ingest() {
       hash_into_fasta_id.pl -nodef -fasta "${cds_files[file_num]}" \
                           -hash 01_posn_hsh/$file_base.hsh \
                           -out 02_fasta_nuc/$file_base
-    annot_name=$(head -1 02_fasta_nuc/$file_base | perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | 
-      perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
-    cat_or_zcat "${cds_files[file_num]}" | 
-      awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
-    echo "Main:   $file_base" >> stats/tmp.fasta_list
     # calc basic sequence stats
+    annot_name=$(basename 02_fasta_nuc/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
     printf "  Main:  " >> stats/tmp.fasta_seqstats
     cat_or_zcat "${cds_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
   done
 
-  # Also get position information from the "extra" annotation sets, if any.
+  echo "  Get position information from the extra annotation sets, if any."
   if (( ${#cds_files_extra[@]} > 0 ))
   then
     for (( file_num = 0; file_num < ${#cds_files_extra[@]} ; file_num++ )); do
@@ -223,18 +219,22 @@ run_ingest() {
       hash_into_fasta_id.pl -nodef -fasta "${cds_files_extra[file_num]}" \
                             -hash 01_posn_hsh/$file_base.hsh \
                             -out 02_fasta_nuc/$file_base
-      annot_name=$(head -1 02_fasta_nuc/$file_base | perl -pe 's/>.+__(.+)__\d+__\d+$/$1/' | 
-         perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
-      cat_or_zcat "${cds_files_extra[file_num]}" | 
-        awk -v ANNOT=$annot_name '$1~/^>/ {ct++} END{print ANNOT "\t" ct}' >> stats/tmp.gene_count_start
-      echo "Extra:  $file_base" >> stats/tmp.fasta_list
       # calc basic sequence stats
+      annot_name=$(basename 02_fasta_nuc/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
       printf "  Extra: " >> stats/tmp.fasta_seqstats
       cat_or_zcat "${cds_files_extra[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
     done
   fi
 
-  # Also protein files
+  echo "  Count starting sequences, for later comparisons"
+  for file in 02_fasta_nuc/*.fna; do
+    awk '$0~/UNDEFINED/ {ct++} 
+      END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' $file
+    cat $file | grep '>' | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/.+__$ann_rex\..+/$1/' |
+      grep -v UNDEFINED | sort | uniq -c | awk '{print $2 "\t" $1}' >> stats/tmp.gene_count_start
+  done
+
+  echo "  Also get protein files"
   if (( ${#protein_files[@]} > 0 ))
   then
     for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
@@ -654,7 +654,7 @@ run_calc_chr_pairs() {
   cd "${WORK_DIR}"
   echo "Generate a report of observed chromosome pairs"
 
-  echo "  Identify gene pairs, ussing mmseqs --easy_cluster"
+  echo "  Identify gene pairs, using mmseqs --easy_cluster"
     mmseqs easy-cluster 19_pan_aug_leftover_merged_cds.fna 24_pan_fasta_clust 03_mmseqs_tmp \
     --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
@@ -1018,7 +1018,7 @@ canonicalize_paths
 # Check for existence of third-party executables
 missing_req=0
 for program in mmseqs dagchainer mcl run_DAG_chainer.pl; do
-  if ! command -v $program &> /dev/null; then
+  if ! type $program &> /dev/null; then
     echo "Warning: executable $program is not on your PATH."
     missing_req=$((missing_req+1))
   fi
@@ -1029,7 +1029,7 @@ if [ "$missing_req" -gt 0 ]; then
 fi
 
 # Check that the bin directory is in the PATH
-if ! command pick_family_rep.pl &> /dev/null; then
+if ! type hash_into_fasta_id.pl &> /dev/null; then
   printf "\nPlease add the pandagma bin directory to your PATH and try again. Try the following:\n"
   printf "\n  PATH=$PWD/bin:\$PATH\n\n"
   exit 1; 
