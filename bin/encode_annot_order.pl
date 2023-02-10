@@ -72,9 +72,16 @@ while (<$PAN_FH>) {
   # Encode the panID as a peptide
   my $pepID = $encode_hsh{$panID};
 
-  # Split third field, a annot.chr string, into annot and chr
-  $ann_chr =~ /(\S+)\.(\D+\w+\D+)(\d+)$/;
-  my ($ann, $chr_pre, $chr) = ($1, $2, $3);
+  # From the second feeld (prefixed genes), extract the annot name
+  my $annot_str_regex = "([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+";  # TO DO: Take as parameter
+  #my $annot_str_regex = "(\D+\d+\D+)\d+.+";  # TO DO: Take as parameter
+  my $ANN_REX = $annot_str_regex;
+  my $ann = $gene;
+  $ann =~ s/$ANN_REX/$1/;
+
+  # From the third field, a annot.chr string, extract chr
+  $ann_chr =~ /\S+\.(\D+\w+\D+)(\d+)$/;
+  my ($chr_pre, $chr) = ($1, $2, $3);
   if ( !defined $chr_pre || !defined $chr ){
     if ($verbose){ say "For pan-gene consensus, skipping unrecognized annotation-prefix-chr pattern: $ann_chr" }
     next;
@@ -232,4 +239,4 @@ __END__
 2023
 S. Cannon
 02-09 Initial version, based on consen_pangene_order.pl
-
+02-10 Get full annotation name rather than just gensp.genotype.gnm prefix
