@@ -893,11 +893,12 @@ run_clean() {
   echo "  work_dir: $PWD"
   if [ -d MMTEMP ]; then rm -rf MMTEMP/*; 
   fi
-  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_pan_aug_leftover_merged_prot; do
+  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_pan_aug_leftover_merged_prot \
+    22_syn_pan_aug_extra_pctl${pctl_low}; do
     if [ -d $dir ]; then echo "  Removing directory $dir"; rm -rf $dir &
     fi
   done
-  for file in 10* 11* 14* 20* 21* 22* 23* 24* consen*; do
+  for file in 10* 11* 14* 20* 21* 23* 24* consen*; do
     if [ -f $file ]; then echo "  Removing file $file"; rm $file; 
     fi
   done
