@@ -2,3 +2,5 @@
 /data/
 /data_extra/
 out*
+BAK*
+nohup*
