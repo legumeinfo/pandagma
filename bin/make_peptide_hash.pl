@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+
 use strict;
 use warnings;
 use Getopt::Long;
@@ -29,11 +30,11 @@ die "\n$usage\n" if ( $help );
 
 # Coding groups
 my @AA = split("", "AVLIFWPMSCE");
-my @BB = split("", "SNEDHKRCQTFLV");
+my @BB = split("", "SYEDHKRTFLVG");
 my @CC = split("", "ICLAWEFMSVP");
-my @DD = split("", "EDFLHNRVKCQTS");
+my @DD = split("", "EDFLHYRVKTSG");
 my @EE = split("", "IFEVCWLMPSA");
-my @FF = split("", "QY");
+my @FF = split("", "QN");
 
 my %seen_motif;
 my $code = "";
@@ -58,9 +59,9 @@ foreach my $i (1 .. $number){
 
 sub make_motif {
   my $rA = int(rand(11));
-  my $rB = int(rand(13));
+  my $rB = int(rand(12));
   my $rC = int(rand(11));
-  my $rD = int(rand(13));
+  my $rD = int(rand(12));
   my $rE = int(rand(11));
   #my $rF = int(rand(2));
   my $code = join("", $AA[$rA], $BB[$rB], $CC[$rC], $DD[$rD], $EE[$rE]);
@@ -72,8 +73,8 @@ __END__
 02-09 Initial version.
 
 
-	Coding groups				
-count					
+	Coding groups
+count
 1	Alanine	Ala	A	1	nonpolar
 2	Valine	Val	V	2	nonpolar
 2	Leucine	Leu	L	3	nonpolar
@@ -85,11 +86,11 @@ count
 2	Serine	Ser	S	9	polar
 2	Cysteine	Cys	C	10	polar
 	Glutamic acid	Glu	E	11	acidic
-					
+
 2	Valine	Val	V	1	nonpolar
 2	Leucine	Leu	L	2	nonpolar
 2	Serine	Ser	S	3	polar
-1	Asparagine	Asn	N	4	polar
+1	Tyrosine	Tyr	Y	4	polar, aromatic
 2	Glutamic acid	Glu	E	5	acidic
 1	Aspartic acid	Asp	D	6	acidic
 1	Histidine	His	H	7	basic
@@ -99,11 +100,7 @@ count
 1	Threonine	Thr	T	11	polar
 2	Cysteine	Cys	C	12	polar
 2	Phenylalanine	Phe	F	13	nonpolar, aromatic
-					
+
 1	Glutamine	Gln	Q	1	polar
-1	Tyrosine	Tyr	Y	2	polar, aromatic
-
-
-
-
+1	Asparagine	Asn	N	2	polar
 

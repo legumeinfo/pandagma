@@ -9,7 +9,7 @@ use feature "say";
 my $PROGRAM_NAME = basename($0);
 
 my $usage = <<EOS;
-Given five-column input (pan-IDs, chromosomes, annot.chr#, start, end), 
+Given five-column input (pan-IDs, gene_IDs, annot.chr#, start, end), 
 calculate gene order per annotation, then report
   (1) pan-ID;
   (2) consensus (median) chromosome for each pan-gene; 
