@@ -5,16 +5,16 @@ use warnings;
 use Getopt::Long;
 
 my $usage = <<EOS;
-Generates a list of unique strings consisting of amino acid sequences, e.g. IVWF, PDIS, ...
-The intended purpose is to generate codes that will be interpreted as amino acid
-sequences by alignment programs -- for example, to encode a list of elements as peptide strings.
+Generates a list of unique strings consisting of amino acid sequences, e.g. FDFLS, WLDAV, ...
+The intended purpose is to generate codes that will be interpreted as amino acid sequences by 
+alignment programs -- for example, to encode a list of elements as peptide strings.
 Glutamine and asparagine (Q and N) are not used; they have been reserved to indicate orientation.
 
 Usage: make_peptide_hash.pl [options]
 
   OPTIONS:
     -number    (pos integer; default 100000) Number of unique strings to return.
-    -width     (pos integer; default 4) Number of random AA characters to generate in each peptide.
+    -width     (pos integer; default 5) Number of random AA characters to generate in each peptide.
     -unstable  (boolean; default unset) Generate peptides that are novel between runs. 
                  By default this is false (unset), and the random numbers are generated using the same 
                  random number seed each time, to give random-but-reproducible output.
@@ -24,7 +24,7 @@ EOS
 
 my $number = 100000;
 my $seed = 7;  # Provided to srand unless -unstable is set
-my $width = 4;
+my $width = 5;
 my $unstable;
 my $help;
 
@@ -48,14 +48,22 @@ my @FF = split("", "QN");
 
 my %seen_motif;
 my $code = "";
-my $count = 0;
+my ($count, $tries, $continue) = (0, 0, 1);
 my $prefix="pan";
 
 foreach my $i (1 .. $number){
-  while (1){
+  while ($continue){
+    $tries++;
     $code = make_motif($width);
-    if ($seen_motif{$code}){
-      next;
+    if ( $seen_motif{$code} ){
+      if ( $count <= $number && $tries > 5*$number ){
+        warn "Bailing after $tries tries generated $count results.\n";
+        warn "The value of -n was set too high ($number), given the value of -w ($width)\n";
+        $continue = 0; # Break the while loop
+      }
+      else {
+        next;
+      }
     }
     else {
       $count++;
