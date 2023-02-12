@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-02-06"
+version="2023-02-11"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -52,7 +52,7 @@ Subcommands (in order they are usually run):
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
      pick_exemplars - Pick representative sequence for each pan-gene
-     filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
+   filter_to_pctile - Calculate orthogroup composition and filter fasta files by selected percentiles.
       name_pangenes - Assign pan-gene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
@@ -197,7 +197,7 @@ run_ingest() {
     cat_or_zcat "${cds_files[file_num]}" >> 02_all_cds.fna # Collect original seqs for later comparisons
     echo "  Adding positional information to fasta file $file_base"
     cat_or_zcat "${annotation_files[file_num]}" | 
-      gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
+      gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
       hash_into_fasta_id.pl -nodef -fasta "${cds_files[file_num]}" \
                           -hash 01_posn_hsh/$file_base.hsh \
                           -out 02_fasta_nuc/$file_base
@@ -215,7 +215,7 @@ run_ingest() {
       cat_or_zcat "${cds_files_extra[file_num]}" >> 02_all_cds.fna  # Collect original seqs for later comparisons
       echo "  Adding positional information to extra fasta file $file_base"
       cat_or_zcat "${annotation_files_extra[file_num]}" | 
-        gff_or_bed_to_hash.awk > 01_posn_hsh/$file_base.hsh
+        gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
       hash_into_fasta_id.pl -nodef -fasta "${cds_files_extra[file_num]}" \
                             -hash 01_posn_hsh/$file_base.hsh \
                             -out 02_fasta_nuc/$file_base
@@ -281,7 +281,7 @@ run_filter() {
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
       echo "  $outfilebase"
-      cat ${mmseqs_path} | 
+      cat ${mmseqs_path} | perl -pe 's/__[\+-]$//'
         filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${outfilebase}_matches.tsv &
 
       # allow to execute up to $NPROC in parallel
@@ -292,7 +292,7 @@ run_filter() {
     echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
-      perl -pe 's/__/\t/g' > 04_dag/${outfilebase}_matches.tsv < "${mmseqs_path}"
+      cat ${mmseqs_path} | perl -pe 's/__/\t/g; s/\t[\+-]$//$' > 04_dag/${outfilebase}_matches.tsv 
     done
   fi
 }
@@ -547,7 +547,7 @@ run_pick_exemplars() {
 }
 
 ##########
-run_filter_to_core() {
+run_filter_to_pctile() {
   cd "${WORK_DIR}"
 
   echo "  Calculate matrix of gene counts per orthogroup and annotation set"
@@ -577,6 +577,13 @@ run_filter_to_core() {
 run_name_pangenes() {
   cd "${WORK_DIR}"
 
+  echo "  If code_table/pan_to_peptide.tsv doesn't exist, generate it."
+  mkdir -p code_table
+  if [ ! -f code_table/pan_to_peptide.tsv ]; then
+    echo "   Generating hash file code_table/pan_to_peptide.tsv"
+    make_peptide_hash.pl > code_table/pan_to_peptide.tsv
+  fi
+
   echo "  Reshape from mcl output format, clustered IDs on one line, to a hash format"
   perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 22_syn_pan_aug_extra_pctl${pctl_low}.clust.tsv |
     cat > 22_syn_pan_aug_extra_pctl${pctl_low}.hsh.tsv
@@ -586,67 +593,76 @@ run_name_pangenes() {
     perl -pe 's/__/\t/g; s/ /\t/g' | awk -v OFS="\t" '{print $2, $1, $3, $5, $6}' |
     sort -k1,1 -k2,2 > 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv
 
-  echo "  Calculate consensus pan-gene positions"
-  cat 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv | 
-    consen_pangene_order.pl -pre ${consen_prefix}.chr -make_new -v -out consen_${consen_prefix}.tsv
+  echo "  Encode pan-genes as unique peptide strings, and extract annotation sets with encoded"
+  echo "  IDs ordered along chromosomes, permitting whole-chromosome alignments of gene order."
+  echo "  Calling script encode_annot_order.pl on file 22_syn_pan_aug_extra_pctl${pctl}_posn.hsh.tsv"
+  mkdir -p 23_encoded_chroms
+  encode_annot_order.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl}_posn.hsh.tsv \
+                        -code_table/pan_to_peptide.tsv \
+                        -annot_str_regex ${ANN_REX} \
+                        -outdir 23_encoded_chroms
 
-  echo "  Reshape defline into a hash, e.g. pan47789	Glycine.pan3.chr01__Glycine.pan3.chr01_000100__45224__45786"
-  echo "  Note: these \"positions\" and sizes are artificial, representing only inferred relative positions."
-  cat consen_${consen_prefix}.tsv | 
-    perl -pe 's/^(\S+)\t(\S+)\.(\D+\d+)(_0*)([123456789]\d+)/$1\t$2.$3$4$5\t$5/' | 
-      awk '{print $1 "\t" $2 "_" $1 "__" $3*100 "__" $3*100+1000}' > consen_posn.hsh
+  #echo "  Calculate consensus pan-gene positions"
+  #cat 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv | 
+  #  consen_pangene_order.pl -pre ${consen_prefix}.chr -make_new -v -out consen_${consen_prefix}.tsv
 
-  echo "  Hash position information into fasta file"
-  hash_into_fasta_id.pl -fasta 22_pan_fasta_rep_pctl${pctl_low}_cds.fna -hash consen_posn.hsh |
-    grep -v "HASH UNDEFINED" > 22_pan_fasta_rep_pctl${pctl_low}_posn_cdsTMP.fna
+  #echo "  Reshape defline into a hash, e.g. pan47789	Glycine.pan3.chr01__Glycine.pan3.chr01_000100__45224__45786"
+  #echo "  Note: these \"positions\" and sizes are artificial, representing only inferred relative positions."
+  #cat consen_${consen_prefix}.tsv | 
+  #  perl -pe 's/^(\S+)\t(\S+)\.(\D+\d+)(_0*)([123456789]\d+)/$1\t$2.$3$4$5\t$5/' | 
+  #    awk '{print $1 "\t" $2 "_" $1 "__" $3*100 "__" $3*100+1000}' > consen_posn.hsh
 
-  echo "  Reshape defline, and sort by position"
-  fasta_to_table.awk 22_pan_fasta_rep_pctl${pctl_low}_posn_cdsTMP.fna | sed 's/__/\t/g; s/ /\t/' | 
-    sort | awk '{print ">" $1, $2, $3, $4; print $5}' > 23_syn_pan_pctl${pctl_low}_posn_cds.fna
+  #echo "  Hash position information into fasta file"
+  #hash_into_fasta_id.pl -fasta 22_pan_fasta_rep_pctl${pctl_low}_cds.fna -hash consen_posn.hsh |
+  #  grep -v "HASH UNDEFINED" > 22_pan_fasta_rep_pctl${pctl_low}_posn_cdsTMP.fna
 
-  echo "  Re-cluster, to identify neighboring genes that are highly similar"
-    mmseqs easy-cluster 23_syn_pan_pctl${pctl_low}_posn_cds.fna 24_pan_fasta 03_mmseqs_tmp \
-    --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
+  #echo "  Reshape defline, and sort by position"
+  #fasta_to_table.awk 22_pan_fasta_rep_pctl${pctl_low}_posn_cdsTMP.fna | sed 's/__/\t/g; s/ /\t/' | 
+  #  sort | awk '{print ">" $1, $2, $3, $4; print $5}' > 23_syn_pan_pctl${pctl_low}_posn_cds.fna
 
-  echo "  Parse mmseqs clusters into pairs of genes that are similar and ordinally close"
-  close=10 # genes within a neighborhood of +-close genes among the consensus-orderd genes
-  cat 24_pan_fasta_cluster.tsv | perl -pe 's/\S+\.chr(\d+)_(\d+)/$1\t$2/g' | 
-    awk -v CLOSE=$close -v PRE=$consen_prefix '$1==$3 && sqrt(($2/100-$4/100)^2)<=CLOSE \
-             {print PRE ".chr" $1 "_" $2 "\t" PRE ".chr" $3 "_" $4}' > 24_pan_fasta_cluster.closepairs
+  #echo "  Re-cluster, to identify neighboring genes that are highly similar"
+  #  mmseqs easy-cluster 23_syn_pan_pctl${pctl_low}_posn_cds.fna 24_pan_fasta 03_mmseqs_tmp \
+  #  --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
-  echo "  Cluster the potential near-duplicate neighboring paralogs"
-  mcl  24_pan_fasta_cluster.closepairs --abc -o 24_pan_fasta_cluster.close.clst
+  #echo "  Parse mmseqs clusters into pairs of genes that are similar and ordinally close"
+  #close=10 # genes within a neighborhood of +-close genes among the consensus-orderd genes
+  #cat 24_pan_fasta_cluster.tsv | perl -pe 's/\S+\.chr(\d+)_(\d+)/$1\t$2/g' | 
+  #  awk -v CLOSE=$close -v PRE=$consen_prefix '$1==$3 && sqrt(($2/100-$4/100)^2)<=CLOSE \
+  #           {print PRE ".chr" $1 "_" $2 "\t" PRE ".chr" $3 "_" $4}' > 24_pan_fasta_cluster.closepairs
+
+  #echo "  Cluster the potential near-duplicate neighboring paralogs"
+  #mcl  24_pan_fasta_cluster.closepairs --abc -o 24_pan_fasta_cluster.close.clst
  
-  echo "  Keep the first gene from the cluster and discard the rest."
-  cat 24_pan_fasta_cluster.close.clst | awk '{$1=""}1' | awk '{$1=$1}1' | tr ' ' '\n' | 
-    sort -u > lists/lis.clust_genes_remove
-  get_fasta_subset.pl -in 23_syn_pan_pctl${pctl_low}_posn_cds.fna -xclude -clobber \
-    -lis lists/lis.clust_genes_remove -out 24_syn_pan_pctl${pctl_low}_posn_trim_cds.fna 
+  #echo "  Keep the first gene from the cluster and discard the rest."
+  #cat 24_pan_fasta_cluster.close.clst | awk '{$1=""}1' | awk '{$1=$1}1' | tr ' ' '\n' | 
+  #  sort -u > lists/lis.clust_genes_remove
+  #get_fasta_subset.pl -in 23_syn_pan_pctl${pctl_low}_posn_cds.fna -xclude -clobber \
+  #  -lis lists/lis.clust_genes_remove -out 24_syn_pan_pctl${pctl_low}_posn_trim_cds.fna 
 
-  echo "  Also get all corresponding protein sequences for genes in lists/lis.18_syn_pan_aug_extra.pctl${pctl_low}"
-  cat /dev/null > 20_pan_fasta_prot.faa
-  for filepath in 02_fasta_prot/*.gz; do 
-    zcat $filepath >> 20_pan_fasta_prot.faa
-  done
-  cat 23_syn_pan_pctl${pctl_low}_posn_cds.fna | awk '$1~/^>/ {print $4}' > lists/lis.23_syn_pan_pctl${pctl_low}_posn
-  get_fasta_subset.pl -in 20_pan_fasta_prot.faa -list lists/lis.23_syn_pan_pctl${pctl_low}_posn \
-                      -clobber -out 23_syn_pan_pctl${pctl_low}_posn_proteinTMP.faa
+  #echo "  Also get all corresponding protein sequences for genes in lists/lis.18_syn_pan_aug_extra.pctl${pctl_low}"
+  #cat /dev/null > 20_pan_fasta_prot.faa
+  #for filepath in 02_fasta_prot/*.gz; do 
+  #  zcat $filepath >> 20_pan_fasta_prot.faa
+  #done
+  #cat 23_syn_pan_pctl${pctl_low}_posn_cds.fna | awk '$1~/^>/ {print $4}' > lists/lis.23_syn_pan_pctl${pctl_low}_posn
+  #get_fasta_subset.pl -in 20_pan_fasta_prot.faa -list lists/lis.23_syn_pan_pctl${pctl_low}_posn \
+  #                    -clobber -out 23_syn_pan_pctl${pctl_low}_posn_proteinTMP.faa
 
-  echo "  Get directory of protein multifasta sequences for each pangene, for (separate) protein alignments"
-  mkdir -p 22_syn_pan_aug_extra_pctl${pctl_low}
-  get_fasta_from_family_file.pl 20_pan_fasta_prot.faa \
-    -family_file 22_syn_pan_aug_extra_pctl${pctl_low}.clust.tsv -out_dir 22_syn_pan_aug_extra_pctl${pctl_low}
+  #echo "  Get directory of protein multifasta sequences for each pangene, for (separate) protein alignments"
+  #mkdir -p 22_syn_pan_aug_extra_pctl${pctl_low}
+  #get_fasta_from_family_file.pl 20_pan_fasta_prot.faa \
+  #  -family_file 22_syn_pan_aug_extra_pctl${pctl_low}.clust.tsv -out_dir 22_syn_pan_aug_extra_pctl${pctl_low}
 
-  echo "  Hash pan-ID into protein fasta file"
-  cat 23_syn_pan_pctl${pctl_low}_posn_cds.fna | 
-    awk '$1~/^>/ {print $4 "\t" substr($1, 2) "__" $2 "__" $3}' > lists/23_syn_pan_pctl${pctl_low}_posn.hsh
-  hash_into_fasta_id.pl -hash lists/23_syn_pan_pctl${pctl_low}_posn.hsh -swap_IDs -nodef \
-    -fasta 23_syn_pan_pctl${pctl_low}_posn_proteinTMP.faa |
-    perl -pe 's/__/ /g' > 23_syn_pan_pctl${pctl_low}_posn_prot.faa
-  
-  # also get trimmed version of protein file
-  get_fasta_subset.pl -in 23_syn_pan_pctl${pctl_low}_posn_prot.faa -xclude -clobber \
-    -lis lists/lis.clust_genes_remove -out 24_syn_pan_pctl${pctl_low}_posn_trim_prot.faa 
+  #echo "  Hash pan-ID into protein fasta file"
+  #cat 23_syn_pan_pctl${pctl_low}_posn_cds.fna | 
+  #  awk '$1~/^>/ {print $4 "\t" substr($1, 2) "__" $2 "__" $3}' > lists/23_syn_pan_pctl${pctl_low}_posn.hsh
+  #hash_into_fasta_id.pl -hash lists/23_syn_pan_pctl${pctl_low}_posn.hsh -swap_IDs -nodef \
+  #  -fasta 23_syn_pan_pctl${pctl_low}_posn_proteinTMP.faa |
+  #  perl -pe 's/__/ /g' > 23_syn_pan_pctl${pctl_low}_posn_prot.faa
+  #
+  ## also get trimmed version of protein file
+  #get_fasta_subset.pl -in 23_syn_pan_pctl${pctl_low}_posn_prot.faa -xclude -clobber \
+  #  -lis lists/lis.clust_genes_remove -out 24_syn_pan_pctl${pctl_low}_posn_trim_prot.faa 
 }
 
 ##########
@@ -1038,7 +1054,7 @@ fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
 commandlist="ingest mmseqs filter dagchainer mcl consense add_extra pick_exemplars \
-             filter_to_core name_pangenes calc_chr_pairs summarize"
+             filter_to_pctile name_pangenes calc_chr_pairs summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do
