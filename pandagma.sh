@@ -595,17 +595,35 @@ run_name_pangenes() {
 
   echo "  Encode pan-genes as unique peptide strings, and extract annotation sets with encoded"
   echo "  IDs ordered along chromosomes, permitting whole-chromosome alignments of gene order."
-  echo "  Calling script encode_annot_order.pl on file 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv"
+  echo "  Calling script annot_order_encode.pl on file 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv"
   mkdir -p 23_encoded_chroms
-  encode_annot_order.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
-                        -code_table code_table/pan_to_peptide.tsv \
-                        -annot_regex ${ANN_REX} \
-                        -outdir 23_encoded_chroms
+  annot_order_encode.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
+                        -code_table code_table/pan_to_peptide.tsv -utilized code_table/utilized.tsv \
+                        -annot_regex ${ANN_REX} -outdir 23_encoded_chroms 
 
   echo "  Align chromosome sequences with peptide-encoded-gene-orders."
   mkdir -p 23_encoded_chroms_aligned
   do_align.sh 23_encoded_chroms 23_encoded_chroms_aligned $NPROC
 
+  echo "  Filter chromosome alignments to consensus motifs"
+  mkdir -p 23_encoded_chroms_filt1
+  for filepath in 23_encoded_chroms_aligned/*; do 
+    base=`basename $filepath`
+    cons -sequence $filepath -outseq 23_encoded_chroms_filt1/$base -name $base &
+  done
+
+  echo "  Decode motifs to recover pangene IDs in order along each chromosome."
+  cat /dev/null > consen_gene_order.tsv
+  cat /dev/null > consen_motif_error.txt
+  for filepath in 23_encoded_chroms_filt1/*; do
+    chr=`basename $filepath`
+    annot_order_decode.pl -align $filepath -code code_table/utilized.tsv \
+      -v 2&>>consen_motif_error.txt 1>>consen_gene_order.tsv
+  done
+
+  echo "  Find panIDs that weren't placed"
+  comm -23 <( cut -f1 code_table/utilized.tsv ) <( cut -f1 consen_gene_order.tsv | sort -u ) |
+    awk -v OFS="\t" '{print $1, "unplaced", "000000", "?"}' > consen_gene_unplaced.tsv
 
   #echo "  Calculate consensus pan-gene positions"
   #cat 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv | 

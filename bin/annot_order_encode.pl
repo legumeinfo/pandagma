@@ -32,12 +32,12 @@ Usage: encode_annot_order.pl -pan_table PANGENE_TABLE -code_table PAN_TO_PEPTIDE
                       for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1 (default)
                     or \"(\\D+\\d+\\D+)\\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
     -outdir   Directory where files will be written [default "."]
+    -utilized Filename for recording which pepIDs and panIDs were utilized.
     -verbose  For some debugging info, to STDOUT. Use -v -v to give more output.
     -help     This message. 
 EOS
 
-my ($pan_table, $code_table);
-my $help;
+my ($pan_table, $code_table, $utilized, $help);
 my $outdir=".";
 my $verbose=0;
 my $annot_regex = "([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+"; 
@@ -46,6 +46,7 @@ GetOptions (
   "pan_table=s" =>   \$pan_table,
   "code_table=s" =>  \$code_table,
   "outdir:s" =>      \$outdir,
+  "utilized:s" =>    \$utilized,
   "annot_regex:s" => \$annot_regex,
   "verbose+" =>      \$verbose,
   "help" =>          \$help,
@@ -94,6 +95,7 @@ while (<$PAN_FH>) {
 # Do a second-pass reading of the pan_table and read pan_table into an array.
 open ($PAN_FH, "<", $pan_table) or die "Can't open in pan_table: $pan_table\n";
 my %HoH_pepID_chr;
+my %used_pepIDs;
 my @pangene_table;
 while (<$PAN_FH>) {
   chomp;
@@ -103,6 +105,7 @@ while (<$PAN_FH>) {
 
   # Encode the panID as a peptide
   my $pepID = $encode_hsh{$panID};
+  $used_pepIDs{$panID} = $pepID;
 
   # From the second field (prefixed genes), extract the annot name
   my $ANN_REX = $annot_regex;
@@ -260,6 +263,13 @@ foreach my $chr_str (sort keys %seen_chr){
     my @chunks = ( $encoded_order =~ m/.{100}/g );
     say $OUTFH ">$ann ";
     say $OUTFH join ("\n", @chunks);
+  }
+}
+
+if ($utilized){ # Print file that records which pepIDs and panIDs were used
+  open my $USEDFH, ">", $utilized or die "Couldn't open out utilized file, $utilized\n";
+  foreach my $panID (sort keys %used_pepIDs){
+    say $USEDFH "$panID\t$used_pepIDs{$panID}";
   }
 }
 
