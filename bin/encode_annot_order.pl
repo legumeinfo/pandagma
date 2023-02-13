@@ -27,11 +27,10 @@ Usage: encode_annot_order.pl -pan_table PANGENE_TABLE -code_table PAN_TO_PEPTIDE
     -code_table PAN_TO_PEPTIDE_FILE, e.g. pan_to_peptide.tsv
 
   OPTIONS:
-    -annot_regex 
-    -annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g.
-         \"([^.]+\\.[^.]+\\.[^.]+\\.[^.]+)\\..+\"
-           for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1 (default)
-         or \"(\\D+\\d+\\D+)\\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
+    -annot_regex  Regular expression for capturing annotation name from gene ID, e.g.
+                    \"([^.]+\\.[^.]+\\.[^.]+\\.[^.]+)\\..+\"
+                      for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1 (default)
+                    or \"(\\D+\\d+\\D+)\\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
     -outdir   Directory where files will be written [default "."]
     -verbose  For some debugging info, to STDOUT. Use -v -v to give more output.
     -help     This message. 
@@ -224,7 +223,6 @@ foreach my $row ( @pangene_table_ordered ) {
     warn "unexpected orientation for $pepID: [$orient]";
     $pepID .= "Q";
   }
-  $pepID = "$pepID" . "Q"; # TO DO: Register order with this letter, using Q or N
   #say join("\t", $chr_str, $ann, $order, $start, $end, $pepID);
   if (! $seen_chr{$chr_str}){
     $seen_chr{$chr_str}++;

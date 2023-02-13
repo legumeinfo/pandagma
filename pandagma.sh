@@ -281,7 +281,7 @@ run_filter() {
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
       echo "  $outfilebase"
-      cat ${mmseqs_path} | perl -pe 's/__[\+-]$//'
+      cat ${mmseqs_path} | perl -pe 's/__[\+-]\t/\t/; s/__[+-]$//' |
         filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${outfilebase}_matches.tsv &
 
       # allow to execute up to $NPROC in parallel
@@ -590,17 +590,22 @@ run_name_pangenes() {
 
   echo "  Add positional information to the hash output."
   join -a 1 -1 2 -2 1 <(sort -k2,2 22_syn_pan_aug_extra_pctl${pctl_low}.hsh.tsv) <(cat 01_posn_hsh/*hsh | sort -k1,1) | 
-    perl -pe 's/__/\t/g; s/ /\t/g' | awk -v OFS="\t" '{print $2, $1, $3, $5, $6}' |
+    perl -pe 's/__/\t/g; s/ /\t/g' | awk -v OFS="\t" '{print $2, $1, $3, $5, $6, $7}' |
     sort -k1,1 -k2,2 > 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv
 
   echo "  Encode pan-genes as unique peptide strings, and extract annotation sets with encoded"
   echo "  IDs ordered along chromosomes, permitting whole-chromosome alignments of gene order."
-  echo "  Calling script encode_annot_order.pl on file 22_syn_pan_aug_extra_pctl${pctl}_posn.hsh.tsv"
+  echo "  Calling script encode_annot_order.pl on file 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv"
   mkdir -p 23_encoded_chroms
-  encode_annot_order.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl}_posn.hsh.tsv \
-                        -code_table/pan_to_peptide.tsv \
-                        -annot_str_regex ${ANN_REX} \
+  encode_annot_order.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
+                        -code_table code_table/pan_to_peptide.tsv \
+                        -annot_regex ${ANN_REX} \
                         -outdir 23_encoded_chroms
+
+  echo "  Align chromosome sequences with peptide-encoded-gene-orders."
+  mkdir -p 23_encoded_chroms_aligned
+  do_align.sh 23_encoded_chroms 23_encoded_chroms_aligned $NPROC
+
 
   #echo "  Calculate consensus pan-gene positions"
   #cat 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv | 
