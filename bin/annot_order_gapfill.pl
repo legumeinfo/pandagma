@@ -11,7 +11,7 @@ Given alignment of gene order with pangene IDs determined by alignment of gene o
 (by annot_order_encode.pl and annot_order_decode.pl), place leftover pangenes
 relative to the pangenes that have established, alignment-based placements.
 
-Usage: annot_order_backfill.pl -consen_table CONSEN_TABLE  -unplaced UNPLACED_LIST \
+Usage: annot_order_gapfill.pl -consen_table CONSEN_TABLE  -unplaced UNPLACED_LIST \
                                -pan_table PANGENE_TABLE
                                
   CONSEN_TABLE, e.g. consen_gene_order.tsv, has four columns:
@@ -137,7 +137,7 @@ while (<$PAN_FH>) {
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
   if ( $chr_pre =~ /chloro|chl|CP|mito|MT|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
-    if ($verbose){ say "For pan-gene consensus, skipping non-chromosome gene [$chr_pre $chr]\t$gene" }
+    if ($verbose>1){ say "For pan-gene consensus, skipping non-chromosome gene [$chr_pre $chr]\t$gene" }
   }
   else {
     $chr_gene_count++;
@@ -161,7 +161,7 @@ my @sorted_table = sort {
      $a->[2] cmp $b->[2] || $a->[3] <=> $b->[3] || $a->[4] <=> $b->[4] 
    } @pangene_table; 
 
-# Calculate gene order per annot-and-chromosome
+say "Calculating gene order per annot-and-chromosome";
 my ($prAnn, $prChr) = ("", "");
 my $ord=0;
 my @elts_with_order;
@@ -193,9 +193,8 @@ foreach my $row ( @sorted_table ) {
   }
 }
 my $num_chrs = keys %seen_chr;
-#say "CHROMOSOMES: $num_chrs";
 
-# Find the most frequent chromosome for each pan-gene set
+say "Finding the most frequent chromosome for each pan-gene set";
 my %top_chr;
 my %chr_ct_top_chr;
 if ($verbose>1) {print "#pangeneID\tchr:count ...\n"}
@@ -235,7 +234,9 @@ say "Scoring each gene relative to unplaced target genes";
 foreach my $target_panID (keys %unplaced){
   $count++;
   my $main_chr = $top_chr{$target_panID};
-  say "$count\tDominant chr of $target_panID is $main_chr";
+  if ($verbose){
+    say "$count\tDominant chr of $target_panID is $main_chr";
+  }
   foreach my $ann (keys %annots){
     if ( defined $pangene_elts_per_ann{$ann}{$target_panID}[2] ){
       my $target_panID_chr = $pangene_elts_per_ann{$ann}{$target_panID}[2];
@@ -268,7 +269,7 @@ foreach my $target_panID (keys %unplaced){
 $count = 0;
 foreach my $target_panID (keys %unplaced){
   $count++;
-  say "$count\t$target_panID";
+  if ($verbose>1){ say "$count\t$target_panID"; }
   my $main_chr = $top_chr{$target_panID};
   my ($before_ID, $after_ID);
   my @fore_aft_score;
@@ -292,11 +293,13 @@ foreach my $target_panID (keys %unplaced){
         my $AFT_POS = ${$consen_table{$main_chr}{$AFT_ID}}[2];
         my $here_orient;
         $orient_panID{$target_panID} < 0 ? $here_orient = "-" : $here_orient = "+";
-        my $new_pos = int(($AFT_POS + $FORE_POS)/2);
-
-        say "FORE: ", join("\t", @{$consen_table{$main_chr}{$FORE_ID}}, $fore_aft_score[$idx-1]);
-        say "HERE: ", join("\t", $target_panID, $main_chr, ($AFT_POS + $FORE_POS)/2, $here_orient, 0);
-        say "AFT:  ", join("\t", @{$consen_table{$main_chr}{$AFT_ID}}, $fore_aft_score[$idx]);
+        my $new_pos = ($AFT_POS + $FORE_POS)/2;
+        
+        if ($verbose>1){
+          say "FORE: ", join("\t", @{$consen_table{$main_chr}{$FORE_ID}}, $fore_aft_score[$idx-1]);
+          say "HERE: ", join("\t", $target_panID, $main_chr, ($AFT_POS + $FORE_POS)/2, $here_orient, 0);
+          say "AFT:  ", join("\t", @{$consen_table{$main_chr}{$AFT_ID}}, $fore_aft_score[$idx]);
+        }
         $consen_table{$main_chr}{$target_panID} = [ $target_panID, $main_chr, $new_pos, $here_orient ];
         my $merged_key = join("__", $target_panID, $main_chr, $new_pos, $here_orient );
         $consen_table_entire{$merged_key}++;
@@ -305,22 +308,54 @@ foreach my $target_panID (keys %unplaced){
       $idx++;
     }
   }
-  say "";
   #say Dumper(%consen_table);
 }
 
 # Final traversal of %consen_table to print the results - now with added elements from %unplaced.
+# First put it into an array of arrays, before sorting.
+# Renumber the panIDs, since the initial numbers may not have sufficient space to permit
+# addition of unplaced genes within the available ordered integers, given the placement scheme.
+my @consen_table_AoA;
+my $chr_count = keys %chr_hsh;
 my $OUT_FH;
 if ($outfile){
   open ($OUT_FH, ">", $outfile) or die "Can't open outfile: $outfile\n";
 }
 for my $record (keys %consen_table_entire){
   my @parts = split(/__/, $record);
+  my ($panID, $chr, $order, $orient) = @parts;
+  my $printchr;
+  if ($chr_count <= 9){ # don't zero-pad the chromosome number
+    $printchr = sprintf("chr%d", $chr);
+  }
+  else { # pad chromosome number for two digits
+    $printchr = sprintf("chr%02d", $chr);
+  }
+  my @new_record = ($panID, $printchr, $order, $orient);
+  push @consen_table_AoA, \@new_record;
+}
+my @sorted_consen_table_AoA = sort {
+  $a->[1] cmp $b->[1] ||   # chromosome string
+  $a->[2] <=> $b->[2]      # position
+} @consen_table_AoA;
+
+my $new_ordinals = 0;
+%seen_chr = ();
+for my $row (@sorted_consen_table_AoA){
+  my ($panID, $chr, $orig_order, $orient) = @$row;
+  if ($seen_chr{$chr}){
+    $new_ordinals += 100;
+  }
+  else { # not seen_chr
+    $seen_chr{$chr}++;
+    $new_ordinals = 100;
+  }
+  
   if ($outfile){
-    say $OUT_FH join("\t", @parts);
+    say $OUT_FH join ("\t", $panID, $chr, $new_ordinals, $orient, $orig_order);
   }
   else {
-    say join("\t", @parts);
+    say join ("\t", $panID, $chr, $new_ordinals, $orient, $orig_order);
   }
 }
 
