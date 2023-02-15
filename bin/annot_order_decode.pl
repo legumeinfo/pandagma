@@ -9,7 +9,7 @@ my $usage = <<EOS;
 Given alignment of gene order with pangene IDs encoded as peptide strings,
 decode these back into pangene IDs.
 
-Usage: decode_annot_order.pl -alignment ALIGN_FILE -code_table PAN_TO_PEPTIDE_FILE  [options]
+Usage: annot_order_decode.pl -alignment ALIGN_FILE -code_table PAN_TO_PEPTIDE_FILE  [options]
    ALIGN_FILE is a fasta file -- either a single sequence (a consensus from an alignment), 
    or a multifasta alignment file; in either case, with pseudo-peptide sequence
    corresponding with the PAN_TO_PEPTIDE_FILE hash table.
@@ -23,7 +23,6 @@ Usage: decode_annot_order.pl -alignment ALIGN_FILE -code_table PAN_TO_PEPTIDE_FI
     -code_table (filename) PAN_TO_PEPTIDE_FILE, e.g. pan_to_peptide.tsv or utilized.tsv
 
   OPTIONS:
-    -outdir    (filename) Specify directory where files will be written [default "."]
     -motif_len (integer; default 5) Length of expected motif blocks, not counting Q/N separator
     -verbose   (boolean) For some debugging info, to STDOUT. Use -v -v to give more output.
     -help      (boolean) This message. 
@@ -31,14 +30,12 @@ EOS
 
 my ($align_file, $code_table);
 my $help;
-my $outdir=".";
 my $motif_len=5;
 my $verbose=0;
 
 GetOptions (
   "align_file=s" => \$align_file,
   "code_table=s" => \$code_table,
-  "outdir:s" =>     \$outdir,
   "motif_len:i" =>  \$motif_len,
   "verbose+" =>     \$verbose,
   "help" =>         \$help,

@@ -2,11 +2,9 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use List::Util qw(sum);
 use File::Basename;
 use Data::Dumper;
 use feature "say";
-my $PROGRAM_NAME = basename($0);
 
 my $usage = <<EOS;
 Given six-column input (pan-IDs, gene_IDs, annot.chr#, start, end, orientation), 
@@ -14,7 +12,7 @@ Produce chromosome multifasta files, with a representation of gene order per ann
 Gene order is coded as a set of unique peptide strings that can be aligned using a 
 standard protein multiple alignment program.
 
-Usage: encode_annot_order.pl -pan_table PANGENE_TABLE -code_table PAN_TO_PEPTIDE_FILE  [options]
+Usage: annot_order_encode.pl -pan_table PANGENE_TABLE -code_table PAN_TO_PEPTIDE_FILE  [options]
    PANGENE_TABLE input has six columns:
      panID  geneID  annot.chr  start  end  orientation
 
@@ -146,10 +144,6 @@ my @sorted_table = sort {
      $a->[2] cmp $b->[2] || $a->[3] <=> $b->[3] || $a->[4] <=> $b->[4] 
    } @pangene_table; 
 
-# Get counts of genes per annot & chr
-# TO DO: Derive counts from slice of pangene_table
-#my @ann_chr = @sorted_table[2,3];
-
 # Calculate gene order per annot-and-chromosome
 my ($prAnn, $prChr) = ("", "");
 my $ord=0;
@@ -277,24 +271,6 @@ if ($utilized){ # Print file that records which pepIDs and panIDs were used
 #say "";
 #say Dumper(\%encoded_order_seq);
 
-##################################################
-# SUBRUTINES
-
-# Return median value for an array of numbers
-# See http://stackoverflow.com/questions/5119034/using-perl-to-find-median-mode-standard-deviation
-sub calc_median {
-  my $value_ref = shift;
-  my @values = @$value_ref;
-  my $median;
-  my $mid = int ((scalar @values)/2);
-  my @sorted_values = sort {$a <=> $b} @values;
-  if (@values % 2) {
-    $median = $sorted_values[ $mid ];
-  } else {
-    $median = ($sorted_values[$mid-1] + $sorted_values[$mid])/2;
-  } 
-  return $median;
-}
 
 __END__
 2023
@@ -302,4 +278,4 @@ S. Cannon
 02-09 Initial version, based on consen_pangene_order.pl
 02-10 Get full annotation name rather than just gensp.genotype.gnm prefix
 02-11 Handle gene order. Do more filtering against scaffolds.
-
+02-13 Remove unused subroutine.
