@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-02-11"
+version="2023-02-15"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -625,7 +625,7 @@ run_name_pangenes() {
 
   echo "  Fill gaps in the alignment-based pangene ordering. This step can take half an hour or so."
   annot_order_gapfill.pl -verbose -consen consen_gene_order.tsv -unplaced consen_pan_unplaced.txt \
-    -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv -out consen_gene_order_gapfilled.tsv -v
+    -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv -out consen_gene_order_gapfilled.tsv 
 
   echo "  Reshape defline into a hash, e.g. pan20175 Phaseolus.pan2.chr11_222300_pan20175 222300 223300 -"
   echo "  Note: these \"positions\" and sizes are artificial, representing only inferred relative positions."
@@ -641,7 +641,7 @@ run_name_pangenes() {
 
   echo "  Reshape defline, and sort by position (CDS)"
   fasta_to_table.awk 22_pan_fasta_rep_pctl${pctl_low}_posn_cdsTMP.fna | sed 's/__/\t/g; s/ /\t/' | 
-    sort | awk '{print ">" $1, $2, $3, $4; print $5}' > 23_syn_pan_pctl${pctl_low}_posn_cds.fna
+    sort | awk '{print ">" $1, $2, $3, $4, $5; print $6}' > 23_syn_pan_pctl${pctl_low}_posn_cds.fna
 
   echo "  Also get corresponding protein sequences for genes in lists/lis.18_syn_pan_aug_extra.pctl${pctl_low}"
   if [ ! -f 20_pan_fasta_prot.faa ]; then
@@ -649,7 +649,8 @@ run_name_pangenes() {
       zcat $filepath >> 20_pan_fasta_prot.faa
     done
   fi
-  cat 23_syn_pan_pctl${pctl_low}_posn_cds.fna | awk '$1~/^>/ {print $4}' > lists/lis.23_syn_pan_pctl${pctl_low}_posn
+
+  cat 23_syn_pan_pctl${pctl_low}_posn_cds.fna | awk '$1~/^>/ {print $5}' > lists/lis.23_syn_pan_pctl${pctl_low}_posn
   get_fasta_subset.pl -in 20_pan_fasta_prot.faa -list lists/lis.23_syn_pan_pctl${pctl_low}_posn \
                       -clobber -out 23_syn_pan_pctl${pctl_low}_posn_proteinTMP.faa
 
@@ -659,6 +660,8 @@ run_name_pangenes() {
     -family_file 22_syn_pan_aug_extra_pctl${pctl_low}.clust.tsv -out_dir 22_syn_pan_aug_extra_pctl${pctl_low}
 
   echo "  Hash pan-ID into protein fasta file"
+  cat 23_syn_pan_pctl${pctl_low}_posn_cds.fna |
+    awk '$1~/^>/ {print $5 "\t" substr($1,2)}' > lists/23_syn_pan_pctl${pctl_low}_posn.hsh
   hash_into_fasta_id.pl -hash lists/23_syn_pan_pctl${pctl_low}_posn.hsh -swap_IDs -nodef \
     -fasta 23_syn_pan_pctl${pctl_low}_posn_proteinTMP.faa |
     perl -pe 's/__/ /g' > 23_syn_pan_pctl${pctl_low}_posn_prot.faa
@@ -728,7 +731,6 @@ run_summarize() {
               22_pan_fasta_rep_pctl${pctl_hi}_cds.fna \
               22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
               23_syn_pan_pctl${pctl_low}_posn_cds.fna 23_syn_pan_pctl${pctl_low}_posn_prot.faa \
-              24_syn_pan_pctl${pctl_low}_posn_trim_cds.fna 24_syn_pan_pctl${pctl_low}_posn_trim_prot.faa \
               observed_chr_pairs.tsv ; do
     if [ -f ${WORK_DIR}/$file ]; then
       cp ${WORK_DIR}/$file ${full_out_dir}/
@@ -840,9 +842,6 @@ run_summarize() {
   annot_name=23_syn_pan_pctl${pctl_low}_posn_cds.fna
     printf "  pctl${pctl_low}: " >> ${stats_file}
     cat_or_zcat "${WORK_DIR}/23_syn_pan_pctl${pctl_low}_posn_cds.fna" | calc_seq_stats >> ${stats_file}
-  annot_name=24_syn_pan_pctl${pctl_low}_posn_trim_cds.fna
-    printf "  Trim:   " >> ${stats_file}
-    cat_or_zcat "${WORK_DIR}/24_syn_pan_pctl${pctl_low}_posn_trim_cds.fna" | calc_seq_stats >> ${stats_file}
 
   echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
   #   tmp.gene_count_start was generated during run_ingest
