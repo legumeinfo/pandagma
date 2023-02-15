@@ -9,9 +9,8 @@ NPROC=$3
 
 for filepath in $INDIR/*; do
   file=`basename $filepath`;
-  #muscle -align $filepath -output $OUTDIR/$file &
-  #muscle -super5 $filepath -output $OUTDIR/$file &
-  famsa -t $NPROC -v $INDIR/$file $OUTDIR/$file &
+  echo "  Computing alignment, using program famsa, for file $file"
+  famsa -t $NPROC $INDIR/$file $OUTDIR/$file &
 
   # allow to execute up to $NPROC in parallel
   if [[ $(jobs -r -p | wc -l) -ge $NPROC ]]; then
