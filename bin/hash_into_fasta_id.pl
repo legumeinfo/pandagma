@@ -92,7 +92,7 @@ while ( <$FASTA_FH> ){
     $display_id = $1;
     $desc = $2;
     $seq = "";
-    #print "1:[$display_id] {$desc}\n";
+    #warn "1:[$display_id] {$desc}\n";
 
     # strip off splice variant
     $display_id =~ m/(.+)($STR_RX)$/;
@@ -101,7 +101,7 @@ while ( <$FASTA_FH> ){
       $suffix =~ s/$STR_RX//; 
       $suffix =~ s/-/./; 
     }
-    # print "[$base_id] [$suffix]\n";
+    #warn "[$base_id] [$suffix]\n";
     
     $hash{$base_id} = "$base_id HASH UNDEFINED" unless defined ($hash{$base_id});
     if ($swap_IDs){
@@ -121,10 +121,10 @@ while ( <$FASTA_FH> ){
       }
     }
   }
-  elsif ($line =~ /^>(\S+)\s*$/){
+  elsif ($line =~ /^>(\S+)$/ || $line =~ /^>(\S+)\s+$/){
     $display_id = $1;
     $seq = "";
-    #print "2:[$display_id]\n";
+    #warn "2:[$display_id]\n";
 
     # strip off splice variant
     $display_id =~ m/(.+)($STR_RX)$/;
@@ -133,10 +133,25 @@ while ( <$FASTA_FH> ){
       $suffix =~ s/$STR_RX//; 
       $suffix =~ s/-/./; 
     }
-    # print "[$base_id] [$suffix]\n";
+    #warn "[$base_id] [$suffix]\n";
     
     $hash{$base_id} = "$base_id HASH UNDEFINED" unless defined ($hash{$base_id});
-    print $OUT_FH ">$hash{$base_id}$suffix\n";
+    if ($swap_IDs){
+      if ($nodef){ # DON'T print the defline description
+        print $OUT_FH ">$hash{$base_id}$suffix $base_id$suffix\n";
+      }
+      else { # DO print the defline description
+        print $OUT_FH ">$hash{$base_id}$suffix $base_id$suffix $desc\n";
+      }
+    }
+    else { # not $swap_IDs
+      if ($nodef){ # DON'T print the defline description
+        print $OUT_FH ">$hash{$base_id}$suffix\n";
+      }
+      else { # DO print the defline description
+        print $OUT_FH ">$hash{$base_id}$suffix $desc\n";
+      }
+    }
   }
   elsif ($line !~ /^>/){
     $seq .= $line;
@@ -162,3 +177,4 @@ Versions
 2022-11-07 Switch to zcat from gzcat. Handle deflines containing spaces or tabs.
 2022-11-27 Fix bug in "-strip_regex" code
 2022-12-26 Add option -swap_IDs to print new ID and old ID
+2023-02-16 Add option -swap_IDs to print new ID and old ID ... also in the case where defline has no description.
