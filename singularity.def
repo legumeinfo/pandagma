@@ -11,7 +11,6 @@ Stage: dagchainer
     make PREFIX=/usr/local/dagchainer
     rm -rf dagchainer-${DAGCHAINER_VERSION}
 
-
 Bootstrap: docker
 From: debian:bullseye-slim
 
@@ -23,7 +22,7 @@ From: debian:bullseye-slim
 
 %post
     apt update
-    apt install -y --no-install-recommends ca-certificates curl libbio-perl-perl mcl mmseqs2 
+    apt install -y --no-install-recommends ca-certificates curl libbio-perl-perl mcl mmseqs2 emboss
     rm -rf /var/lib/apt/lists/*
 
     # Build from main branch

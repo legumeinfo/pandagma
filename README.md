@@ -14,7 +14,7 @@ The workflow is essentially as follows:
 * Add back the genes that were excluded to this point 
 * Add "extra" annotation sets by homology 
 * Identify a representative sequence for each pan-gene
-* Calculate consensus order of the pan-genes
+* Calculate consensus order of the pan-genes, based on whole-chromosome multiple alignments of ordered panIDs
 * Calculate and report statistics
 
 ## Installation methods <a name="installation"></a>
@@ -37,7 +37,7 @@ To run pandamga using singularity, use `singularity exec --cleanenv pandagma.sif
 ### Installation method 2: manual installation of scripts and dependencies
 
 These dependencies are required: 
-```  bioperl, mmseqs, dagchainer, and mcl. ```
+```  bioperl, mmseqs, dagchainer, mcl, EMBOSS, famsa ```
 These need to be installed and available in the script's environment.
 
 Once those are available on your PATH, the program can be called directly with its options.
@@ -51,6 +51,8 @@ For example, using conda:
   conda install -n pandagma -c conda-forge -c bioconda dagchainer
   conda install -n pandagma -c conda-forge -c bioconda mcl
   conda install -n pandagma -c conda-forge -c bioconda mmseqs2
+  conda install -n pandagma -c conda-forge -c bioconda emboss
+  conda install -n pandagma -c conda-forge -c bioconda famsa
   conda activate pandagama
 ~~~
 
@@ -175,7 +177,7 @@ Variables in pandagma config file:
               work_Zea  Zea
 
 3. Get into a suitable work environment (computation node), and load dependencies.
-    The script has these third-party dependencies: **bioperl, mcl, mmseqs2, DAGchainer**
+    The script has these third-party dependencies: **bioperl, mcl, mmseqs2, DAGchainer, famsa, EMBOSS**
 
     These can be loaded using a module-loading system, or with a package manager such as conda, or
     via a Singularity image. 

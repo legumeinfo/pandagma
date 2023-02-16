@@ -1030,7 +1030,7 @@ canonicalize_paths
 
 # Check for existence of third-party executables
 missing_req=0
-for program in mmseqs dagchainer mcl run_DAG_chainer.pl; do
+for program in mmseqs dagchainer mcl cons famsa run_DAG_chainer.pl; do
   if ! type $program &> /dev/null; then
     echo "Warning: executable $program is not on your PATH."
     missing_req=$((missing_req+1))
