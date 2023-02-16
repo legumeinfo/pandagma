@@ -608,6 +608,7 @@ run_name_pangenes() {
   for filepath in 23_encoded_chroms_aligned/*; do 
     base=`basename $filepath`
     cons -sequence $filepath -outseq 23_encoded_chroms_filt1/$base -name $base &
+    if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
   done
 
   echo "  Decode motifs to recover pangene IDs in order along each chromosome."
