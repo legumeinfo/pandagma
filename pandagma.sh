@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-02-15"
+version="2023-02-16"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -610,14 +610,13 @@ run_name_pangenes() {
     cons -sequence $filepath -outseq 23_encoded_chroms_filt1/$base -name $base &
     if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
   done
+  wait
 
   echo "  Decode motifs to recover pangene IDs in order along each chromosome."
   cat /dev/null > consen_gene_order.tsv
-  cat /dev/null > consen_motif_error.txt
   for filepath in 23_encoded_chroms_filt1/*; do
     chr=`basename $filepath`
-    annot_order_decode.pl -align $filepath -code code_table/utilized.tsv \
-      -v 2&>>consen_motif_error.txt 1>>consen_gene_order.tsv
+    annot_order_decode.pl -align $filepath -code code_table/utilized.tsv  -v >>consen_gene_order.tsv
   done
 
   echo "  Find panIDs that weren't placed"
