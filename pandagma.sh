@@ -661,7 +661,7 @@ run_name_pangenes() {
 
   echo "  Hash pan-ID into protein fasta file"
   cat 23_syn_pan_pctl${pctl_low}_posn_cds.fna |
-    awk '$1~/^>/ {print $5 "\t" substr($1,2)}' > lists/23_syn_pan_pctl${pctl_low}_posn.hsh
+    awk '$1~/^>/ { print $5 "\t" substr($1,2) "__" $2 "__" $3 "__" $4 }' > lists/23_syn_pan_pctl${pctl_low}_posn.hsh
   hash_into_fasta_id.pl -hash lists/23_syn_pan_pctl${pctl_low}_posn.hsh -swap_IDs -nodef \
     -fasta 23_syn_pan_pctl${pctl_low}_posn_proteinTMP.faa |
     perl -pe 's/__/ /g' > 23_syn_pan_pctl${pctl_low}_posn_prot.faa
