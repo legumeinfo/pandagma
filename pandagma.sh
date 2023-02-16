@@ -912,7 +912,8 @@ run_clean() {
     if [ -d $dir ]; then echo "  Removing directory $dir"; rm -rf $dir &
     fi
   done
-  for file in 10* 11* 14* 20* 21* 23* 24* consen*; do
+  #for file in 10* 11* 14* 20* 21* 23* 24* consen*; do
+  for file in 10* 11* 14* 20*; do
     if [ -f $file ]; then echo "  Removing file $file"; rm $file; 
     fi
   done
