@@ -292,7 +292,7 @@ run_filter() {
     echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
-      cat ${mmseqs_path} | perl -pe 's/__/\t/g; s/\t[\+-]$//$' > 04_dag/${outfilebase}_matches.tsv 
+      cat ${mmseqs_path} | perl -pe 's/__/\t/g; s/\t[\+-]$//' > 04_dag/${outfilebase}_matches.tsv 
     done
   fi
 }
