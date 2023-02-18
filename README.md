@@ -21,18 +21,15 @@ The workflow is essentially as follows:
 
 ### Installation method 1: by creating a Singularity container image
 
-To build a [Singularity](https://singularity.hpcng.org/) container image from the provided [Singularity definition file](https://singularity.hpcng.org/user-docs/master/definition_files.html) (`singularity.def`):
+To build a [Singularity](https://singularity.hpcng.org/) container image from the provided [Singularity definition file](https://singularity.hpcng.org/user-docs/master/definition_files.html) (`singularity.def`), after cloning this repository:
 
     singularity build [--remote] pandagma.sif singularity.def
 
 Where the `--remote` option is used if building the image as an unprivileged user using (by default) the [Sylabs Cloud Remote Builder](https://cloud.sylabs.io/builder).
 
-To run pandamga using singularity, use `singularity exec --cleanenv pandagma.sif [options]`, e.g.:
+To run pandamga using singularity, use `singularity run --cleanenv pandagma.sif [options]`, e.g.:
 
-    singularity pandagma.sif init
-    ... modify config/Example.conf ...
-    mkdir /path/to/pandagma/work_dir # create work dir on fast, node-local storage
-    nohup singularity exec --cleanenv pandagma.sif -c CONFIG_FILE &
+    singularity run --cleanenv pandagma.sif -c CONFIG_FILE
 
 ### Installation method 2: manual installation of scripts and dependencies
 
