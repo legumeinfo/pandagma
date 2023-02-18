@@ -980,8 +980,8 @@ shift $(expr $OPTIND - 1)
 export NPROC=${NPROC:-1}
 export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 
-# mmseqs uses a significant number of threads on its own. Set a maximum, which may be below NPROC.
-MMSEQSTHREADS=$(( 10 < ${NPROC} ? 10 : ${NPROC} ))
+# mmseqs uses significant number of threads on its own. Set a maximum, which may be below NPROC.
+MMSEQSTHREADS=$(( 4 < ${NPROC} ? 4 : ${NPROC} ))
 
 pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation dagchainer_args 
       out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex preferred_annot work_dir'
