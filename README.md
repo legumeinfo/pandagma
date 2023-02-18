@@ -70,7 +70,7 @@ Usage:
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
            -w (working directory, for temporary and intermediate files.
                 Must be specified in config file if not specified here.)
-           -n (number of processors to use. Default 10)
+           -n (number of processors to use. Defaults to number of processors available to the parent process)
            -r (retain. Don't do subcommand \"clean\" after running \"all\".)
            -v (version)
            -h (help)
