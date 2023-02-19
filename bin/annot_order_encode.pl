@@ -127,7 +127,6 @@ while (<$PAN_FH>) {
     $chr =~ s/^0*([^0]+)/$1/;
     if ($chr_hsh{$chr} < $chr_gene_count/100){
       say "Skipping molecule $chr_pre$chr because of low gene count: $chr_hsh{$chr}";
-      say " ... suggesting a scaffold or other atypical chromosome.";
     }
     else {
       $chr_hsh{$chr}++;

@@ -78,12 +78,12 @@ my %consen_table_entire; # Version with merged "uni-key", to avoid collapse of r
 while (<$CONSEN_FH>){
   chomp;
   my ( $panID, $chr, $order, $orient ) = split(/\t/, $_);
+  my $order_as_num = 1*$order;
   $chr =~ s/chr0*//;
-  $consen_table{$chr}{$panID} = [ $panID, $chr, $order, $orient ];
-  my $merged_key = join("__", $panID, $chr, $order, $orient );
-  $consen_table_entire{$merged_key} = [ $panID, $chr, $order, $orient ];
+  $consen_table{$chr}{$panID} = [ $panID, $chr, $order_as_num, $orient ];
+  my $merged_key = join("__", $panID, $chr, $order_as_num, $orient );
+  $consen_table_entire{$merged_key} = [ $panID, $chr, $order_as_num, $orient ];
 }
-
 
 # Do a first-pass reading of the pan_table to get counts per molecule, to help later
 # bypass probable scaffolds.
@@ -116,6 +116,7 @@ while (<$PAN_FH>) {
 open ($PAN_FH, "<", $pan_table) or die "Can't open in pan_table: $pan_table\n";
 my @pangene_table;
 my %HoH_panID_chr;
+my %seen_mol;
 while (<$PAN_FH>) {
   chomp;
   next unless (/^\S+/);
@@ -143,8 +144,11 @@ while (<$PAN_FH>) {
     $chr_gene_count++;
     $chr =~ s/^0*([^0]+)/$1/;
     if ($chr_hsh{$chr} < $chr_gene_count/100){
-      say "Skipping molecule $chr_pre$chr because of low gene count: $chr_hsh{$chr}";
-      say " ... suggesting a scaffold or other atypical chromosome.";
+      if ($seen_mol{"$chr_pre$chr"}){ next }
+      else {
+        $seen_mol{"$chr_pre$chr"}++;
+        say "Skipping molecule $chr_pre$chr because of low gene count: $chr_hsh{$chr}";
+      }
     }
     else {
       $chr_hsh{$chr}++;
@@ -292,12 +296,17 @@ foreach my $target_panID (keys %unplaced){
         my $AFT_ID =  $panID;
         my $AFT_POS = ${$consen_table{$main_chr}{$AFT_ID}}[2];
         my $here_orient;
-        $orient_panID{$target_panID} < 0 ? $here_orient = "-" : $here_orient = "+";
+        if ( $orient_panID{$target_panID} < 0 ){
+          $here_orient = "-" ;
+        }
+        else { 
+          $here_orient = "+" ;
+        }
         my $new_pos = ($AFT_POS + $FORE_POS)/2;
         
         if ($verbose>1){
           say "FORE: ", join("\t", @{$consen_table{$main_chr}{$FORE_ID}}, $fore_aft_score[$idx-1]);
-          say "HERE: ", join("\t", $target_panID, $main_chr, ($AFT_POS + $FORE_POS)/2, $here_orient, 0);
+          say "HERE: ", join("\t", $target_panID, $main_chr, $new_pos, "$orient_panID{$target_panID}|$here_orient", 0);
           say "AFT:  ", join("\t", @{$consen_table{$main_chr}{$AFT_ID}}, $fore_aft_score[$idx]);
         }
         $consen_table{$main_chr}{$target_panID} = [ $target_panID, $main_chr, $new_pos, $here_orient ];
