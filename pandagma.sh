@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-02-16"
+version="2023-02-19"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -624,8 +624,9 @@ run_name_pangenes() {
     awk '{print $1}' > consen_pan_unplaced.txt
 
   echo "  Fill gaps in the alignment-based pangene ordering. This step can take half an hour or so."
-  annot_order_gapfill.pl -verbose -consen consen_gene_order.tsv -unplaced consen_pan_unplaced.txt \
-    -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv -out consen_gene_order_gapfilled.tsv 
+  annot_order_gapfill.pl -verbose -nproc $NPROC -consen consen_gene_order.tsv \
+    -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
+    -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv 
 
   echo "  Reshape defline into a hash, e.g. pan20175 Phaseolus.pan2.chr11_222300_pan20175 222300 223300 -"
   echo "  Note: these \"positions\" and sizes are artificial, representing only inferred relative positions."

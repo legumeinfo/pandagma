@@ -4,6 +4,7 @@ use warnings;
 use Getopt::Long;
 use File::Basename;
 use Data::Dumper;
+use Parallel::ForkManager;
 use feature "say";
 
 my $usage = <<EOS;
@@ -35,6 +36,7 @@ will give a hash of genes on a chromosome, with values indicating "beforeness" a
 
   OPTIONS:
     -outfile    File with previously unplaced genes added into the consen_table.
+    -nproc      Maximum number of processes to be created. 0 means no forking. (default 2).
     -annot_regex  Regular expression for capturing annotation name from gene ID, e.g.
                     \"([^.]+\\.[^.]+\\.[^.]+\\.[^.]+)\\..+\"
                       for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1 (default)
@@ -45,19 +47,21 @@ EOS
 
 my ($consen, $unplaced, $pan_table);
 my $help;
+my $nproc=2;
 my $outfile;
 my $verbose=0;
 my $logstr="";
 my $annot_regex = "([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+"; 
 
 GetOptions (
-  "consen=s" => \$consen,
-  "unplaced=s" => \$unplaced,
-  "pan_table=s" =>  \$pan_table,
-  "outfile:s" =>   \$outfile,
+  "consen=s" =>      \$consen,
+  "unplaced=s" =>    \$unplaced,
+  "pan_table=s" =>   \$pan_table,
+  "outfile:s" =>     \$outfile,
   "annot_regex:s" => \$annot_regex,
-  "verbose+" =>     \$verbose,
-  "help" =>         \$help,
+  "nproc:i" =>       \$nproc,
+  "verbose+" =>      \$verbose,
+  "help" =>          \$help,
 );
 
 die "\n$usage\n" if ( $help || ! $consen || ! $unplaced || ! $pan_table );
@@ -231,11 +235,16 @@ if ($verbose>1) {print "\n"}
 # as being either before the target gene or after it, for each annotation set.
 # The verdict for each gene will be stored in $target_gene_scores_HoH{$target_panID}{$panID},
 # containing small negative integer values for genes before the target and small postive values after it.
+# This step is slow, so parallelize it.
+my $pm = Parallel::ForkManager->new($nproc);
 my %target_gene_scores_HoH;
 my %orient_panID; # to hold predominant orientation, as + or - integer, keyed on panID
 my $count;
 say "Scoring each gene relative to unplaced target genes";
+DATA_LOOP:
 foreach my $target_panID (keys %unplaced){
+  # Forks and returns the pid for the child:
+  my $pid = $pm->start and next DATA_LOOP;
   $count++;
   my $main_chr = $top_chr{$target_panID};
   if ($verbose){
@@ -264,7 +273,9 @@ foreach my $target_panID (keys %unplaced){
       }
     }
   }
+  $pm->finish; # Terminates the child process
 }
+$pm->wait_all_children;
 
 #say Dumper($target_gene_scores_HoH{$target_panID});
 #say Dumper(%consen_table);
