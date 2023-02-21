@@ -31,7 +31,7 @@ From: debian:bullseye-slim
 
 %post
     apt update
-    apt install -y --no-install-recommends libbio-perl-perl mcl mmseqs2 emboss
+    apt install -y --no-install-recommends libbio-perl-perl libparallel-forkmanager-perl mcl mmseqs2 emboss
     rm -rf /var/lib/apt/lists/*
     chmod +x /usr/local/bin/*
 

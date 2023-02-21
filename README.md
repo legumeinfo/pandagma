@@ -45,6 +45,7 @@ For example, using conda:
 ~~~
   conda create -n pandagma
   conda install -n pandagma -c conda-forge -c bioconda perl-bioperl-core
+  conda install -n pandagma -c conda-forge -c bioconda 	perl-parallel-forkmanager
   conda install -n pandagma -c conda-forge -c bioconda dagchainer
   conda install -n pandagma -c conda-forge -c bioconda mcl
   conda install -n pandagma -c conda-forge -c bioconda mmseqs2
