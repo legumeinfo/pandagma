@@ -169,7 +169,7 @@ my @sorted_table = sort {
      $a->[2] cmp $b->[2] || $a->[3] <=> $b->[3] || $a->[4] <=> $b->[4] 
    } @pangene_table; 
 
-say "Calculating gene order per annot-and-chromosome";
+say "# Calculating gene order per annot-and-chromosome";
 my ($prAnn, $prChr) = ("", "");
 my $ord=0;
 my @elts_with_order;
@@ -202,7 +202,7 @@ foreach my $row ( @sorted_table ) {
 }
 my $num_chrs = keys %seen_chr;
 
-say "Finding the most frequent chromosome for each pan-gene set";
+say "# Finding the most frequent chromosome for each pan-gene set";
 my %top_chr;
 my %chr_ct_top_chr;
 if ($verbose>1) {print "#pangeneID\tchr:count ...\n"}
