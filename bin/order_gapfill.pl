@@ -7,6 +7,8 @@ use Data::Dumper;
 use Parallel::ForkManager;
 use feature "say";
 
+$! = 1;  # disable buffering, to get finer-grained real-time process & debugging output
+
 my $usage = <<EOS;
 Given alignment of gene order with pangene IDs determined by alignment of gene orders 
 (by order_encode.pl and order_decode.pl), place leftover pangenes
@@ -75,7 +77,7 @@ while (<$UN_FH>){
   $unplaced{$panID}++;
 }
 
-# Read table of panIDs with alignment-based placements
+# Read table of panIDs with alignment- or reference-based placements
 open (my $CONSEN_FH, "<", $consen) or die "Can't open in consensus file: $consen\n";
 my %consen_table; # Working version; will be augmented with unplaced panIDs
 my %consen_table_entire; # Version with merged "uni-key", to avoid collapse of repeated panIDs
@@ -205,9 +207,9 @@ my $num_chrs = keys %seen_chr;
 say "# Finding the most frequent chromosome for each pan-gene set";
 my %top_chr;
 my %chr_ct_top_chr;
-if ($verbose>1) {print "#pangeneID\tchr:count ...\n"}
+if ($verbose>2) {print "#pangeneID\tchr:count ...\n"}
 foreach my $panID (sort keys %HoH_panID_chr) {
-  if ($verbose>1){ $logstr .= "$panID\t" }
+  if ($verbose>2){ $logstr .= "$panID\t" }
   # Sort chromosomes by count of chromosomes seen for this panID
   foreach my $chr ( sort { $HoH_panID_chr{$panID}{$b} <=> $HoH_panID_chr{$panID}{$a} } 
                             keys %{$HoH_panID_chr{$panID}} ) {
@@ -217,63 +219,55 @@ foreach my $panID (sort keys %HoH_panID_chr) {
       $top_chr{$panID} = $chr; 
       $chr_ct_top_chr{$panID} = $chr_ct;
     }
-    if ($verbose>1){ $logstr .= "$chr:$chr_ct " }
+    if ($verbose>2){ $logstr .= "$chr:$chr_ct " }
   }
-  if ($verbose>1){ $logstr .= "\n" }
+  if ($verbose>2){ $logstr .= "\n" }
 }
-if ($verbose>1){ print "$logstr\n" }
+if ($verbose>2){ print "$logstr\n" }
 
-if ($verbose>1) {print "#pangeneID\ttop_chr:count\n"}
+if ($verbose>2) {print "#pangeneID\ttop_chr:count\n"}
 foreach my $panID (sort keys %top_chr) {
-  if ($verbose>1){ printf "%s\t%s:%s\n", $panID, $top_chr{$panID}, $chr_ct_top_chr{$panID} }
+  if ($verbose>2){ printf "%s\t%s:%s\n", $panID, $top_chr{$panID}, $chr_ct_top_chr{$panID} }
 }
-if ($verbose>1) {print "\n"}
+if ($verbose>2) {print "\n"}
 
 #say Dumper(\@pangene_table_ordered);
 
+##########
 # For each unplaced target gene (on a chromosome), score every gene (on that chromosome)
 # as being either before the target gene or after it, for each annotation set.
 # The verdict for each gene will be stored in $target_gene_scores_HoH{$target_panID}{$panID},
 # containing small negative integer values for genes before the target and small postive values after it.
-# This step is slow, so parallelize it.
-my $pm = Parallel::ForkManager->new($nproc);
+say "# Scoring each gene relative to unplaced target genes, using $nproc threads.";
+say "# A dot will be printed for each unplaced gene assessed.\n  ";
+my %target_gene_scores_HoH;
+#my %retrieved_target_gene_scores; # to hold %data_structure_reference afer return from sub-processes
+#my $pm = Parallel::ForkManager->new($nproc);
 #$pm -> run_on_finish (
 #  sub {
 #    my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $data_structure_reference) = @_;
 #    # retrieve data structure from child
-#    if (defined($data_structure_reference)) {  # children are not forced to send anything
-#      my $string = ${$data_structure_reference};  # child passed a string reference
-#      print "$string\n";
+#    if (defined($data_structure_reference)) {  
+#      %retrieved_target_gene_scores = %{$data_structure_reference};  # child passed a hash reference
+#      #say Dumper(\%retrieved_target_gene_scores);
 #    }
 #    else {  # problems occurring during storage or retrieval will throw a warning
 #      print qq|No message received from child process $pid!\n|;
 #    }
 #  }
 #);
-my %target_gene_scores_HoH;
-my %orient_panID; # to hold predominant orientation, as + or - integer, keyed on panID
-my $count;
-say "Scoring each gene relative to unplaced target genes, using $nproc threads.";
-print "A dot will be printed for each unplaced gene assessed.\n  ";
-DATA_LOOP:
+#DATA_LOOP:
 foreach my $target_panID (keys %unplaced){
-  # Forks and returns the pid for the child:
-  my $pid = $pm->start and next DATA_LOOP;
-  $count++;
+  #my $pid = $pm->start and next DATA_LOOP;  # Forks and returns the pid for the child
+
   my $main_chr = $top_chr{$target_panID};
-  if ($verbose>1){
-    print "$count\tDominant chr of $target_panID is $main_chr\n  ";
-  }
-  else { # Print progress indicator
-    print ".";
-    if ( $count % 100 == 0 ){ print "\n  " }
-  }
+  #print "$count\tDominant chr of $target_panID is $main_chr\n  ";
+  print "."; # Print progress indicator
   foreach my $ann (keys %annots){
     if ( defined $pangene_elts_per_ann{$ann}{$target_panID}[2] ){
       my $target_panID_chr = $pangene_elts_per_ann{$ann}{$target_panID}[2];
       my $target_panID_order = $pangene_elts_per_ann{$ann}{$target_panID}[3];
       #say "CHECK: $target_panID\t$target_panID_chr\t$target_panID_order\t$ann";
-      my $compare;
       foreach my $panID ( keys %{$pangene_elts_per_ann{$ann}} ){
         my ($panID, $ann, $chr, $ord, $start, $end, $orient) = @{$pangene_elts_per_ann{$ann}{$panID}};
         if (defined $chr && defined $target_panID_chr && $chr == $target_panID_chr){
@@ -283,40 +277,66 @@ foreach my $target_panID (keys %unplaced){
           else { # This panID comes at or after the target
             $target_gene_scores_HoH{$target_panID}{$panID}++;
           }
-          # Accumulate and store a consensus orientation for this panID# 
-          $orient =~ /-/ ?  $orient_panID{$panID}-- : $orient_panID{$panID}++;
-          #say "$panID\t$chr\t$ann\t$ord\t$orient\t$target_gene_scores_HoH{$target_panID}{$panID}";
         }
       }
     }
   }
-  $pm->finish; # Terminates the child process
+  #$pm->finish(0, \%target_gene_scores_HoH); # Terminates the child process
 }
-$pm->wait_all_children;
+#$pm->wait_all_children;
 say "\nFinished scoring genes relative to unplaced target genes.";
 
-#say Dumper($target_gene_scores_HoH{$target_panID});
+# NOTE: if Parallel::ForkManager is used, uncomment the following line.
+# %target_gene_scores_HoH = %retrieved_target_gene_scores
+
+#say Dumper(\%target_gene_scores_HoH);  
+
+##########
+say "# Collect consensus panID orientations.";
+my %orient_panID; # to hold predominant orientation, as + or - integer, keyed on panID
+foreach my $target_panID (keys %unplaced){
+  print "."; # Print progress indicator
+  foreach my $ann (keys %annots){
+    if ( defined $pangene_elts_per_ann{$ann}{$target_panID}[2] ){
+      my $target_panID_chr = $pangene_elts_per_ann{$ann}{$target_panID}[2];
+      # foreach my $panID ( keys %{$pangene_elts_per_ann{$ann}} ){
+        my ($panID, $ann, $chr, $ord, $start, $end, $orient) = @{$pangene_elts_per_ann{$ann}{$target_panID}};
+        #say "($panID, $ann, $chr, $ord, $start, $end, $orient), $target_panID_chr";
+        if (defined $chr && defined $target_panID_chr && $chr == $target_panID_chr){
+          # Accumulate and store a consensus orientation for this panID# 
+          $orient =~ /-/ ?  $orient_panID{$panID}-- : $orient_panID{$panID}++;
+        }
+    }
+  }
+}
+say "\nFinished calculating consensus panIDs.";
+
+#say Dumper(\%orient_panID);
 #say Dumper(%consen_table);
+
 # Now traverse the table of panIDs that have been positioned by alignment, and look up
 # whether each ID occurs before or after the target ID, relative to available annotations.
-$count = 0;
+my $count = 0;
 foreach my $target_panID (keys %unplaced){
   $count++;
-  if ($verbose>1){ say "$count\t$target_panID"; }
+  if ($verbose >2){ say "$count\t$target_panID"; }
   my $main_chr = $top_chr{$target_panID};
   my ($before_ID, $after_ID);
   my @fore_aft_score;
   $fore_aft_score[0] = -9;
   my @consen_IDs_ordered;
   my $idx=1;
-  #say "MAIN CHR: $main_chr";
+  if ($verbose >1){ say "MAIN CHR: $main_chr; panID: $target_panID" }
+  
+  #say Dumper($target_gene_scores_HoH{$target_panID});
   foreach my $panID ( sort { $consen_table{$main_chr}{$a}[2] <=> $consen_table{$main_chr}{$b}[2] }
                       keys %{$consen_table{$main_chr}} ){
+    #say "panID: $panID, chr $main_chr";
     if (defined $target_gene_scores_HoH{$target_panID}{$panID}){
       my $placement_score = $target_gene_scores_HoH{$target_panID}{$panID};
       $fore_aft_score[$idx] = $placement_score;
       $consen_IDs_ordered[$idx] = $panID;
-      #say join("\t", @{$consen_table{$main_chr}{$panID}}, $placement_score);
+      if ($verbose >1){ say join("\t", @{$consen_table{$main_chr}{$panID}}, $placement_score) }
 
       if ($fore_aft_score[$idx-2] < 0 && $fore_aft_score[$idx-1] < 0 && $fore_aft_score[$idx] >=0){
         my $FORE_ID = $consen_IDs_ordered[$idx-1];
@@ -325,12 +345,8 @@ foreach my $target_panID (keys %unplaced){
         my $AFT_ID =  $panID;
         my $AFT_POS = ${$consen_table{$main_chr}{$AFT_ID}}[2];
         my $here_orient;
-        if ( $orient_panID{$target_panID} < 0 ){
-          $here_orient = "-" ;
-        }
-        else { 
-          $here_orient = "+" ;
-        }
+        if ( $orient_panID{$target_panID} < 0 ){ $here_orient = "-" }
+        else { $here_orient = "+" }
         my $new_pos = ($AFT_POS + $FORE_POS)/2;
         
         if ($verbose>1){
@@ -341,12 +357,11 @@ foreach my $target_panID (keys %unplaced){
         $consen_table{$main_chr}{$target_panID} = [ $target_panID, $main_chr, $new_pos, $here_orient ];
         my $merged_key = join("__", $target_panID, $main_chr, $new_pos, $here_orient );
         $consen_table_entire{$merged_key}++;
-        last;
       }
       $idx++;
     }
   }
-  #say Dumper(%consen_table);
+  if ($verbose>1){ say "=================\n"; }
 }
 
 # Final traversal of %consen_table to print the results - now with added elements from %unplaced.
@@ -401,4 +416,6 @@ __END__
 2023
 S. Cannon
 02-14 Initial version, based on order_by_consensus.pl
-02-22 Expriment with Parallel::ForkManager run_on_finish
+02-22 Retrieve data structures from Parallel::ForkManager with run_on_finish callback
+02-23 Yank Parallel::ForkManager because of inconsistency in retrieval of data structure.
+
