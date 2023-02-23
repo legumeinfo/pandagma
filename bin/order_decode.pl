@@ -23,12 +23,13 @@ Usage: order_decode.pl -alignment ALIGN_FILE -code_table PAN_TO_PEPTIDE_FILE  [o
     -code_table (filename) PAN_TO_PEPTIDE_FILE, e.g. pan_to_peptide.tsv or utilized.tsv
 
   OPTIONS:
+    -outfile   (filename) 
     -motif_len (integer; default 5) Length of expected motif blocks, not counting Q/N separator
     -verbose   (boolean) For some debugging info, to STDOUT. Use -v -v to give more output.
     -help      (boolean) This message. 
 EOS
 
-my ($align_file, $code_table);
+my ($align_file, $code_table, $outfile);
 my $help;
 my $motif_len=5;
 my $verbose=0;
@@ -36,6 +37,7 @@ my $verbose=0;
 GetOptions (
   "align_file=s" => \$align_file,
   "code_table=s" => \$code_table,
+  "outfile:s"  =>   \$outfile,
   "motif_len:i" =>  \$motif_len,
   "verbose+" =>     \$verbose,
   "help" =>         \$help,
@@ -44,6 +46,9 @@ GetOptions (
 die "\n$usage\n" if ( $help || ! $align_file || ! $code_table );
 
 my $logstr;
+
+my $OUT_FH;
+if ($outfile){ open $OUT_FH, ">", $outfile or die "Can't open out $outfile: $!\n"; }
 
 # Put code_table into a hash
 open (my $ENC_FH, "<", $code_table) or die "Can't open in encode table: $code_table\n";
@@ -114,8 +119,10 @@ sub lookup_motif{
     $orient_char =~ s/Q/+/;
     $orient_char =~ s/N/-/;
     my $panID = $encode_hsh{$motif};
-    my $ordinal_posn = sprintf("%06d", $order*100);
-    say "$panID\t$seqID\t$ordinal_posn\t$orient_char";
+    #my $ordinal_posn = sprintf("%06d", $order*100);
+    #say "$panID\t$seqID\t$ordinal_posn\t$orient_char";
+    if ($outfile){ say $OUT_FH "$panID\t$seqID\t$order\t$orient_char"; }
+    else { say "$panID\t$seqID\t$order\t$orient_char"; }
   }
   else {
     if ( $verbose>1 ){ warn "  XXX\t$seqID\t$motif\t$orient_char\tNO_MATCH\t$posn\n" }
@@ -127,4 +134,5 @@ __END__
 S. Cannon
 02-09 Initial version, based on order_by_consensus.pl
 02-03 Improve reporting of non-matches. Generate final output format.
-02-22 Lower the verbosity.
+02-23 Lower the verbosity. Add -outfile option. Report order as integer rather than padded string.
+
