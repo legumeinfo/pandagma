@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-02-22"
+version="2023-02-23"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -23,6 +23,9 @@ Usage:
            -w (working directory, for temporary and intermediate files. 
                 Must be specified in config file if not specified here.)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
+           -o (ordering method, for placing pan-genes. Options: 
+                \"reference\" (default; uses preferred_annot to order, followed by gap-filling for missing panIDs.)
+                \"alignment\" (uses whole-chromosome alignment of ordered panIDs from all annotations)
            -r (retain. Don't do subcommand \"clean\" after running \"all\".)
            -v (version)
            -h (help)
@@ -53,7 +56,7 @@ Subcommands (in order they are usually run):
                       annotation sets that may be of lower or uncertain quality.
      pick_exemplars - Pick representative sequence for each pan-gene
    filter_to_pctile - Calculate orthogroup composition and filter fasta files by selected percentiles.
-      order_and_name - Assign pan-gene names with consensus chromosomes and ordinal positions.
+     order_and_name - Assign pan-gene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
 
@@ -575,13 +578,6 @@ run_filter_to_pctile() {
 run_order_and_name() {
   cd "${WORK_DIR}"
 
-  echo "  If code_table/pan_to_peptide.tsv doesn't exist, generate it."
-  mkdir -p code_table
-  if [ ! -f code_table/pan_to_peptide.tsv ]; then
-    echo "   Generating hash file code_table/pan_to_peptide.tsv"
-    make_peptide_hash.pl > code_table/pan_to_peptide.tsv
-  fi
-
   echo "  Reshape from mcl output format, clustered IDs on one line, to a hash format"
   perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 22_syn_pan_aug_extra_pctl${pctl_low}.clust.tsv |
     cat > 22_syn_pan_aug_extra_pctl${pctl_low}.hsh.tsv
@@ -591,48 +587,70 @@ run_order_and_name() {
     perl -pe 's/__/\t/g; s/ /\t/g' | awk -v OFS="\t" '{print $2, $1, $3, $5, $6, $7}' |
     sort -k1,1 -k2,2 > 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv
 
-  echo "  Encode pan-genes as unique peptide strings, and extract annotation sets with encoded"
-  echo "  IDs ordered along chromosomes, permitting whole-chromosome alignments of gene order."
-  echo "  Calling script order_encode.pl on file 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv"
-  mkdir -p 23_encoded_chroms
-  order_encode.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
-                        -code_table code_table/pan_to_peptide.tsv -utilized code_table/utilized.tsv \
-                        -annot_regex ${ANN_REX} -outdir 23_encoded_chroms 
+  echo "Order method: $order_method"
+  if [[ $order_method =~ "align" ]]; then
+    echo "==  The next several steps will determine panID ordering using the \"alignment\" ordering option,"
+    echo "    based on alignment of panID orders in each annotation, for each chromosome."
+    echo "  If code_table/pan_to_peptide.tsv doesn't exist, generate it."
+    mkdir -p code_table
+    if [ ! -f code_table/pan_to_peptide.tsv ]; then
+      echo "   Generating hash file code_table/pan_to_peptide.tsv"
+      make_peptide_hash.pl > code_table/pan_to_peptide.tsv
+    fi
+  
+    echo "  Encode pan-genes as unique peptide strings, and extract annotation sets with encoded"
+    echo "  IDs ordered along chromosomes, permitting whole-chromosome alignments of gene order."
+    echo "  Calling script order_encode.pl on file 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv"
+    mkdir -p 23_encoded_chroms
+    order_encode.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
+                          -code_table code_table/pan_to_peptide.tsv -utilized code_table/utilized.tsv \
+                          -annot_regex ${ANN_REX} -outdir 23_encoded_chroms 
+  
+    echo "  Align chromosome sequences with peptide-encoded-gene-orders."
+    mkdir -p 23_encoded_chroms_aligned
+    do_align.sh 23_encoded_chroms 23_encoded_chroms_aligned $(( $NPROC/2 ))
+  
+    echo "  Filter chromosome alignments to consensus motifs"
+    mkdir -p 23_encoded_chroms_filt1
+    for filepath in 23_encoded_chroms_aligned/*; do 
+      base=`basename $filepath`
+      cons -sequence $filepath -outseq 23_encoded_chroms_filt1/$base -name $base &
+      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+    done
+    wait
+  
+    echo "  Decode motifs to recover pangene IDs in order along each chromosome."
+    for filepath in 23_encoded_chroms_filt1/*; do
+      chr=`basename $filepath`
+      order_decode.pl -align $filepath -code code_table/utilized.tsv -out consen_gene_order.tsv -v 
+    done
+  
+    echo "  Find panIDs that weren't placed"
+    comm -23 <( cut -f1 code_table/utilized.tsv ) <( cut -f1 consen_gene_order.tsv | sort -u ) |
+      awk '{print $1}' > consen_pan_unplaced.txt
 
-  echo "  Align chromosome sequences with peptide-encoded-gene-orders."
-  mkdir -p 23_encoded_chroms_aligned
-  do_align.sh 23_encoded_chroms 23_encoded_chroms_aligned $(( $NPROC/2 ))
+  elif [[ $order_method =~ "reference" ]]; then
+    echo "==  The next several steps will determine panID ordering using the \"reference\" ordering option,"
+    echo "    based on the panID order from the supplied \"preferred annotation\", $preferred_annot"
+    echo "  Run order_by_reference.pl"
+    order_by_reference.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
+      -pref_annot $preferred_annot -consen_out consen_gene_order.tsv -unplaced_out consen_pan_unplaced.txt
+  else 
+    echo "Ordering method (-o $order_method ) is not one of \"alignment\" or \"reference\". Aborting."
+    exit 1
+  fi # End of $order_method =~ /align/
 
-  echo "  Filter chromosome alignments to consensus motifs"
-  mkdir -p 23_encoded_chroms_filt1
-  for filepath in 23_encoded_chroms_aligned/*; do 
-    base=`basename $filepath`
-    cons -sequence $filepath -outseq 23_encoded_chroms_filt1/$base -name $base &
-    if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
-  done
-  wait
-
-  echo "  Decode motifs to recover pangene IDs in order along each chromosome."
-  cat /dev/null > consen_gene_order.tsv
-  for filepath in 23_encoded_chroms_filt1/*; do
-    chr=`basename $filepath`
-    order_decode.pl -align $filepath -code code_table/utilized.tsv  -v >>consen_gene_order.tsv
-  done
-
-  echo "  Find panIDs that weren't placed"
-  comm -23 <( cut -f1 code_table/utilized.tsv ) <( cut -f1 consen_gene_order.tsv | sort -u ) |
-    awk '{print $1}' > consen_pan_unplaced.txt
-
-  echo "  Fill gaps in the alignment-based pangene ordering. This step is time-consuming,"
-  echo "  so is run in parallel, using $NPROC/2 threads."
-  order_gapfill.pl -verbose -nproc $(( $NPROC/2 )) -consen consen_gene_order.tsv \
+  echo "  Fill gaps in the alignment-based pangene ordering. This step is time-consuming."
+  #echo "  so is run in parallel, using $NPROC/2 threads."
+  #order_gapfill.pl -verbose -nproc $(( $NPROC/2 )) -consen consen_gene_order.tsv \
+  order_gapfill.pl -verbose -consen consen_gene_order.tsv \
     -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
     -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv 
 
   echo "  Reshape defline into a hash, e.g. pan20175 Phaseolus.pan2.chr11_222300_pan20175 222300 223300 -"
   echo "  Note: these \"positions\" and sizes are artificial, representing only inferred relative positions."
   cat consen_gene_order_gapfilled.tsv | awk -v PRE=$consen_prefix '
-    {printf("%s\t%s.%s_%06d_%s\t%d\t%d\t%s\n", $1, PRE, $2, $3, $1, $3, $3+1000, $4)}' > consen_posn.hsh
+    {printf("%s\t%s.%s_%06d_%s\t%d\t%d\t%s\n", $1, PRE, $2, $3, $1, $3*100, $3*100+1000, $4)}' > consen_posn.hsh
 
   echo "  Extract a version of the consen_gene_order file with immediate tandem duplicates collapsed"
   cat consen_posn.hsh | top_line.awk > consen_posn_trim.hsh
@@ -952,16 +970,18 @@ run_ReallyClean() {
 NPROC=$(command -v nproc > /dev/null && nproc || getconf _NPROCESSORS_ONLN)
 CONFIG="null"
 optarg_work_dir="null"
+order_method="reference"
 step="all"
 retain="no"
 
-while getopts "c:w:s:n:rvhm" opt
+while getopts "c:w:s:n:o:rvhm" opt
 do
   case $opt in
     c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
     w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
     s) step=$OPTARG ;;
     n) NPROC=$OPTARG ;;
+    o) order_method=$OPTARG; echo "Order method: $order_method" ;;
     r) retain="yes" ;;
     v) version ;;
     h) printf >&2 "$HELP_DOC\n" && exit 0 ;;
