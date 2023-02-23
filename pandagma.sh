@@ -633,7 +633,7 @@ run_order_and_name() {
     echo "==  The next several steps will determine panID ordering using the \"reference\" ordering option,"
     echo "    based on the panID order from the supplied \"preferred annotation\", $preferred_annot"
     echo "  Run order_by_reference.pl"
-    order_by_reference.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
+    order_by_reference.pl -verbose -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
       -pref_annot $preferred_annot -consen_out consen_gene_order.tsv -unplaced_out consen_pan_unplaced.txt
   else 
     echo "Ordering method (-o $order_method ) is not one of \"alignment\" or \"reference\". Aborting."
