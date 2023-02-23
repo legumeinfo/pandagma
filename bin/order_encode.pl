@@ -12,7 +12,7 @@ Produce chromosome multifasta files, with a representation of gene order per ann
 Gene order is coded as a set of unique peptide strings that can be aligned using a 
 standard protein multiple alignment program.
 
-Usage: annot_order_encode.pl -pan_table PANGENE_TABLE -code_table PAN_TO_PEPTIDE_FILE  [options]
+Usage: order_encode.pl -pan_table PANGENE_TABLE -code_table PAN_TO_PEPTIDE_FILE  [options]
    PANGENE_TABLE input has six columns:
      panID  geneID  annot.chr  start  end  orientation
 
@@ -274,7 +274,7 @@ if ($utilized){ # Print file that records which pepIDs and panIDs were used
 __END__
 2023
 S. Cannon
-02-09 Initial version, based on consen_pangene_order.pl
+02-09 Initial version, based on order_by_consensus.pl
 02-10 Get full annotation name rather than just gensp.genotype.gnm prefix
 02-11 Handle gene order. Do more filtering against scaffolds.
 02-13 Remove unused subroutine.

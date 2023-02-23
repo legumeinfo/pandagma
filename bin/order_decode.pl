@@ -9,7 +9,7 @@ my $usage = <<EOS;
 Given alignment of gene order with pangene IDs encoded as peptide strings,
 decode these back into pangene IDs.
 
-Usage: annot_order_decode.pl -alignment ALIGN_FILE -code_table PAN_TO_PEPTIDE_FILE  [options]
+Usage: order_decode.pl -alignment ALIGN_FILE -code_table PAN_TO_PEPTIDE_FILE  [options]
    ALIGN_FILE is a fasta file -- either a single sequence (a consensus from an alignment), 
    or a multifasta alignment file; in either case, with pseudo-peptide sequence
    corresponding with the PAN_TO_PEPTIDE_FILE hash table.
@@ -125,6 +125,6 @@ sub lookup_motif{
 __END__
 2023
 S. Cannon
-02-09 Initial version, based on consen_pangene_order.pl
+02-09 Initial version, based on order_by_consensus.pl
 02-03 Improve reporting of non-matches. Generate final output format.
 02-22 Lower the verbosity.

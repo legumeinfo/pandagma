@@ -593,9 +593,9 @@ run_order_and_name() {
 
   echo "  Encode pan-genes as unique peptide strings, and extract annotation sets with encoded"
   echo "  IDs ordered along chromosomes, permitting whole-chromosome alignments of gene order."
-  echo "  Calling script annot_order_encode.pl on file 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv"
+  echo "  Calling script order_encode.pl on file 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv"
   mkdir -p 23_encoded_chroms
-  annot_order_encode.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
+  order_encode.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
                         -code_table code_table/pan_to_peptide.tsv -utilized code_table/utilized.tsv \
                         -annot_regex ${ANN_REX} -outdir 23_encoded_chroms 
 
@@ -616,7 +616,7 @@ run_order_and_name() {
   cat /dev/null > consen_gene_order.tsv
   for filepath in 23_encoded_chroms_filt1/*; do
     chr=`basename $filepath`
-    annot_order_decode.pl -align $filepath -code code_table/utilized.tsv  -v >>consen_gene_order.tsv
+    order_decode.pl -align $filepath -code code_table/utilized.tsv  -v >>consen_gene_order.tsv
   done
 
   echo "  Find panIDs that weren't placed"
@@ -625,7 +625,7 @@ run_order_and_name() {
 
   echo "  Fill gaps in the alignment-based pangene ordering. This step is time-consuming,"
   echo "  so is run in parallel, using $NPROC/2 threads."
-  annot_order_gapfill.pl -verbose -nproc $(( $NPROC/2 )) -consen consen_gene_order.tsv \
+  order_gapfill.pl -verbose -nproc $(( $NPROC/2 )) -consen consen_gene_order.tsv \
     -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
     -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv 
 

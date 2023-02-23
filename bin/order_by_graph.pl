@@ -494,5 +494,5 @@ sub printstr {
 
 __END__
 2023
-02-20 New script "pan_graph_order.pl", derived from consen_pangene_order.pl
+02-20 New script "pan_graph_order.pl", derived from order_by_consensus.pl
 

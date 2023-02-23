@@ -17,7 +17,7 @@ calculate gene order per annotation, then report
   (4) median start position from the pan-genes;
   (5) median end position from the pan-genes.
 
-Usage: cat PANGENE_TABLE | consen_pangene_order.pl [options]
+Usage: cat PANGENE_TABLE | order_by_consensus.pl [options]
    Input has five columns:
      panID  geneID  chr  annot.chr  start  end
 
@@ -244,7 +244,7 @@ __END__
 10-29 Initial version.
 11-04 Read from STDIN rather than file
 2023
-01-13 Rename from consen_pangene_order.pl to consen_pangene_order.pl. This version operates
+01-13 Rename from order_by_consensus.pl to order_by_consensus.pl. This version operates
        on the same five-column input data with genomic position, but calculates modal 
        chromosome and gene orders per annotation set; then calculates modal order for the pangene.
 

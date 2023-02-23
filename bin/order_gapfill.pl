@@ -9,10 +9,10 @@ use feature "say";
 
 my $usage = <<EOS;
 Given alignment of gene order with pangene IDs determined by alignment of gene orders 
-(by annot_order_encode.pl and annot_order_decode.pl), place leftover pangenes
+(by order_encode.pl and order_decode.pl), place leftover pangenes
 relative to the pangenes that have established, alignment-based placements.
 
-Usage: annot_order_gapfill.pl -consen_table CONSEN_TABLE  -unplaced UNPLACED_LIST \
+Usage: order_gapfill.pl -consen_table CONSEN_TABLE  -unplaced UNPLACED_LIST \
                                -pan_table PANGENE_TABLE
                                
   CONSEN_TABLE, e.g. consen_gene_order.tsv, has four columns:
@@ -400,5 +400,5 @@ for my $row (@sorted_consen_table_AoA){
 __END__
 2023
 S. Cannon
-02-14 Initial version, based on consen_pangene_order.pl
+02-14 Initial version, based on order_by_consensus.pl
 02-22 Expriment with Parallel::ForkManager run_on_finish
