@@ -237,25 +237,42 @@ if ($verbose>1) {print "\n"}
 # containing small negative integer values for genes before the target and small postive values after it.
 # This step is slow, so parallelize it.
 my $pm = Parallel::ForkManager->new($nproc);
+#$pm -> run_on_finish (
+#  sub {
+#    my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $data_structure_reference) = @_;
+#    # retrieve data structure from child
+#    if (defined($data_structure_reference)) {  # children are not forced to send anything
+#      my $string = ${$data_structure_reference};  # child passed a string reference
+#      print "$string\n";
+#    }
+#    else {  # problems occurring during storage or retrieval will throw a warning
+#      print qq|No message received from child process $pid!\n|;
+#    }
+#  }
+#);
 my %target_gene_scores_HoH;
 my %orient_panID; # to hold predominant orientation, as + or - integer, keyed on panID
 my $count;
-say "Scoring each gene relative to unplaced target genes";
+say "Scoring each gene relative to unplaced target genes, using $nproc threads.";
+print "A dot will be printed for each unplaced gene assessed.\n  ";
 DATA_LOOP:
 foreach my $target_panID (keys %unplaced){
   # Forks and returns the pid for the child:
   my $pid = $pm->start and next DATA_LOOP;
   $count++;
   my $main_chr = $top_chr{$target_panID};
-  if ($verbose){
-    say "$count\tDominant chr of $target_panID is $main_chr";
+  if ($verbose>1){
+    print "$count\tDominant chr of $target_panID is $main_chr\n  ";
+  }
+  else { # Print progress indicator
+    print ".";
+    if ( $count % 100 == 0 ){ print "\n  " }
   }
   foreach my $ann (keys %annots){
     if ( defined $pangene_elts_per_ann{$ann}{$target_panID}[2] ){
       my $target_panID_chr = $pangene_elts_per_ann{$ann}{$target_panID}[2];
       my $target_panID_order = $pangene_elts_per_ann{$ann}{$target_panID}[3];
       #say "CHECK: $target_panID\t$target_panID_chr\t$target_panID_order\t$ann";
-      #say Dumper($pangene_elts_per_ann{$ann}{$target_panID});
       my $compare;
       foreach my $panID ( keys %{$pangene_elts_per_ann{$ann}} ){
         my ($panID, $ann, $chr, $ord, $start, $end, $orient) = @{$pangene_elts_per_ann{$ann}{$panID}};
@@ -276,6 +293,7 @@ foreach my $target_panID (keys %unplaced){
   $pm->finish; # Terminates the child process
 }
 $pm->wait_all_children;
+say "\nFinished scoring genes relative to unplaced target genes.";
 
 #say Dumper($target_gene_scores_HoH{$target_panID});
 #say Dumper(%consen_table);
@@ -383,4 +401,4 @@ __END__
 2023
 S. Cannon
 02-14 Initial version, based on consen_pangene_order.pl
-
+02-22 Expriment with Parallel::ForkManager run_on_finish

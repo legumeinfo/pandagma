@@ -90,15 +90,15 @@ foreach my $seqID (sort keys %seq_hsh){
       $motif =~ m/(\w+)(\w{$motif_len})/;
       my $remainder = $1;
       $motif = $2;
-      if ($verbose){ warn "  XXX\t$seqID\t$remainder\tX\tREMAINDER\t$posn\n" }
+      if ( $verbose>1 ){ warn "  XXX\t$seqID\t$remainder\tX\tREMAINDER\t$posn\n" }
       lookup_motif($seqID, $motif, $orient_char, $posn, $order);
       $order++;
     }
     elsif ( length($motif) == 0 ) {
-      if ($verbose){ warn "  XXX\t$seqID\t$Xs\t$orient_char\tGAPPY\t$posn\n" }
+      if ( $verbose>1 ){ warn "  XXX\t$seqID\t$Xs\t$orient_char\tGAPPY\t$posn\n" }
     }
     elsif ( length($motif) > 0 && length($motif) != $motif_len ){
-      if ($verbose){ warn "  XXX\t$seqID\t$motif\t$orient_char\tBAD_ALN\t$posn\n" }
+      if ( $verbose>1 ){ warn "  XXX\t$seqID\t$motif\t$orient_char\tBAD_ALN\t$posn\n" }
     }
     else { # Motif at least is of the right length
       lookup_motif($seqID, $motif, $orient_char, $posn, $order);
@@ -118,7 +118,7 @@ sub lookup_motif{
     say "$panID\t$seqID\t$ordinal_posn\t$orient_char";
   }
   else {
-    if ($verbose){ warn "  XXX\t$seqID\t$motif\t$orient_char\tNO_MATCH\t$posn\n" }
+    if ( $verbose>1 ){ warn "  XXX\t$seqID\t$motif\t$orient_char\tNO_MATCH\t$posn\n" }
   }
 }
 
@@ -127,3 +127,4 @@ __END__
 S. Cannon
 02-09 Initial version, based on consen_pangene_order.pl
 02-03 Improve reporting of non-matches. Generate final output format.
+02-22 Lower the verbosity.

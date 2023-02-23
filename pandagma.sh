@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-02-19"
+version="2023-02-22"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -601,7 +601,7 @@ run_name_pangenes() {
 
   echo "  Align chromosome sequences with peptide-encoded-gene-orders."
   mkdir -p 23_encoded_chroms_aligned
-  do_align.sh 23_encoded_chroms 23_encoded_chroms_aligned $NPROC
+  do_align.sh 23_encoded_chroms 23_encoded_chroms_aligned $(( $NPROC/2 ))
 
   echo "  Filter chromosome alignments to consensus motifs"
   mkdir -p 23_encoded_chroms_filt1
@@ -623,8 +623,9 @@ run_name_pangenes() {
   comm -23 <( cut -f1 code_table/utilized.tsv ) <( cut -f1 consen_gene_order.tsv | sort -u ) |
     awk '{print $1}' > consen_pan_unplaced.txt
 
-  echo "  Fill gaps in the alignment-based pangene ordering. This step can take half an hour or so."
-  annot_order_gapfill.pl -verbose -nproc $NPROC -consen consen_gene_order.tsv \
+  echo "  Fill gaps in the alignment-based pangene ordering. This step is time-consuming,"
+  echo "  so is run in parallel, using $NPROC/2 threads."
+  annot_order_gapfill.pl -verbose -nproc $(( $NPROC/2 )) -consen consen_gene_order.tsv \
     -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
     -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv 
 
