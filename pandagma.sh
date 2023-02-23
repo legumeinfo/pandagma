@@ -53,7 +53,7 @@ Subcommands (in order they are usually run):
                       annotation sets that may be of lower or uncertain quality.
      pick_exemplars - Pick representative sequence for each pan-gene
    filter_to_pctile - Calculate orthogroup composition and filter fasta files by selected percentiles.
-      name_pangenes - Assign pan-gene names with consensus chromosomes and ordinal positions.
+      order_and_name - Assign pan-gene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
 
@@ -572,7 +572,7 @@ run_filter_to_pctile() {
 }
 
 ##########
-run_name_pangenes() {
+run_order_and_name() {
   cd "${WORK_DIR}"
 
   echo "  If code_table/pan_to_peptide.tsv doesn't exist, generate it."
@@ -1053,7 +1053,7 @@ fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
 commandlist="ingest mmseqs filter dagchainer mcl consense add_extra pick_exemplars \
-             filter_to_pctile name_pangenes calc_chr_pairs summarize"
+             filter_to_pctile order_and_name calc_chr_pairs summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do

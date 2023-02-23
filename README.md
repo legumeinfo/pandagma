@@ -125,7 +125,7 @@ Subcommands (in order they are usually run):
                       annotation sets that may be of lower or uncertain quality.
      pick_exemplars - Pick representative sequence for each pan-gene
      filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
-      name_pangenes - Assign pan-gene names with consensus chromosomes and ordinal positions.
+      order_and_name - Assign pan-gene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
 
