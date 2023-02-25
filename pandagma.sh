@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-02-23"
+version="2023-02-25"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -24,7 +24,7 @@ Usage:
                 Must be specified in config file if not specified here.)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
            -o (ordering method, for placing pan-genes. Options: 
-                \"reference\" (default; uses preferred_annot to order, followed by gap-filling for missing panIDs.)
+                \"reference\" (default; uses preferred_annot to order, then gap-filling for missing panIDs.)
                 \"alignment\" (uses whole-chromosome alignment of ordered panIDs from all annotations)
            -r (retain. Don't do subcommand \"clean\" after running \"all\".)
            -v (version)
@@ -102,6 +102,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         This is used for picking representative IDs+sequence from an orthogroup, when
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
+       order_method - Method to determine consensus panID order. reference or alignment [default reference]
            work_dir - Working directory, for temporary and intermediate files. 
 """
 
@@ -620,9 +621,11 @@ run_order_and_name() {
     wait
   
     echo "  Decode motifs to recover pangene IDs in order along each chromosome."
+    cat /dev/null > consen_gene_order.tsv
     for filepath in 23_encoded_chroms_filt1/*; do
       chr=`basename $filepath`
-      order_decode.pl -align $filepath -code code_table/utilized.tsv -out consen_gene_order.tsv -v 
+      order_decode.pl -align $filepath -code code_table/utilized.tsv -verbose |
+        top_line.awk >> consen_gene_order.tsv 
     done
   
     echo "  Find panIDs that weren't placed"
@@ -964,40 +967,15 @@ run_ReallyClean() {
   cd $OLDPWD
 }
 
-##########
-# Command-line interpreter
+########################################
+# Main program
 
 NPROC=$(command -v nproc > /dev/null && nproc || getconf _NPROCESSORS_ONLN)
 CONFIG="null"
 optarg_work_dir="null"
-order_method="reference"
+order_method="null"
 step="all"
 retain="no"
-
-while getopts "c:w:s:n:o:rvhm" opt
-do
-  case $opt in
-    c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
-    w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
-    s) step=$OPTARG ;;
-    n) NPROC=$OPTARG ;;
-    o) order_method=$OPTARG; echo "Order method: $order_method" ;;
-    r) retain="yes" ;;
-    v) version ;;
-    h) printf >&2 "$HELP_DOC\n" && exit 0 ;;
-    m) printf >&2 "$HELP_DOC\n$MORE_INFO\n" && exit 0 ;;
-    *) printf >&2 "$HELP_DOC\n" && exit 1 ;;
-  esac
-done
-
-if [ "$#" -eq 0 ]; then
-  printf >&2 "$HELP_DOC\n" && exit 0;
-fi
-
-shift $(expr $OPTIND - 1)
-
-########################################
-# Main program
 
 export NPROC=${NPROC:-1}
 export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
@@ -1006,7 +984,28 @@ export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 MMSEQSTHREADS=$(( 4 < ${NPROC} ? 4 : ${NPROC} ))
 
 pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation dagchainer_args 
-      out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex preferred_annot work_dir'
+  out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex order_method preferred_annot work_dir'
+
+##########
+# Command-line interpreter
+
+while getopts "c:w:s:n:o:rvhm" opt
+do
+  case $opt in
+    c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
+    w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
+    s) step=$OPTARG; echo "step(s): $step" ;;
+    n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
+    o) order_method=$OPTARG; echo "order method: $order_method" ;;
+    r) retain="yes" ;;
+    v) version ;;
+    h) printf >&2 "$HELP_DOC\n" && exit 0 ;;
+    m) printf >&2 "$HELP_DOC\n$MORE_INFO\n" && exit 0 ;;
+    *) printf >&2 "$HELP_DOC\n" && exit 1 ;;
+  esac
+done
+
+getopts_order_method=$order_method
 
 if [ $CONFIG == "null" ]; then
   printf "\nPlease provide the path to a config file: -c CONFIG\n" >&2
@@ -1019,6 +1018,19 @@ fi
 # Add shell variables from config file
 . "${CONF}"
 
+if [ "$#" -eq 0 ]; then
+  printf >&2 "$HELP_DOC\n" && exit 0;
+fi
+
+shift $(expr $OPTIND - 1)
+
+if [ "$order_method" != "$getopts_order_method" ] && [ "$getopts_order_method" != "null" ]; then
+  echo "Command-line option for order_method was \"$getopts_order_method\", overriding"
+  echo "the setting of \"$order_method\" from the config."
+  order_method=$getopts_order_method
+fi
+
+##########
 # Check for existence of work directory.
 # work_dir provided via cli argument takes precedence over the variable specified in the conf file
 if [ $optarg_work_dir == "null" ] && [ -z ${work_dir+x} ]; then
