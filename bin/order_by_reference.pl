@@ -88,6 +88,7 @@ open ($PAN_FH, "<", $pan_table) or die "Can't open in pan_table: $pan_table\n";
 my @pangene_table;
 my %HoH_panID_chr;
 my %seen_mol;
+my %skipped_mols;
 while (<$PAN_FH>) {
   chomp;
   next unless (/^\S+/);
@@ -118,7 +119,7 @@ while (<$PAN_FH>) {
       if ($seen_mol{"$chr_pre$chr"}){ next }
       else {
         $seen_mol{"$chr_pre$chr"}++;
-        say "Skipping molecule $chr_pre$chr because of low gene count: $chr_hsh{$chr}";
+        $skipped_mols{"$chr_pre$chr"}++; 
       }
     }
     else {
@@ -128,6 +129,12 @@ while (<$PAN_FH>) {
       my @seven_elts = ( $panID, $gene, $ann, $chr, $start, $end, $orient );
       push( @pangene_table, \@seven_elts );
     }
+  }
+}
+if (%skipped_mols){
+  say "Skipped the folowing molecules because of low gene count:";
+  for my $short ( keys %skipped_mols ){
+    say "  $short: $skipped_mols{$short}";
   }
 }
 
@@ -146,6 +153,7 @@ my %pangene_elts_per_ann;
 my $pref_annot_label;
 my %annots;
 my %seen_chr;
+my $prev_panID="";
 foreach my $row ( @sorted_table ) {
   my ($panID, $gene, $ann, $chr, $start, $end, $orient) = @$row;
   #say join("\t", "AA: ", $panID, $gene, $ann, $chr, $start, $end, $orient);
@@ -153,23 +161,29 @@ foreach my $row ( @sorted_table ) {
   unless ( $annots{$ann} ){ $annots{$ann}++ }
   unless ( $seen_panIDs{$panID} ){ $seen_panIDs{$panID}++ }
   if ($ann =~ /$PREF_REX/){ $pref_annot_label = $ann }
-  if ($ann eq $prev_ann && $chr == $prev_chr){
-    $ord++;
-    @elts_with_order = ( $panID, $ann, $chr, $ord, $start, $end, $orient );
-    push ( @pangene_table_ordered, [@elts_with_order] );
-    $pangene_elts_per_ann{$ann}{$panID} = [ $panID, $ann, $chr, $ord, $start, $end, $orient ];
-    #say join("\t", @elts_with_order);
-    ($prev_ann, $prev_chr) = ($ann, $chr);
+  if ($panID eq $prev_panID){ # Use just one of a tandem duplicated panID
+    next;
   }
-  elsif ($ann ne $prev_ann || $chr != $prev_chr){
-    $ord=1;
-    @elts_with_order = ( $panID, $ann, $chr, $ord, $start, $end, $orient );
-    push ( @pangene_table_ordered, [@elts_with_order] );
-    $pangene_elts_per_ann{$ann}{$panID} = [ $panID, $ann, $chr, $ord, $start, $end, $orient ];
-    #say join("\t", @elts_with_order);
-    ($prev_ann, $prev_chr) = ($ann, $chr);
-    $ord++;
+  else { # not a tandem duplicate
+    if ($ann eq $prev_ann && $chr == $prev_chr){
+      $ord++;
+      @elts_with_order = ( $panID, $ann, $chr, $ord, $start, $end, $orient );
+      push ( @pangene_table_ordered, [@elts_with_order] );
+      $pangene_elts_per_ann{$ann}{$panID} = [ $panID, $ann, $chr, $ord, $start, $end, $orient ];
+      #say join("\t", @elts_with_order);
+      ($prev_ann, $prev_chr) = ($ann, $chr);
+    }
+    elsif ($ann ne $prev_ann || $chr != $prev_chr){
+      $ord=1;
+      @elts_with_order = ( $panID, $ann, $chr, $ord, $start, $end, $orient );
+      push ( @pangene_table_ordered, [@elts_with_order] );
+      $pangene_elts_per_ann{$ann}{$panID} = [ $panID, $ann, $chr, $ord, $start, $end, $orient ];
+      #say join("\t", @elts_with_order);
+      ($prev_ann, $prev_chr) = ($ann, $chr);
+      $ord++;
+    }
   }
+  $prev_panID = $panID;
 }
 my $num_chrs = keys %seen_chr;
 
@@ -213,4 +227,5 @@ __END__
 2023
 S. Cannon
 02-23 Initial version, based on order_gapfill.pl
+02-25 Make summary report of %skipped_mols
 

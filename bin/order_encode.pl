@@ -95,6 +95,7 @@ open ($PAN_FH, "<", $pan_table) or die "Can't open in pan_table: $pan_table\n";
 my %HoH_pepID_chr;
 my %used_pepIDs;
 my @pangene_table;
+my %skipped_mols;
 while (<$PAN_FH>) {
   chomp;
   next unless (/^\S+/);
@@ -126,7 +127,7 @@ while (<$PAN_FH>) {
     $chr_gene_count++;
     $chr =~ s/^0*([^0]+)/$1/;
     if ($chr_hsh{$chr} < $chr_gene_count/100){
-      say "Skipping molecule $chr_pre$chr because of low gene count: $chr_hsh{$chr}";
+      $skipped_mols{"$chr_pre$chr"}++;
     }
     else {
       $chr_hsh{$chr}++;
@@ -135,6 +136,12 @@ while (<$PAN_FH>) {
       my @seven_elts = ( $pepID, $gene, $ann, $chr, $start, $end, $orient );
       push( @pangene_table, \@seven_elts );
     }
+  }
+}
+if (%skipped_mols){
+  say "Skipped the folowing molecules because of low gene count:";
+  for my $short ( keys %skipped_mols ){
+    say "  $short: $skipped_mols{$short}";
   }
 }
 
@@ -278,3 +285,4 @@ S. Cannon
 02-10 Get full annotation name rather than just gensp.genotype.gnm prefix
 02-11 Handle gene order. Do more filtering against scaffolds.
 02-13 Remove unused subroutine.
+02-25 Make summary report of %skipped_mols

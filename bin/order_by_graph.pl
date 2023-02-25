@@ -101,6 +101,7 @@ open ($PAN_FH, "<", $pan_table) or die "Can't open in pan_table: $pan_table\n";
 my @pangene_table;
 my %HoH_panID_chr;
 my %seen_mol;
+my %skipped_mols;
 while (<$PAN_FH>) {
   chomp;
   next unless (/^\S+/);
@@ -131,7 +132,7 @@ while (<$PAN_FH>) {
       if ($seen_mol{"$chr_pre$chr"}){ next }
       else {
         $seen_mol{"$chr_pre$chr"}++;
-        say "Skipping molecule $chr_pre$chr because of low gene count: $chr_hsh{$chr}";
+        $skipped_mols{"$chr_pre$chr"}++;
       }
     }
     else {
@@ -141,6 +142,12 @@ while (<$PAN_FH>) {
       my @seven_elts = ( $panID, $gene, $ann, $chr, $start, $end, $orient );
       push( @pangene_table, \@seven_elts );
     }
+  }
+}
+if (%skipped_mols){
+  say "Skipped the folowing molecules because of low gene count:";
+  for my $short ( keys %skipped_mols ){
+    say "  $short: $skipped_mols{$short}";
   }
 }
 
@@ -495,4 +502,5 @@ sub printstr {
 __END__
 2023
 02-20 New script "pan_graph_order.pl", derived from order_by_consensus.pl
+02-25 Make summary report of %skipped_mols
 
