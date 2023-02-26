@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-02-25"
+version="2023-02-26"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -644,11 +644,10 @@ run_order_and_name() {
   fi # End of $order_method =~ /align/
 
   echo "  Fill gaps in the alignment-based pangene ordering. This step is time-consuming."
-  #echo "  so is run in parallel, using $NPROC/2 threads."
-  #order_gapfill.pl -verbose -nproc $(( $NPROC/2 )) -consen consen_gene_order.tsv \
+  echo "  so is run in parallel, using $NPROC threads."
   order_gapfill.pl -verbose -consen consen_gene_order.tsv \
     -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
-    -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv 
+    -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv -nproc $NPROC
 
   echo "  Reshape defline into a hash, e.g. pan20175 Phaseolus.pan2.chr11_222300_pan20175 222300 223300 -"
   echo "  Note: these \"positions\" and sizes are artificial, representing only inferred relative positions."
@@ -973,7 +972,7 @@ run_ReallyClean() {
 NPROC=$(command -v nproc > /dev/null && nproc || getconf _NPROCESSORS_ONLN)
 CONFIG="null"
 optarg_work_dir="null"
-order_method="null"
+optarg_order_method="null"
 step="all"
 retain="no"
 
@@ -996,7 +995,7 @@ do
     w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
     s) step=$OPTARG; echo "step(s): $step" ;;
     n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
-    o) order_method=$OPTARG; echo "order method: $order_method" ;;
+    o) optarg_order_method=$OPTARG; echo "order method: $optarg_order_method" ;;
     r) retain="yes" ;;
     v) version ;;
     h) printf >&2 "$HELP_DOC\n" && exit 0 ;;
@@ -1004,8 +1003,6 @@ do
     *) printf >&2 "$HELP_DOC\n" && exit 1 ;;
   esac
 done
-
-getopts_order_method=$order_method
 
 if [ $CONFIG == "null" ]; then
   printf "\nPlease provide the path to a config file: -c CONFIG\n" >&2
@@ -1024,10 +1021,10 @@ fi
 
 shift $(expr $OPTIND - 1)
 
-if [ "$order_method" != "$getopts_order_method" ] && [ "$getopts_order_method" != "null" ]; then
-  echo "Command-line option for order_method was \"$getopts_order_method\", overriding"
+if [ "$order_method" != "$optarg_order_method" ] && [ "$optarg_order_method" != "null" ]; then
+  echo "Command-line option for order_method was \"$optarg_order_method\", overriding"
   echo "the setting of \"$order_method\" from the config."
-  order_method=$getopts_order_method
+  order_method=$optarg_order_method
 fi
 
 ##########
