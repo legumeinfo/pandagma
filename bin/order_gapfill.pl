@@ -4,7 +4,7 @@ use warnings;
 use Getopt::Long;
 use File::Basename;
 use Data::Dumper;
-#use Parallel::ForkManager;
+use Parallel::ForkManager;
 use List::Util qw(sum);
 use feature "say";
 
@@ -39,7 +39,7 @@ will give a hash of genes on a chromosome, with values indicating "beforeness" a
 
   OPTIONS:
     -outfile    File with previously unplaced genes added into the consen_table.
-    -nproc      Maximum number of processes to be created. 0 means no forking. (default 2).
+    -nproc      Maximum number of processes to be created. 0 means no forking. (default 0).
     -annot_regex  Regular expression for capturing annotation name from gene ID, e.g.
                     \"([^.]+\\.[^.]+\\.[^.]+\\.[^.]+)\\..+\"
                       for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1 (default)
@@ -50,7 +50,7 @@ EOS
 
 my ($consen, $unplaced, $pan_table);
 my $help;
-my $nproc=2;
+my $nproc=0;
 my $outfile;
 my $verbose=0;
 my $logstr="";
@@ -218,7 +218,7 @@ foreach my $row ( @sorted_table ) {
 }
 my $num_chrs = keys %seen_chr;
 
-say "# Finding the most frequent chromosome for each pan-gene set";
+say "# Finding the most frequent chromosome for each panID";
 my %top_chr;
 my %chr_ct_top_chr;
 if ($verbose>2) {print "#pangeneID\tchr:count ...\n"}
@@ -248,21 +248,29 @@ if ($verbose>2) {print "\n"}
 ##########
 # For each unplaced target gene (on a chromosome), score every gene (on that chromosome)
 # as being either before the target gene or after it, for each annotation set.
-# The verdict for each gene will be stored in $target_gene_scores_HoH{$chr}{$target_panID}{$panID},
+# The verdict for each gene will be stored in $target_gene_scores_by_annot{$ann}{$chr}{$target_panID}{$panID},
 # containing small negative integer values for genes before the target and small postive values after it.
 say "# Scoring each gene relative to $ct_unplaced unplaced target panIDs; will report one dot per panID.";
-
-my %target_gene_scores_HoH;
-my %orient_target_panID; # to hold predominant orientation, as + or - integer, keyed on panID
-my %used_target_panID;
-my $dots=1;
-foreach my $target_panID (keys %unplaced){
-  my $main_chr = $top_chr{$target_panID};
-  #print "$count\tDominant chr of $target_panID is $main_chr\n  ";
-  print "."; # Print progress indicator
-  if ($dots % 100 == 0){ print " $dots\n"; }
-  select()->flush();
-  foreach my $ann (keys %annots){
+my %target_gene_scores_by_annot;
+my $pm1 = Parallel::ForkManager->new($nproc);
+$pm1 -> run_on_finish ( 
+  sub {
+    my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $data_structure_reference) = @_;
+    if (defined($data_structure_reference)) { 
+      %target_gene_scores_by_annot = %{$data_structure_reference}; 
+      #say "$data_structure_reference:\n", Dumper(%target_gene_scores_by_annot);
+    }
+    else { say "No message received from child process $pid!" }
+  }
+);
+DATA_LOOP:
+foreach my $ann (keys %annots){
+  my $pid = $pm1->start and next DATA_LOOP;
+  foreach my $target_panID (keys %unplaced){
+    print ".";
+    #select()->flush();
+    my $main_chr = $top_chr{$target_panID};
+    #print "$count\tDominant chr of $target_panID is $main_chr\n  ";
     if ( defined $pangene_elts_per_ann{$ann}{$target_panID}[2] ){
       my $target_panID_chr = $pangene_elts_per_ann{$ann}{$target_panID}[2];
       my $target_panID_order = $pangene_elts_per_ann{$ann}{$target_panID}[3];
@@ -270,42 +278,70 @@ foreach my $target_panID (keys %unplaced){
       foreach my $panID ( keys %{$pangene_elts_per_ann{$ann}} ){
         my ($panID, $ann, $chr, $ord, $start, $end, $orient) = @{$pangene_elts_per_ann{$ann}{$panID}};
         if (defined $chr && defined $target_panID_chr && $chr == $target_panID_chr){
-          $used_target_panID{$chr}{$panID} = $target_panID unless defined $used_target_panID{$chr}{$panID};
           if ($ord < $target_panID_order){ # This panID comes before the target
-            $target_gene_scores_HoH{$chr}{$target_panID}{$panID}--;
+            $target_gene_scores_by_annot{$ann}{$chr}{$target_panID}{$panID}--;
           }
           else { # This panID comes at or after the target
-            $target_gene_scores_HoH{$chr}{$target_panID}{$panID}++;
+            $target_gene_scores_by_annot{$ann}{$chr}{$target_panID}{$panID}++;
           }
         }
       }
+    }
+  }
+  $pm1->finish(0, \%target_gene_scores_by_annot);
+}
+$pm1->wait_all_children;
+say "\nFinished scoring genes relative to unplaced target genes.";
 
-      # Also calculate consensus panID orientations. 
-      $target_panID_chr = $pangene_elts_per_ann{$ann}{$target_panID}[2];
-      my ($panID, $ann, $chr, $ord, $start, $end, $orient) = @{$pangene_elts_per_ann{$ann}{$target_panID}};
-      #say "($panID, $ann, $chr, $ord, $start, $end, $orient), $target_panID_chr";
-      if (defined $chr && defined $target_panID_chr && $chr == $target_panID_chr){
-        # Accumulate and store a consensus orientation for this panID# 
-        $orient =~ /-/ ?  $orient_target_panID{$panID} = "-" : $orient_target_panID{$panID} = "+";
+# Combine the scores in the target_gene_scores_by_annot hashes, combining across annotations,
+# and record which panIDs were used in merged_target_gene_scores
+my $chr_count = keys %chr_hsh;
+my %merged_target_gene_scores;
+my %used_target_panIDs;
+foreach my $ann ( keys %annots ){
+  foreach my $chr ( 1 .. $chr_count ){
+    foreach my $target_panID ( keys %unplaced ){
+      foreach my $panID ( keys %{$target_gene_scores_by_annot{$ann}{$chr}{$target_panID}} ){
+        my $score = $target_gene_scores_by_annot{$ann}{$chr}{$target_panID}{$panID};
+        $merged_target_gene_scores{$chr}{$target_panID}{$panID} += $score;
+        $used_target_panIDs{$chr}{$panID} = $target_panID unless $used_target_panIDs{$chr}{$panID};
       }
     }
   }
-  $dots++;
 }
-say "\nFinished scoring genes relative to unplaced target genes.";
 
-# Make revised hashes to hold panID info for panIDs included ("used") in %target_gene_scores_HoH
+#say Dumper(\%merged_target_gene_scores);
+
+# Calculate consensus panID orientations (in %orient_target_panID), 
+my %orient_target_panID;
+foreach my $ann (keys %annots){
+  #say "ANNOT: $ann";
+  foreach my $target_panID (keys %unplaced){
+    my $main_chr = $top_chr{$target_panID};
+    #print "Dominant chr of $target_panID is $main_chr\n  ";
+    if ( defined $pangene_elts_per_ann{$ann}{$target_panID}[2] ){
+      my $target_panID_chr = $pangene_elts_per_ann{$ann}{$target_panID}[2];
+      my ($panID, $ann, $chr, $ord, $start, $end, $orient) = @{$pangene_elts_per_ann{$ann}{$target_panID}};
+      if (defined $chr && defined $target_panID_chr && $chr == $target_panID_chr){
+        # Accumulate and store a consensus orientation for this panID
+        $orient =~ /-/ ?  $orient_target_panID{$panID} = "-" : $orient_target_panID{$panID} = "+";
+        #say "@@@ ($panID, $ann, $chr, $ord, $start, $end, $orient), $target_panID_chr, $orient";
+      }
+    }
+  }
+}
+
+# Make revised hashes to hold panID info for panIDs included ("used") in %merged_target_gene_scores
 my %consen_table_entire_used; 
 my %orient_known_panIDs_by_chr_used;
 my %posn_known_panIDs_by_chr_used;
 foreach my $chr ( keys %consen_table_entire ){
   foreach my $merged_key ( keys %{$consen_table_entire{$chr}} ){
     my ( $panID, $chr, $order, $orient ) = @{$consen_table_entire{$chr}{$merged_key}};
-    #say "??? $panID, $chr, $order, $orient";
-    foreach my $target_panID ( $used_target_panID{$chr}{$panID} ){
-      if (defined $target_panID && defined $target_gene_scores_HoH{$chr}{$target_panID}{$panID} ){
+    foreach my $target_panID ( $used_target_panIDs{$chr}{$panID} ){
+      if (defined $target_panID && defined $merged_target_gene_scores{$chr}{$target_panID}{$panID} ){
         #say "target_panID: $target_panID";
-        #say "CHECK: $chr, $target_panID, $panID, $target_gene_scores_HoH{$chr}{$target_panID}{$panID}";
+        #say "### $chr, $target_panID, $panID, $merged_target_gene_scores{$chr}{$target_panID}{$panID}";
         my $merged_key = join("__", $panID, $chr, $order, $orient );
         $consen_table_entire_used{$chr}{$merged_key} = [ $panID, $chr, $order, $orient ];
         $orient_known_panIDs_by_chr_used{$chr}{$panID} = $orient;
@@ -328,7 +364,7 @@ foreach my $target_panID (keys %unplaced){
   my @fore_aft_score;
   $fore_aft_score[0] = -9;
   my $idx=0;
-  if ($verbose >2){ say "MAIN CHR: $main_chr; panID: $target_panID" }
+  if ($verbose >1){ say "MAIN CHR: $main_chr; panID: $target_panID" }
   
   # Sort consen_table by chromosome, then position.
   my $ct_missed;
@@ -337,11 +373,11 @@ foreach my $target_panID (keys %unplaced){
                                   $consen_table_entire_used{$main_chr}{$b}[2] }
                       keys %{$consen_table_entire_used{$main_chr}} ){
     my ($panID, $main_chr, $order, $orient) = split(/__/, $merged_key);
-    #say "panID: $panID, chr $main_chr";
+    #say "Merged key has elements ($panID, $main_chr, $order, $orient)";
     # Compare the target panID against all others in this chr, to get a composite before/after placement score.
-    if (defined $target_gene_scores_HoH{$main_chr}{$target_panID}{$panID}){
+    if (defined $merged_target_gene_scores{$main_chr}{$target_panID}{$panID}){
       # fore_aft_score holds the count of target_panIDs that occur before (-) or after (+) the present panID
-      $fore_aft_score[$idx] = $target_gene_scores_HoH{$main_chr}{$target_panID}{$panID};
+      $fore_aft_score[$idx] = $merged_target_gene_scores{$main_chr}{$target_panID}{$panID};
       unless (exists $consen_IDs_ordered_per_chr{$main_chr}[$idx]){
         $consen_IDs_ordered_per_chr{$main_chr}[$idx] = $panID;
       }
@@ -354,19 +390,16 @@ foreach my $target_panID (keys %unplaced){
     }
     else {
       $ct_missed++;
-      if ($verbose>1){ say "$ct_missed -- No target gene score for $target_panID vs. $panID"; }
+      if ($verbose>2){ say "$ct_missed -- No target gene score for $target_panID vs. $panID"; }
       $signs_by_chr{$main_chr}{$target_panID}{$idx} = $prev_orient;
-      $idx++;  # Increment the index, to keep in sync with positions from sorted target_gene_scores_HoH
+      $idx++;  # Increment the index, to keep in sync with positions from sorted merged_target_gene_scores
       $missed_panIDs_by_chr{$main_chr}{$merged_key} = [ $panID, $main_chr, $order, $orient ];
     }
-
-    if ($verbose >1){ 
-      say join( "\t", @{$consen_table_entire_used{$main_chr}{$merged_key}} );
-    }
+    #say join( "\t", "&&&", @{$consen_table_entire_used{$main_chr}{$merged_key}} );
   }
   
   # Determine consensus placement of this target panID
-  #say "CHECK: ( $main_chr, $target_panID )";
+  say "Do find_placement of target_panID $target_panID on chr $main_chr";
   my $transition_idx = find_placement( $main_chr, $target_panID, \%signs_by_chr );
 
   if (defined $transition_idx){
@@ -396,7 +429,7 @@ foreach my $target_panID (keys %unplaced){
     $consen_table_entire_used{$main_chr}{$merged_key} = [ $target_panID, $main_chr, $NEW_POS, $HERE_ORIENT ];
   
     if ($verbose>1){
-      #say join("\t", "FORE:", $FORE_ID, $main_chr, $FORE_POS, $FORE_ORIENT, $FORE_POS );
+      say join("\t", "FORE:", $FORE_ID, $main_chr, $FORE_POS, $FORE_ORIENT, $FORE_POS );
       say join("\t", "HERE:", $target_panID, $main_chr, $NEW_POS, $HERE_ORIENT, $NEW_POS );
       say join("\t", "AFT:", $AFT_ID, $main_chr, $AFT_POS, $AFT_ORIENT, $AFT_POS );
       say "Size of consen_IDs_ordered on chr $main_chr: ", scalar(@{$consen_IDs_ordered_per_chr{$main_chr}});
@@ -441,7 +474,6 @@ foreach my $chr (1 .. $num_chrs ){
 # Renumber the panIDs, since the initial numbers may not have sufficient space to permit
 # addition of unplaced genes within the available ordered integers, given the placement scheme.
 my @consen_table_AoA;
-my $chr_count = keys %chr_hsh;
 my $OUT_FH;
 if ($outfile){
   open ($OUT_FH, ">", $outfile) or die "Can't open outfile: $outfile\n";
@@ -524,13 +556,13 @@ sub find_placement {
   foreach my $i ( $width-1 .. @elements-($width+1) ){
     my @fore_elts = @elements[ $i-($width-1) .. $i ];
     my @aft_elts = @elements[ $i+1 .. $i+$width ];
-    if ($verbose>1){
+    if ($verbose>2){
       say sum(@fore_elts), " ", sum(@aft_elts), "\t@fore_elts   @aft_elts\t$i"; 
     }
     if ( sum(@fore_elts) < 0 && sum(@aft_elts) == $width &&
          abs(sum(@aft_elts)) > abs(sum(@fore_elts)) && 
          $seen_transition == 0 ){
-      if ($verbose>1){ say join ("\t", "  target:", $panID, $chr,  "transition_idx:", $i); }
+      if ($verbose>2){ say join ("\t", "  target:", $panID, $chr,  "transition_idx:", $i); }
       $transition_idx = $i;
       $seen_transition = 1;
       last;
@@ -546,4 +578,4 @@ S. Cannon
 02-22 Retrieve data structures from Parallel::ForkManager with run_on_finish callback
 02-23 Yank Parallel::ForkManager because of inconsistency in retrieval of data structure.
 02-25 More testing. Merge original consen_gene_order table with missed and formerly unplaced panIDs.
-
+02-26 Add back ForkManager after restructuring loop and %target_gene_scores_by_annot hash.
