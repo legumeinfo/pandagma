@@ -5,6 +5,9 @@ use Getopt::Long;
 use File::Basename;
 use Data::Dumper;
 use Parallel::ForkManager;
+use Symbol;
+use IO::Handle;
+use Scalar::Util qw< openhandle >;
 use List::Util qw(sum);
 use feature "say";
 
@@ -136,6 +139,7 @@ while (<$PAN_FH>) {
   next unless (/^\S+/);
   my $line = $_;
   my ($panID, $gene, $ann_chr, $start, $end, $orient) = split(/\t/, $line);
+  #say $line;
 
   # From the second field (prefixed genes), extract the annot name
   my $ANN_REX = $annot_regex;
@@ -143,7 +147,7 @@ while (<$PAN_FH>) {
   $ann =~ s/$ANN_REX/$1/;
 
   # From the third field, a annot.chr string, extract chr
-  $ann_chr =~ /\S+\.(\D+\w+\D+)(\d+)$/;
+  $ann_chr =~ /^\S+\.(\D+\w+\D+)(\d+)$/;
   my ($chr_pre, $chr) = ($1, $2, $3);
   if ( !defined $chr_pre || !defined $chr ){
     if ($verbose>2){ say "For pan-gene consensus, skipping unrecognized annotation-prefix-chr pattern: $ann_chr" }
@@ -167,6 +171,7 @@ while (<$PAN_FH>) {
     else {
       $chr_hsh{$chr}++;
       #say "A:\t($panID, $gene, $ann, $chr_pre, $chr)";
+      #say "HoH_panID_chr: $panID, $gene, $ann, $chr, $start, $end, $orient";
       $HoH_panID_chr{$panID}{$chr}++;
       my @seven_elts = ( $panID, $gene, $ann, $chr, $start, $end, $orient );
       push( @pangene_table, \@seven_elts );
@@ -180,13 +185,13 @@ if (%skipped_mols){
   }
 }
 
-# Sort @pangene_table to determine order per (1) annot; (2) chromosome; (3) posn
+# Sort @pangene_table to determine order per annot [2]; chromosome [3];  posn [4]
 my @sorted_table = sort { 
      $a->[2] cmp $b->[2] || $a->[3] <=> $b->[3] || $a->[4] <=> $b->[4] 
    } @pangene_table; 
 
 say "# Calculating gene order per annot-and-chromosome";
-my ($prAnn, $prChr) = ("", "");
+my ($prAnn, $prChr) = ("", 0);
 my $ord=0;
 my @elts_with_order;
 my @pangene_table_ordered;
@@ -203,7 +208,7 @@ foreach my $row ( @sorted_table ) {
     @elts_with_order = ( $panID, $ann, $chr, $ord, $start, $end, $orient );
     push ( @pangene_table_ordered, [@elts_with_order] );
     $pangene_elts_per_ann{$ann}{$panID} = [ $panID, $ann, $chr, $ord, $start, $end, $orient ];
-    #say join("\t", @elts_with_order);
+    ##say join("\t", @elts_with_order);
     ($prAnn, $prChr) = ($ann, $chr);
   }
   elsif ($ann ne $prAnn || $chr != $prChr){
@@ -211,12 +216,14 @@ foreach my $row ( @sorted_table ) {
     @elts_with_order = ( $panID, $ann, $chr, $ord, $start, $end, $orient );
     push ( @pangene_table_ordered, [@elts_with_order] );
     $pangene_elts_per_ann{$ann}{$panID} = [ $panID, $ann, $chr, $ord, $start, $end, $orient ];
-    #say join("\t", @elts_with_order);
+    ##say join("\t", @elts_with_order);
     ($prAnn, $prChr) = ($ann, $chr);
     $ord++;
   }
 }
 my $num_chrs = keys %seen_chr;
+my $num_annots = keys %annots;
+say "#  $num_chrs chrs and $num_annots annotations";
 
 say "# Finding the most frequent chromosome for each panID";
 my %top_chr;
@@ -251,47 +258,47 @@ if ($verbose>2) {print "\n"}
 # The verdict for each gene will be stored in $target_gene_scores_by_annot{$ann}{$chr}{$target_panID}{$panID},
 # containing small negative integer values for genes before the target and small postive values after it.
 say "# Scoring each gene relative to $ct_unplaced unplaced target panIDs; will report one dot per panID.";
-my %target_gene_scores_by_annot;
+my $tmpdir = "consen_tmp";
+unless ( -d $tmpdir ){ mkdir $tmpdir or die "Can't mkdir $tmpdir $!\n" };
 my $pm1 = Parallel::ForkManager->new($nproc);
-$pm1 -> run_on_finish ( 
-  sub {
-    my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $data_structure_reference) = @_;
-    if (defined($data_structure_reference)) { 
-      %target_gene_scores_by_annot = %{$data_structure_reference}; 
-      #say "$data_structure_reference:\n", Dumper(%target_gene_scores_by_annot);
-    }
-    else { say "No message received from child process $pid!" }
-  }
-);
 DATA_LOOP:
 foreach my $ann (keys %annots){
   my $pid = $pm1->start and next DATA_LOOP;
+  say "Starting $ann";
+  my $ann_file = "$tmpdir/target_gene_scores_$ann";
+  my $SYM = gensym; # method from Symbol;  creates an anonymous glob and returns a reference to it.
+  open $SYM, ">", $ann_file or die "Can't open out $ann_file: $!\n";
   foreach my $target_panID (keys %unplaced){
     print ".";
-    #select()->flush();
+    select()->flush();
     my $main_chr = $top_chr{$target_panID};
-    #print "$count\tDominant chr of $target_panID is $main_chr\n  ";
+    #say "$count\tDominant chr of $target_panID is $main_chr\n  ";
+    #say "ann: $ann; target_panID: $target_panID";
     if ( defined $pangene_elts_per_ann{$ann}{$target_panID}[2] ){
       my $target_panID_chr = $pangene_elts_per_ann{$ann}{$target_panID}[2];
       my $target_panID_order = $pangene_elts_per_ann{$ann}{$target_panID}[3];
       #say "CHECK: $target_panID\t$target_panID_chr\t$target_panID_order\t$ann";
       foreach my $panID ( keys %{$pangene_elts_per_ann{$ann}} ){
         my ($panID, $ann, $chr, $ord, $start, $end, $orient) = @{$pangene_elts_per_ann{$ann}{$panID}};
+        #say "CC: ($panID, $ann, $chr, $ord, $start, $end, $orient)";
         if (defined $chr && defined $target_panID_chr && $chr == $target_panID_chr){
           if ($ord < $target_panID_order){ # This panID comes before the target
-            $target_gene_scores_by_annot{$ann}{$chr}{$target_panID}{$panID}--;
+            say $SYM join ("\t", $chr, $target_panID, $panID, -1);
           }
           else { # This panID comes at or after the target
-            $target_gene_scores_by_annot{$ann}{$chr}{$target_panID}{$panID}++;
+            say $SYM join ("\t", $chr, $target_panID, $panID, 1);
           }
         }
       }
     }
   }
-  $pm1->finish(0, \%target_gene_scores_by_annot);
+  say "\nFinished $ann\n";
+  $pm1->finish; # No structures to return; stored data written to files.
+  #if (openhandle($SYM)){close $SYM};
 }
 $pm1->wait_all_children;
 say "\nFinished scoring genes relative to unplaced target genes.";
+
 
 # Combine the scores in the target_gene_scores_by_annot hashes, combining across annotations,
 # and record which panIDs were used in merged_target_gene_scores
@@ -299,15 +306,16 @@ my $chr_count = keys %chr_hsh;
 my %merged_target_gene_scores;
 my %used_target_panIDs;
 foreach my $ann ( keys %annots ){
-  foreach my $chr ( 1 .. $chr_count ){
-    foreach my $target_panID ( keys %unplaced ){
-      foreach my $panID ( keys %{$target_gene_scores_by_annot{$ann}{$chr}{$target_panID}} ){
-        my $score = $target_gene_scores_by_annot{$ann}{$chr}{$target_panID}{$panID};
-        $merged_target_gene_scores{$chr}{$target_panID}{$panID} += $score;
-        $used_target_panIDs{$chr}{$panID} = $target_panID unless $used_target_panIDs{$chr}{$panID};
-      }
-    }
+  my $ann_file = "$tmpdir/target_gene_scores_$ann";
+  my $SYM = gensym; # method from Symbol;  creates an anonymous glob and returns a reference to it.
+  open $SYM, "<", $ann_file or die "Can't open in $ann_file: $!\n";
+  while (<$SYM>){
+    chomp;
+    my ($chr, $target_panID, $panID, $orient) = split("\t", $_);
+    $merged_target_gene_scores{$chr}{$target_panID}{$panID} += $orient;
+    $used_target_panIDs{$chr}{$panID} = $target_panID unless $used_target_panIDs{$chr}{$panID};
   }
+  close $SYM;
 }
 
 #say Dumper(\%merged_target_gene_scores);
@@ -399,7 +407,7 @@ foreach my $target_panID (keys %unplaced){
   }
   
   # Determine consensus placement of this target panID
-  say "Do find_placement of target_panID $target_panID on chr $main_chr";
+  if ($verbose){say "Do find_placement of target_panID $target_panID on chr $main_chr";}
   my $transition_idx = find_placement( $main_chr, $target_panID, \%signs_by_chr );
 
   if (defined $transition_idx){
@@ -578,4 +586,4 @@ S. Cannon
 02-22 Retrieve data structures from Parallel::ForkManager with run_on_finish callback
 02-23 Yank Parallel::ForkManager because of inconsistency in retrieval of data structure.
 02-25 More testing. Merge original consen_gene_order table with missed and formerly unplaced panIDs.
-02-26 Add back ForkManager after restructuring loop and %target_gene_scores_by_annot hash.
+02-26 Add back ForkManager after restructuring loop and writing to tmp files.
