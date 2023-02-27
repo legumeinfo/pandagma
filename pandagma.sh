@@ -563,7 +563,7 @@ run_filter_to_pctile() {
       awk -v PCTL=$percentile -v ANNCT=$max_annot_ct '$2>=ANNCT*(PCTL/100)&& $1!~/^#/ {print $1}' |
         cat > lists/lis.18_syn_pan_aug_extra.pctl${percentile}
 
-    echo "  Get a fasta subset with only genes from at least (percentile/100)*max_annot_ct annotation sets"
+    echo "  Get a fasta subset with only genes from at least $(($max_annot_ct*$pctl_low/100)) annotation sets"
     get_fasta_subset.pl -in 21_pan_fasta_clust_rep_cds.fna \
                         -list lists/lis.18_syn_pan_aug_extra.pctl${percentile} \
                         -clobber -out 22_pan_fasta_rep_pctl${percentile}_cds.fna
