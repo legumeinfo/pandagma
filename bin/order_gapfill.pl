@@ -83,6 +83,10 @@ while (<$UN_FH>){
   $ct_unplaced++;
 }
 
+if ($ct_unplaced > 20000){ 
+  die "The number of unplaced genes is unusually high, at $ct_unplaced. This suggests a problem in the previous step(s).";
+}
+
 # Read table of panIDs with alignment- or reference-based placements
 open (my $CONSEN_FH, "<", $consen) or die "Can't open in consensus file: $consen\n";
 my %consen_table; # Working version; will be augmented with unplaced panIDs
@@ -121,7 +125,7 @@ while (<$PAN_FH>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  unless ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  unless ( $chr_pre =~ /chloro|chl|^CP|mito|ctg|contig|tig|pilon|^scaff|^sc|^super|^un\w+\d+/i ){
     $chr_gene_count++;
     $chr =~ s/^0*([^0]+)/$1/;
     $chr_hsh{$chr}++;
@@ -155,7 +159,7 @@ while (<$PAN_FH>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  if ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  if ( $chr_pre =~ /chloro|chl|^CP|mito|ctg|contig|tig|pilon|^scaff|^sc|^super|^un\w+\d+/i ){
     if ($verbose>2){ say "For pan-gene consensus, skipping non-chromosome gene [$chr_pre $chr]\t$gene" }
   }
   else {
@@ -257,6 +261,7 @@ if ($verbose>2) {print "\n"}
 # as being either before the target gene or after it, for each annotation set.
 # The verdict for each gene will be stored in $target_gene_scores_by_annot{$ann}{$chr}{$target_panID}{$panID},
 # containing small negative integer values for genes before the target and small postive values after it.
+
 say "# Scoring each gene relative to $ct_unplaced unplaced target panIDs; will report one dot per panID.";
 my $tmpdir = "consen_tmp";
 unless ( -d $tmpdir ){ mkdir $tmpdir or die "Can't mkdir $tmpdir $!\n" };
@@ -587,3 +592,5 @@ S. Cannon
 02-23 Yank Parallel::ForkManager because of inconsistency in retrieval of data structure.
 02-25 More testing. Merge original consen_gene_order table with missed and formerly unplaced panIDs.
 02-26 Add back ForkManager after restructuring loop and writing to tmp files.
+02-27 Fix REGEX for chromosome prefix, removing patterns that can match Mtrun
+

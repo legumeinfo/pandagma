@@ -83,7 +83,7 @@ while (<$PAN_FH>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  unless ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  unless ( $chr_pre =~ /chloro|chl|^CP|mito|ctg|contig|tig|pilon|^scaff|^sc|^super|^un\w+\d+/i ){
     $chr_gene_count++;
     $chr =~ s/^0*([^0]+)/$1/;
     $chr_hsh{$chr}++;
@@ -120,7 +120,7 @@ while (<$PAN_FH>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  if ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  if ( $chr_pre =~ /chloro|chl|^CP|mito|ctg|contig|tig|pilon|^scaff|^sc|^super|^un\w+\d+/i ){
     if ($verbose){ say "For pan-gene consensus, skipping non-chromosome gene [$chr_pre $chr]\t$gene" }
   }
   else {
@@ -286,3 +286,5 @@ S. Cannon
 02-11 Handle gene order. Do more filtering against scaffolds.
 02-13 Remove unused subroutine.
 02-25 Make summary report of %skipped_mols
+02-27 Fix REGEX for chromosome prefix, removing patterns that can match Mtrun
+

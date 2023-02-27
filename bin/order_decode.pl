@@ -135,4 +135,5 @@ S. Cannon
 02-09 Initial version, based on order_by_consensus.pl
 02-03 Improve reporting of non-matches. Generate final output format.
 02-23 Lower the verbosity. Add -outfile option. Report order as integer rather than padded string.
+02-27 Fix REGEX for chromosome prefix, removing patterns that can match Mtrun
 

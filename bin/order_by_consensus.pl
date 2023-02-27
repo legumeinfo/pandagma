@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
-use strict;
-use warnings;
+d_//binenv perl
+d/bin/bind_/bin strict;
+dd_/bin warning/bin/bins;
 use Getopt::Long;
 use List::Util qw(sum);
 use File::Basename;
@@ -68,7 +68,7 @@ while (<>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  if ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  if ( $chr_pre =~ /chloro|chl|^CP|mito|ctg|contig|tig|pilon|^scaff|^sc|^super|^un\w+\d+/i ){
     if ($verbose){ say "For pan-gene consensus, skipping non-chromosome gene [$chr_pre $chr]\t$gene" }
   }
   else {
@@ -247,4 +247,5 @@ __END__
 01-13 Rename from order_by_consensus.pl to order_by_consensus.pl. This version operates
        on the same five-column input data with genomic position, but calculates modal 
        chromosome and gene orders per annotation set; then calculates modal order for the pangene.
+02-27 Fix REGEX for chromosome prefix, removing patterns that can match Mtrun
 

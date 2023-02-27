@@ -77,7 +77,7 @@ while (<$PAN_FH>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  unless ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  unless ( $chr_pre =~ /chloro|chl|^CP|mito|ctg|contig|tig|pilon|^scaff|^sc|^super|^un\w+\d+/i ){
     $chr_gene_count++;
     $chr =~ s/^0*([^0]+)/$1/;
     $chr_hsh{$chr}++;
@@ -110,7 +110,8 @@ while (<$PAN_FH>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  if ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  #say "AA:\t( $panID, $gene, $ann, $chr_pre|$chr, $start, $end, $orient )";
+  if ( $chr_pre =~ /chloro|chl|^CP|mito|ctg|contig|tig|pilon|^scaff|^sc|^super|^un\w+\d+/i ){
     if ($verbose>1){ say "For pan-gene consensus, skipping non-chromosome gene [$chr_pre $chr]\t$gene" }
   }
   else {
@@ -125,7 +126,7 @@ while (<$PAN_FH>) {
     }
     else {
       $chr_hsh{$chr}++;
-      #say "A:\t($panID, $gene, $ann, $chr_pre, $chr)";
+      #say "BB:\t( $panID, $gene, $ann, $chr_pre|$chr, $start, $end, $orient )";
       $HoH_panID_chr{$panID}{$chr}++;
       my @seven_elts = ( $panID, $gene, $ann, $chr, $start, $end, $orient );
       push( @pangene_table, \@seven_elts );
@@ -139,7 +140,7 @@ if (%skipped_mols){
   }
 }
 
-# Sort @pangene_table to determine order per (1) annot; (2) chromosome; (3) posn
+# Sort @pangene_table to determine order per annot [2]; chromosome [3]; posn [4]
 my @sorted_table = sort { 
      $a->[2] cmp $b->[2] || $a->[3] <=> $b->[3] || $a->[4] <=> $b->[4] 
    } @pangene_table; 
@@ -157,7 +158,7 @@ my %seen_chr;
 my $prev_panID="";
 foreach my $row ( @sorted_table ) {
   my ($panID, $gene, $ann, $chr, $start, $end, $orient) = @$row;
-  #say join("\t", "AA: ", $panID, $gene, $ann, $chr, $start, $end, $orient);
+  #say join("\t", "CC: ", $panID, $gene, $ann, $chr, $start, $end, $orient);
   unless ( $seen_chr{$chr} ){ $seen_chr{$chr}++ }
   unless ( $annots{$ann} ){ $annots{$ann}++ }
   unless ( $seen_panIDs{$panID} ){ $seen_panIDs{$panID}++ }
@@ -229,4 +230,5 @@ __END__
 S. Cannon
 02-23 Initial version, based on order_gapfill.pl
 02-25 Make summary report of %skipped_mols
+02-27 Fix REGEX for chromosome prefix, removing patterns that can match Mtrun
 
