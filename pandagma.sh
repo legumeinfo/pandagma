@@ -635,7 +635,8 @@ run_order_and_name() {
   elif [[ $order_method =~ "reference" ]]; then
     echo "==  The next several steps will determine panID ordering using the \"reference\" ordering option,"
     echo "    based on the panID order from the supplied \"preferred annotation\", $preferred_annot"
-    echo "  Run order_by_reference.pl"
+    echo "  order_by_reference.pl -verbose -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \ "
+    echo "     -pref_annot $preferred_annot -consen_out consen_gene_order.tsv -unplaced_out consen_pan_unplaced.txt"
     order_by_reference.pl -verbose -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
       -pref_annot $preferred_annot -consen_out consen_gene_order.tsv -unplaced_out consen_pan_unplaced.txt
   else 
@@ -643,11 +644,12 @@ run_order_and_name() {
     exit 1
   fi # End of $order_method =~ /align/
 
+  gapfill_threads=$(($NPROC/2))
   echo "  Fill gaps in the alignment-based pangene ordering. This step is time-consuming."
-  echo "  so is run in parallel, using $NPROC threads."
+  echo "  so is run in parallel, using $gapfill_threads threads."
   order_gapfill.pl -verbose -consen consen_gene_order.tsv \
     -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
-    -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv -nproc $NPROC
+    -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv -nproc $gapfill_threads
 
   echo "  Reshape defline into a hash, e.g. pan20175 Phaseolus.pan2.chr11_222300_pan20175 222300 223300 -"
   echo "  Note: these \"positions\" and sizes are artificial, representing only inferred relative positions."
