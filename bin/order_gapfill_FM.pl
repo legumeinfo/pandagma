@@ -118,7 +118,7 @@ while (<$PAN_FH>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  unless ( $chr_pre =~ /chloro|chl|CP|mito|MT|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  unless ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
     $chr_gene_count++;
     $chr =~ s/^0*([^0]+)/$1/;
     $chr_hsh{$chr}++;
@@ -151,7 +151,7 @@ while (<$PAN_FH>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  if ( $chr_pre =~ /chloro|chl|CP|mito|MT|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  if ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
     if ($verbose>2){ say "For pan-gene consensus, skipping non-chromosome gene [$chr_pre $chr]\t$gene" }
   }
   else {

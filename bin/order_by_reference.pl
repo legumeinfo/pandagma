@@ -55,6 +55,7 @@ die "\n$usage\n" if ( $help || ! $pan_table || ! $pref_annot );
 
 $pref_annot =~ s/['"]//g;
 my $PREF_REX = qr/$pref_annot/;
+say "# Preferred annotation is: $pref_annot";
 
 # Do a first-pass reading of the pan_table to get counts per molecule, to help later
 # bypass probable scaffolds.
@@ -70,13 +71,13 @@ while (<$PAN_FH>) {
 
   # From the third field, a annot.chr string, extract chr
   $ann_chr =~ /\S+\.(\D+\w+\D+)(\d+)$/;
-  my ($chr_pre, $chr) = ($1, $2, $3);
+  my ($chr_pre, $chr) = ($1, $2);
   if ( !defined $chr_pre || !defined $chr ){
     next;
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  unless ( $chr_pre =~ /chloro|chl|CP|mito|MT|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  unless ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
     $chr_gene_count++;
     $chr =~ s/^0*([^0]+)/$1/;
     $chr_hsh{$chr}++;
@@ -102,14 +103,14 @@ while (<$PAN_FH>) {
 
   # From the third field, a annot.chr string, extract chr
   $ann_chr =~ /\S+\.(\D+\w+\D+)(\d+)$/;
-  my ($chr_pre, $chr) = ($1, $2, $3);
+  my ($chr_pre, $chr) = ($1, $2);
   if ( !defined $chr_pre || !defined $chr ){
     if ($verbose){ say "For pan-gene consensus, skipping unrecognized annotation-prefix-chr pattern: $ann_chr" }
     next;
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  if ( $chr_pre =~ /chloro|chl|CP|mito|MT|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  if ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
     if ($verbose>1){ say "For pan-gene consensus, skipping non-chromosome gene [$chr_pre $chr]\t$gene" }
   }
   else {

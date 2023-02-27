@@ -121,7 +121,7 @@ while (<$PAN_FH>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  unless ( $chr_pre =~ /chloro|chl|CP|mito|MT|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  unless ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
     $chr_gene_count++;
     $chr =~ s/^0*([^0]+)/$1/;
     $chr_hsh{$chr}++;
@@ -155,7 +155,7 @@ while (<$PAN_FH>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  if ( $chr_pre =~ /chloro|chl|CP|mito|MT|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
+  if ( $chr_pre =~ /chloro|chl|CP|mito|ctg|contig|tig|pilon|scaff|sc|super|un\w+\d+/i ){
     if ($verbose>2){ say "For pan-gene consensus, skipping non-chromosome gene [$chr_pre $chr]\t$gene" }
   }
   else {
@@ -300,8 +300,8 @@ $pm1->wait_all_children;
 say "\nFinished scoring genes relative to unplaced target genes.";
 
 
-say "# Combine the scores in the target_gene_scores_by_annot hashes, combining across annotations,";
-say "# and record which panIDs were used in merged_target_gene_scores";
+# Combine the scores in the target_gene_scores_by_annot hashes, combining across annotations,
+# and record which panIDs were used in merged_target_gene_scores
 my $chr_count = keys %chr_hsh;
 my %merged_target_gene_scores;
 my %used_target_panIDs;
@@ -320,7 +320,7 @@ foreach my $ann ( keys %annots ){
 
 #say Dumper(\%merged_target_gene_scores);
 
-say "# Calculate consensus panID orientations (in %orient_target_panID)";
+# Calculate consensus panID orientations (in %orient_target_panID), 
 my %orient_target_panID;
 foreach my $ann (keys %annots){
   #say "ANNOT: $ann";
@@ -359,8 +359,8 @@ foreach my $chr ( keys %consen_table_entire ){
   }
 }
 
-say "# Now traverse the table of panIDs that have been positioned by alignment, and look up";
-say "# whether each ID occurs before or after the target ID, relative to available annotations.";
+# Now traverse the table of panIDs that have been positioned by alignment, and look up
+# whether each ID occurs before or after the target ID, relative to available annotations.
 my $count = 0;
 my %consen_IDs_ordered_per_chr;
 my %signs_by_chr;
@@ -451,7 +451,8 @@ foreach my $target_panID (keys %unplaced){
   if ($verbose>1){ say "=================\n"; }
 }
 
-say "# Merge %consen_table_entire_used and %missed_panIDs_by_chr";
+# Merge %consen_table_entire_used and %missed_panIDs_by_chr
+#my %merged_consen_table_entire = (%missed_panIDs_by_chr, %consen_table_entire_used);
 my %merged_consen_table_entire;
 my ($ct_cte, $ct_cteu, $ct_miss);
 foreach my $chr  (1 .. $num_chrs ){
@@ -476,7 +477,7 @@ foreach my $chr (1 .. $num_chrs ){
 }
 #say "cte: $ct_cte\ncte: $ct_cteu\nmiss: $ct_miss\nmerged: $ct_mcte";
 
-say "# Final traversal of %consen_table to print the results - now with added elements from %unplaced.";
+# Final traversal of %consen_table to print the results - now with added elements from %unplaced.
 # First put it into an array of arrays, before sorting.
 # Renumber the panIDs, since the initial numbers may not have sufficient space to permit
 # addition of unplaced genes within the available ordered integers, given the placement scheme.
