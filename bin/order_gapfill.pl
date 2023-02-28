@@ -14,9 +14,9 @@ use feature "say";
 $! = 1;  # disable buffering, to get finer-grained real-time process & debugging output
 
 my $usage = <<EOS;
-Given alignment of gene order with pangene IDs determined by alignment of gene orders 
-(by order_encode.pl and order_decode.pl), place leftover pangenes
-relative to the pangenes that have established, alignment-based placements.
+Given alignment of gene order with pangene IDs determined previously (by alignment, with
+order_encode.pl and order_decode.pl or by reference, with order_by_reference.pl), place the
+leftover pangenes relative to the pangenes that have established, alignment-based placements.
 
 Usage: order_gapfill.pl -consen_table CONSEN_TABLE  -unplaced UNPLACED_LIST \
                                -pan_table PANGENE_TABLE
@@ -43,6 +43,7 @@ will give a hash of genes on a chromosome, with values indicating "beforeness" a
   OPTIONS:
     -outfile    File with previously unplaced genes added into the consen_table.
     -nproc      Maximum number of processes to be created. 0 means no forking. (default 0).
+    -retain     Retain tempfiles from search of unplaced genes against all others (default false)
     -annot_regex  Regular expression for capturing annotation name from gene ID, e.g.
                     \"([^.]+\\.[^.]+\\.[^.]+\\.[^.]+)\\..+\"
                       for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1 (default)
@@ -56,6 +57,7 @@ my $help;
 my $nproc=0;
 my $outfile;
 my $verbose=0;
+my $retain;
 my $logstr="";
 my $annot_regex = "([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+"; 
 
@@ -66,6 +68,7 @@ GetOptions (
   "outfile:s" =>     \$outfile,
   "annot_regex:s" => \$annot_regex,
   "nproc:i" =>       \$nproc,
+  "retain" =>        \$retain,
   "verbose+" =>      \$verbose,
   "help" =>          \$help,
 );
@@ -321,6 +324,11 @@ foreach my $ann ( keys %annots ){
     $used_target_panIDs{$chr}{$panID} = $target_panID unless $used_target_panIDs{$chr}{$panID};
   }
   close $SYM;
+  # Clean up large temp files
+  unless ($retain){
+    if ($verbose){ say "Removing tempfile |$SYM| $ann_file" }
+    unlink $ann_file or die "Can't unlink file $ann_file: $!\n";
+  }
 }
 
 #say Dumper(\%merged_target_gene_scores);
@@ -337,8 +345,9 @@ foreach my $ann (keys %annots){
       my ($panID, $ann, $chr, $ord, $start, $end, $orient) = @{$pangene_elts_per_ann{$ann}{$target_panID}};
       if (defined $chr && defined $target_panID_chr && $chr == $target_panID_chr){
         # Accumulate and store a consensus orientation for this panID
-        $orient =~ /-/ ?  $orient_target_panID{$panID} = "-" : $orient_target_panID{$panID} = "+";
-        #say "@@@ ($panID, $ann, $chr, $ord, $start, $end, $orient), $target_panID_chr, $orient";
+        if ( $orient =~ /-/ ){ $orient_target_panID{$panID} = "-" }
+        else { $orient_target_panID{$panID} = "+" }
+        #say "@@@ ($panID, $ann, $chr, $ord, $start, $end, $orient), $target_panID_chr, $orient_target_panID{$panID}";
       }
     }
   }
@@ -593,4 +602,4 @@ S. Cannon
 02-25 More testing. Merge original consen_gene_order table with missed and formerly unplaced panIDs.
 02-26 Add back ForkManager after restructuring loop and writing to tmp files.
 02-27 Fix REGEX for chromosome prefix, removing patterns that can match Mtrun
-
+02-28 Fix bug in determining the consensus orientation.

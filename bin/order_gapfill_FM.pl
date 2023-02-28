@@ -11,9 +11,9 @@ use feature "say";
 $! = 1;  # disable buffering, to get finer-grained real-time process & debugging output
 
 my $usage = <<EOS;
-Given alignment of gene order with pangene IDs determined by alignment of gene orders 
-(by order_encode.pl and order_decode.pl), place leftover pangenes
-relative to the pangenes that have established, alignment-based placements.
+Given alignment of gene order with pangene IDs determined previously (by alignment, with
+order_encode.pl and order_decode.pl or by reference, with order_by_reference.pl), place the
+leftover pangenes relative to the pangenes that have established, alignment-based placements.
 
 Usage: order_gapfill.pl -consen_table CONSEN_TABLE  -unplaced UNPLACED_LIST \
                                -pan_table PANGENE_TABLE
@@ -66,6 +66,13 @@ GetOptions (
   "verbose+" =>      \$verbose,
   "help" =>          \$help,
 );
+
+my $dont = <<NOPE;
+Please use order_gapfill.pl rather tha this version (order_gapfill_FM.pl). In this abandoned version, 
+the threads in ForkManager are stomping on one another during the writing of %target_gene_scores_by_annot. 
+In order_gapfill.pl, this problem is fixed by writing to temp files."
+NOPE
+die "\n$dont\n";
 
 die "\n$usage\n" if ( $help || ! $consen || ! $unplaced || ! $pan_table );
 
@@ -324,8 +331,9 @@ foreach my $ann (keys %annots){
       my ($panID, $ann, $chr, $ord, $start, $end, $orient) = @{$pangene_elts_per_ann{$ann}{$target_panID}};
       if (defined $chr && defined $target_panID_chr && $chr == $target_panID_chr){
         # Accumulate and store a consensus orientation for this panID
-        $orient =~ /-/ ?  $orient_target_panID{$panID} = "-" : $orient_target_panID{$panID} = "+";
-        #say "@@@ ($panID, $ann, $chr, $ord, $start, $end, $orient), $target_panID_chr, $orient";
+        if ( $orient =~ /-/ ){ $orient_target_panID{$panID} = "-" }
+        else { $orient_target_panID{$panID} = "+" }
+        #say "@@@ ($panID, $ann, $chr, $ord, $start, $end, $orient), $target_panID_chr, $orient_target_panID{$panID}";
       }
     }
   }
@@ -580,4 +588,4 @@ S. Cannon
 02-25 More testing. Merge original consen_gene_order table with missed and formerly unplaced panIDs.
 02-26 Add back ForkManager after restructuring loop and %target_gene_scores_by_annot hash.
 02-27 Fix REGEX for chromosome prefix, removing patterns that can match Mtrun
-
+02-28 Fix bug in determining the consensus orientation. Add "don't use" message for order_gapfill_FM.pl
