@@ -605,7 +605,7 @@ run_order_and_name() {
     mkdir -p 23_encoded_chroms
     order_encode.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
                           -code_table code_table/pan_to_peptide.tsv -utilized code_table/utilized.tsv \
-                          -annot_regex ${ANN_REX} -outdir 23_encoded_chroms 
+                          -annot_regex "${ANN_REX}" -outdir 23_encoded_chroms 
   
     echo "  Align chromosome sequences with peptide-encoded-gene-orders."
     mkdir -p 23_encoded_chroms_aligned
@@ -635,10 +635,12 @@ run_order_and_name() {
   elif [[ $order_method =~ "reference" ]]; then
     echo "==  The next several steps will determine panID ordering using the \"reference\" ordering option,"
     echo "    based on the panID order from the supplied \"preferred annotation\", $preferred_annot"
-    echo "  order_by_reference.pl -verbose -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \ "
-    echo "     -pref_annot $preferred_annot -consen_out consen_gene_order.tsv -unplaced_out consen_pan_unplaced.txt"
-    order_by_reference.pl -verbose -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
-      -pref_annot $preferred_annot -consen_out consen_gene_order.tsv -unplaced_out consen_pan_unplaced.txt
+    echo " order_by_reference.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \\ "
+    echo "   -annot_regex \"${ANN_REX}\" -pref_annot $preferred_annot \\ "
+    echo "   -consen_out consen_gene_order.tsv -unplaced_out consen_pan_unplaced.txt -verbose "
+    order_by_reference.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
+                          -annot_regex "${ANN_REX}" -pref_annot $preferred_annot \
+                          -consen_out consen_gene_order.tsv -unplaced_out consen_pan_unplaced.txt -verbose 
   else 
     echo "Ordering method (-o $order_method ) is not one of \"alignment\" or \"reference\". Aborting."
     exit 1
