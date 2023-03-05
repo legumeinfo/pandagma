@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-02-26"
+version="2023-03-05"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -231,7 +231,7 @@ run_ingest() {
   fi
 
   echo "  Count starting sequences, for later comparisons"
-  for file in 02_fasta_nuc/*.fna; do
+  for file in 02_fasta_nuc/*.$fna; do
     awk '$0~/UNDEFINED/ {ct++} 
       END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' $file
     cat $file | grep '>' | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/.+__$ann_rex\..+/$1/' |
