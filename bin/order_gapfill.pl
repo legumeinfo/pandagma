@@ -86,10 +86,6 @@ while (<$UN_FH>){
   $ct_unplaced++;
 }
 
-if ($ct_unplaced > 20000){ 
-  die "The number of unplaced genes is unusually high, at $ct_unplaced. This suggests a problem in the previous step(s).";
-}
-
 # Read table of panIDs with alignment- or reference-based placements
 open (my $CONSEN_FH, "<", $consen) or die "Can't open in consensus file: $consen\n";
 my %consen_table; # Working version; will be augmented with unplaced panIDs
@@ -112,13 +108,16 @@ while (<$CONSEN_FH>){
 # bypass probable scaffolds.
 # Read pan_table into an array, and get count of each molecule (chromosome or scaffold.)
 open (my $PAN_FH, "<", $pan_table) or die "Can't open in pan_table: $pan_table\n";
-my $chr_gene_count = 0;
+my $chr_gene_count=0;
+my %panIDs;
 my %chr_hsh;
 while (<$PAN_FH>) {
   chomp;
   next unless (/^\S+/);
   my $line = $_;
   my ($panID, $gene, $ann_chr, $start, $end, $orient) = split(/\t/, $line);
+
+  unless ($panIDs{$panID}){$panIDs{$panID}++};
 
   # From the third field, a annot.chr string, extract chr
   $ann_chr =~ /\S+\.(\D+\w+\D+)(\d+)$/;
@@ -135,6 +134,20 @@ while (<$PAN_FH>) {
   }
 }
 
+$annot_regex =~ s/['"]//g;
+my $ANN_REX = qr/$annot_regex/;
+say "# Annotation regex is: $ANN_REX";
+
+my $ct_panIDs = keys %panIDs;
+if ($ct_unplaced/$ct_panIDs > 0.5){ 
+  warn "The number of unplaced genes is unusually high, at $ct_unplaced vs. $ct_panIDs total panIDs.";
+  warn "This suggests a problem in the previous step(s). Check that -annot_regex is set appropriately,";
+  warn "so that the second column of the PANGENE_TABLE can be parsed into annotation names.";
+  warn "  annot_regex =  $ANN_REX";
+  warn "Other debugging steps: turn on printing at commented \"say\" statements containing AA: BB: CC: etc.";
+  die;
+}
+
 # Do a second-pass reading of the pan_table and read pan_table into an array.
 open ($PAN_FH, "<", $pan_table) or die "Can't open in pan_table: $pan_table\n";
 my @pangene_table;
@@ -149,7 +162,6 @@ while (<$PAN_FH>) {
   #say $line;
 
   # From the second field (prefixed genes), extract the annot name
-  my $ANN_REX = $annot_regex;
   my $ann = $gene;
   $ann =~ s/$ANN_REX/$1/;
 
@@ -177,7 +189,7 @@ while (<$PAN_FH>) {
     }
     else {
       $chr_hsh{$chr}++;
-      #say "A:\t($panID, $gene, $ann, $chr_pre, $chr)";
+      #say "AA:\t($panID, $gene, $ann, $chr_pre, $chr)";
       #say "HoH_panID_chr: $panID, $gene, $ann, $chr, $start, $end, $orient";
       $HoH_panID_chr{$panID}{$chr}++;
       my @seven_elts = ( $panID, $gene, $ann, $chr, $start, $end, $orient );
@@ -207,7 +219,7 @@ my %annots;
 my %seen_chr;
 foreach my $row ( @sorted_table ) {
   my ($panID, $gene, $ann, $chr, $start, $end, $orient) = @$row;
-  #say join("\t", "AA: ", $panID, $gene, $ann, $chr, $start, $end, $orient);
+  #say join("\t", "BB: ", $panID, $gene, $ann, $chr, $start, $end, $orient);
   unless ( $seen_chr{$chr} ){ $seen_chr{$chr}++ }
   unless ( $annots{$ann} ){ $annots{$ann}++ }
   if ($ann eq $prAnn && $chr == $prChr){
@@ -265,14 +277,16 @@ if ($verbose>2) {print "\n"}
 # The verdict for each gene will be stored in $target_gene_scores_by_annot{$ann}{$chr}{$target_panID}{$panID},
 # containing small negative integer values for genes before the target and small postive values after it.
 
-say "# Scoring each gene relative to $ct_unplaced unplaced target panIDs; will report one dot per panID.";
 my $tmpdir = "consen_tmp";
 unless ( -d $tmpdir ){ mkdir $tmpdir or die "Can't mkdir $tmpdir $!\n" };
+say "# Scoring each gene relative to $ct_unplaced unplaced target panIDs; will report one dot per panID.";
+say "# This step is done in parallel, writing to temp files at $tmpdir/";
+
 my $pm1 = Parallel::ForkManager->new($nproc);
 DATA_LOOP:
 foreach my $ann (keys %annots){
   my $pid = $pm1->start and next DATA_LOOP;
-  say "Starting $ann";
+  say "# Starting $ann";
   my $ann_file = "$tmpdir/target_gene_scores_$ann";
   my $SYM = gensym; # method from Symbol;  creates an anonymous glob and returns a reference to it.
   open $SYM, ">", $ann_file or die "Can't open out $ann_file: $!\n";
@@ -288,7 +302,7 @@ foreach my $ann (keys %annots){
       #say "CHECK: $target_panID\t$target_panID_chr\t$target_panID_order\t$ann";
       foreach my $panID ( keys %{$pangene_elts_per_ann{$ann}} ){
         my ($panID, $ann, $chr, $ord, $start, $end, $orient) = @{$pangene_elts_per_ann{$ann}{$panID}};
-        #say "CC: ($panID, $ann, $chr, $ord, $start, $end, $orient)";
+        #if (defined ($ann) ){ say "CC: ($panID, $ann, $chr, $ord, $start, $end, $orient)" }
         if (defined $chr && defined $target_panID_chr && $chr == $target_panID_chr){
           if ($ord < $target_panID_order){ # This panID comes before the target
             say $SYM join ("\t", $chr, $target_panID, $panID, -1);
@@ -300,20 +314,21 @@ foreach my $ann (keys %annots){
       }
     }
   }
-  say "\nFinished $ann\n";
+  say "\n#  Finished $ann\n";
   $pm1->finish; # No structures to return; stored data written to files.
-  #if (openhandle($SYM)){close $SYM};
+  if (openhandle($SYM)){close $SYM};
 }
 $pm1->wait_all_children;
-say "\nFinished scoring genes relative to unplaced target genes.";
+say "\n# Finished scoring genes relative to unplaced target genes.";
 
 
-# Combine the scores in the target_gene_scores_by_annot hashes, combining across annotations,
-# and record which panIDs were used in merged_target_gene_scores
+say "# Combine the scores in the target_gene_scores_by_annot hashes, combining across annotations,";
+say "# and record which panIDs were used in merged_target_gene_scores.";
 my $chr_count = keys %chr_hsh;
 my %merged_target_gene_scores;
 my %used_target_panIDs;
 foreach my $ann ( keys %annots ){
+  if ($verbose){ say "  Processing tempfile for annotation $ann" }
   my $ann_file = "$tmpdir/target_gene_scores_$ann";
   my $SYM = gensym; # method from Symbol;  creates an anonymous glob and returns a reference to it.
   open $SYM, "<", $ann_file or die "Can't open in $ann_file: $!\n";
@@ -326,7 +341,7 @@ foreach my $ann ( keys %annots ){
   close $SYM;
   # Clean up large temp files
   unless ($retain){
-    if ($verbose){ say "Removing tempfile |$SYM| $ann_file" }
+    if ($verbose){ say "  Removing tempfile |$SYM| $ann_file" }
     unlink $ann_file or die "Can't unlink file $ann_file: $!\n";
   }
 }
@@ -347,7 +362,7 @@ foreach my $ann (keys %annots){
         # Accumulate and store a consensus orientation for this panID
         if ( $orient =~ /-/ ){ $orient_target_panID{$panID} = "-" }
         else { $orient_target_panID{$panID} = "+" }
-        #say "@@@ ($panID, $ann, $chr, $ord, $start, $end, $orient), $target_panID_chr, $orient_target_panID{$panID}";
+        #say "DD: ($panID, $ann, $chr, $ord, $start, $end, $orient), $target_panID_chr, $orient_target_panID{$panID}";
       }
     }
   }
@@ -363,7 +378,7 @@ foreach my $chr ( keys %consen_table_entire ){
     foreach my $target_panID ( $used_target_panIDs{$chr}{$panID} ){
       if (defined $target_panID && defined $merged_target_gene_scores{$chr}{$target_panID}{$panID} ){
         #say "target_panID: $target_panID";
-        #say "### $chr, $target_panID, $panID, $merged_target_gene_scores{$chr}{$target_panID}{$panID}";
+        #say "EE: $chr, $target_panID, $panID, $merged_target_gene_scores{$chr}{$target_panID}{$panID}";
         my $merged_key = join("__", $panID, $chr, $order, $orient );
         $consen_table_entire_used{$chr}{$merged_key} = [ $panID, $chr, $order, $orient ];
         $orient_known_panIDs_by_chr_used{$chr}{$panID} = $orient;
@@ -417,7 +432,7 @@ foreach my $target_panID (keys %unplaced){
       $idx++;  # Increment the index, to keep in sync with positions from sorted merged_target_gene_scores
       $missed_panIDs_by_chr{$main_chr}{$merged_key} = [ $panID, $main_chr, $order, $orient ];
     }
-    #say join( "\t", "&&&", @{$consen_table_entire_used{$main_chr}{$merged_key}} );
+    #say join( "\t", "FF:", @{$consen_table_entire_used{$main_chr}{$merged_key}} );
   }
   
   # Determine consensus placement of this target panID
@@ -603,3 +618,5 @@ S. Cannon
 02-26 Add back ForkManager after restructuring loop and writing to tmp files.
 02-27 Fix REGEX for chromosome prefix, removing patterns that can match Mtrun
 02-28 Fix bug in determining the consensus orientation.
+03-05 Improve runtime feedback and debugging info.
+

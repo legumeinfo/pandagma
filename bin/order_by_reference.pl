@@ -57,6 +57,11 @@ $pref_annot =~ s/['"]//g;
 my $PREF_REX = qr/$pref_annot/;
 say "# Preferred annotation is: $pref_annot";
 
+$annot_regex =~ s/['"]//g;
+my $ANN_REX = qr/$annot_regex/;
+say "# Annotation regex is: $ANN_REX";
+
+
 # Do a first-pass reading of the pan_table to get counts per molecule, to help later
 # bypass probable scaffolds.
 # Read pan_table into an array, and get count of each molecule (chromosome or scaffold.)
@@ -89,6 +94,7 @@ open ($PAN_FH, "<", $pan_table) or die "Can't open in pan_table: $pan_table\n";
 my @pangene_table;
 my %HoH_panID_chr;
 my %seen_mol;
+my %seen_annot;
 my %skipped_mols;
 while (<$PAN_FH>) {
   chomp;
@@ -97,9 +103,9 @@ while (<$PAN_FH>) {
   my ($panID, $gene, $ann_chr, $start, $end, $orient) = split(/\t/, $line);
 
   # From the second field (prefixed genes), extract the annot name
-  my $ANN_REX = $annot_regex;
   my $ann = $gene;
   $ann =~ s/$ANN_REX/$1/;
+  unless ($seen_annot{$ann}){ $seen_annot{$ann}++ };
 
   # From the third field, a annot.chr string, extract chr
   $ann_chr =~ /\S+\.(\D+\w+\D+)(\d+)$/;
@@ -110,7 +116,7 @@ while (<$PAN_FH>) {
   }
   $chr_pre =~ s/[_.]$//;
   # Next: skip genes on scaffolds and other non-chromosome molecules
-  #say "AA:\t( $panID, $gene, $ann, $chr_pre|$chr, $start, $end, $orient )";
+  #say join "\t", "AA:", ($panID, $gene, $ann, "$chr_pre|$chr", $start, $end, $orient);
   if ( $chr_pre =~ /chloro|chl|^CP|mito|ctg|contig|tig|pilon|^scaff|^sc|^super|^un\w+\d+/i ){
     if ($verbose>1){ say "For pan-gene consensus, skipping non-chromosome gene [$chr_pre $chr]\t$gene" }
   }
@@ -138,6 +144,14 @@ if (%skipped_mols){
   for my $short ( keys %skipped_mols ){
     say "  $short: $skipped_mols{$short}";
   }
+}
+
+my $ct_annots = keys %seen_annot;
+if ($ct_annots > 100){ 
+  warn "The number of annotations is $ct_annots, which looks excessive. Check that -annot_regex is set";
+  warn "appropriately, so that the second column of the PANGENE_TABLE can be parsed into annotation names.";
+  warn "Other debugging steps: turn on printing at print statements containing AA: BB: CC: etc.";
+  die;
 }
 
 # Sort @pangene_table to determine order per annot [2]; chromosome [3]; posn [4]
@@ -231,4 +245,4 @@ S. Cannon
 02-23 Initial version, based on order_gapfill.pl
 02-25 Make summary report of %skipped_mols
 02-27 Fix REGEX for chromosome prefix, removing patterns that can match Mtrun
-
+03-05 Improve runtime feedback and debugging info.
