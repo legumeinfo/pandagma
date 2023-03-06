@@ -185,7 +185,7 @@ run_ingest() {
   
   mkdir -p 02_fasta_nuc 02_fasta_prot 01_posn_hsh stats
 
-    # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_core.
+    # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_pctl??_end.
     # This is captured from the gene IDs using the annot_str_regex set in the config file.
     cat /dev/null > stats/tmp.gene_count_start
     cat /dev/null > stats/tmp.fasta_seqstats
@@ -234,7 +234,7 @@ run_ingest() {
   for file in 02_fasta_nuc/*.$fna; do
     awk '$0~/UNDEFINED/ {ct++} 
       END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' $file
-    cat $file | grep '>' | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/.+__$ann_rex\..+/$1/' |
+    cat $file | grep '>' | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/.+__$ann_rex.+/$1/' |
       grep -v UNDEFINED | sort | uniq -c | awk '{print $2 "\t" $1}' >> stats/tmp.gene_count_start
   done
 
@@ -649,7 +649,10 @@ run_order_and_name() {
   gapfill_threads=$(($NPROC/2))
   echo "  Fill gaps in the alignment-based pangene ordering. This step is time-consuming."
   echo "  so is run in parallel, using $gapfill_threads threads."
-  order_gapfill.pl -verbose -consen consen_gene_order.tsv \
+  echo "   order_gapfill.pl -verbose -annot_regex \"${ANN_REX}\" -consen consen_gene_order.tsv \\";
+  echo "     -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \\";
+  echo "     -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv -nproc $gapfill_threads";
+  order_gapfill.pl -verbose -annot_regex "${ANN_REX}" -consen consen_gene_order.tsv \
     -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
     -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv -nproc $gapfill_threads
 
