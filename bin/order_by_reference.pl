@@ -148,9 +148,9 @@ if (%skipped_mols){
 
 my $ct_annots = keys %seen_annot;
 if ($ct_annots > 100){ 
-  warn "The number of annotations is $ct_annots, which looks excessive. Check that -annot_regex is set";
+  warn "\nWARNING: The number of annotations is high, at $ct_annots. Check that -annot_regex is set";
   warn "appropriately, so that the second column of the PANGENE_TABLE can be parsed into annotation names.";
-  warn "Other debugging steps: turn on printing at print statements containing AA: BB: CC: etc.";
+  warn "Other debugging steps: turn on printing at print statements containing AA: BB: CC: etc.\n";
   die;
 }
 

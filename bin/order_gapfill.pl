@@ -139,12 +139,13 @@ my $ANN_REX = qr/$annot_regex/;
 say "# Annotation regex is: $ANN_REX";
 
 my $ct_panIDs = keys %panIDs;
+if ($verbose){ say "unplaced: $ct_unplaced; panIDs: $ct_panIDs; ratio: ", $ct_unplaced/$ct_panIDs; }
 if ($ct_unplaced/$ct_panIDs > 0.5){ 
-  warn "The number of unplaced genes is unusually high, at $ct_unplaced vs. $ct_panIDs total panIDs.";
+  warn "\nWARNING: The number of unplaced genes is high, at $ct_unplaced vs. $ct_panIDs total panIDs.";
   warn "This suggests a problem in the previous step(s). Check that -annot_regex is set appropriately,";
   warn "so that the second column of the PANGENE_TABLE can be parsed into annotation names.";
   warn "  annot_regex =  $ANN_REX";
-  warn "Other debugging steps: turn on printing at commented \"say\" statements containing AA: BB: CC: etc.";
+  warn "Other debugging steps: turn on printing at commented \"say\" statements containing AA: BB: CC: etc.\n";
   die;
 }
 
@@ -241,8 +242,16 @@ foreach my $row ( @sorted_table ) {
   }
 }
 my $num_chrs = keys %seen_chr;
-my $num_annots = keys %annots;
-say "#  $num_chrs chrs and $num_annots annotations";
+my $ct_annots = keys %annots;
+say "#  $num_chrs chrs and $ct_annots annotations";
+
+if ($ct_annots > 100){ 
+  warn "\nWARNING: The number of annotations is high, at $ct_annots. Check that -annot_regex is set,";
+  warn "appropriately, so that the second column of the PANGENE_TABLE can be parsed into annotation names.";
+  warn "  annot_regex =  $ANN_REX";
+  warn "Other debugging steps: turn on printing at commented \"say\" statements containing AA: BB: CC: etc.\n";
+  die;
+}
 
 say "# Finding the most frequent chromosome for each panID";
 my %top_chr;
@@ -270,6 +279,7 @@ foreach my $panID (sort keys %top_chr) {
   if ($verbose>2){ printf "%s\t%s:%s\n", $panID, $top_chr{$panID}, $chr_ct_top_chr{$panID} }
 }
 if ($verbose>2) {print "\n"}
+
 
 ##########
 # For each unplaced target gene (on a chromosome), score every gene (on that chromosome)
