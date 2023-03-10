@@ -11,11 +11,11 @@ use Getopt::Long;
 use File::Basename;
 
 my ($chr_pat, $verbose, $help);
-my $noself = "true";
+my $keepself = "";
 
 GetOptions (
   "chr_pat=s" =>  \$chr_pat,   # required
-  "noself"    =>  \$noself,
+  "keepself"  =>  \$keepself,
   "verbose"  =>   \$verbose,
   "help" =>       \$help
 );
@@ -26,8 +26,11 @@ my $usage = <<EOS;
   Usage: cat HOMOLOGY_FILE[S] | $scriptname -chr_pat FILE [-options] 
   
   Given homology data (on STDIN) with the form:
-    chromosome__gene__start__end   chromosome__gene__start__end
-  filter on patterns in the two chromosomes, provided in an input file
+      chromosome__gene__start__end   chromosome__gene__start__end
+    or
+      chromosome__gene__start__end__+   chromosome__gene__start__end__-
+
+  ... filter on patterns in the two chromosomes, provided in an input file
   via the flag -chr_pat .
   
   Example1 from chr_pat file ...
@@ -50,10 +53,10 @@ my $usage = <<EOS;
   Zm-Oh7B_NAM-1.chr9__gene_start_end  Zm-CML103_NAM-1.chr10__gene_start_end  
 
   Flags and parameters:
-   -chr_pat -- file with regex for filtering chromosomes in two fields, as indicated above **
-   -noself  -- boolean requiring that chromosome IDs to not match [true]
-   -verbose -- for some intermediate output to STDERR
-   -help    -- for this info
+   -chr_pat  -- file with regex for filtering chromosomes in two fields, as indicated above **
+   -keepself -- (boolean) Include chromosome self-matches (from the same genome) [false]
+   -verbose  -- (boolean) for some intermediate output to STDERR
+   -help     -- (boolean) for this info
    
    ** = required
 EOS
@@ -90,13 +93,17 @@ while (<$PAT_IN>){ # two fields, e.g. "01 01"
 while (my $line = <>) {
   $line =~ s/>//g; # data shouldn't have ">", but do this to make sure.
   my ($gene1, $gene2) = split(/\t/, $line);
+
+  $gene1 =~ s/__[+-]$//; # strip orientation, since that is not used by subsequent DAGChainer
+  $gene2 =~ s/__[+-]$//; # strip orientation, since that is not used by subsequent DAGChainer
+
   my @parts1 = split(/__/, $gene1);
   my @parts2 = split(/__/, $gene2);
   my $chr1 = $parts1[0];
+  my $geneID1 = $parts1[1];
   my $chr2 = $parts2[0];
-  if ($noself){
-    next if ($chr1 eq $chr2);
-  }
+  my $geneID2 = $parts2[1];
+  unless ($keepself){ next if ($chr1 eq $chr2 && $geneID1 eq $geneID2) };
   my $matches = 0;
   foreach my $chr_rex (keys %rexen){
     if ($verbose){print "TEST: $chr1 $chr2 =~ /$chr_rex/\n"}
@@ -118,6 +125,6 @@ VERSIONS
 2021-10-15 strip ">" from data
 2021-10-19 For matches between different chromosomes, handle both directions, e.g. 11 13 and 13 11
            and terminate regexes with "$" to ensure match of chromosome number, not preceding text
-2021-10-19 Add "noself" flag
+2021-10-19 Add "keepself" flag
 2022-12-31 In regex, ignore leading zeroes in e.g. chr01
-
+2023-03-10 Change -noself to -keepself, and allow orientation code in chromosome__gene fields.
