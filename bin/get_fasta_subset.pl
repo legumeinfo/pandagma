@@ -10,6 +10,7 @@ use warnings;
 use Bio::SeqIO;
 use Getopt::Long;
 use File::Basename;
+use feature "say";
 
 ####### File IO ########
 
@@ -70,13 +71,16 @@ my @list_ary;
 # Put elements of LIST into hash; they may be ordered by array later.
 my %hash;
 
+my $ct=0;
 while (<$LIST_FH>) {
   chomp;
-  next if ( $_ =~ /^$/ );
-  if (defined $_) {
-    $hash{$_} = $_; 
-    $list_ary[$.] = $_;
-  }
+  next if ( $_ =~ /^\s*$/ );
+  my $id = $_;
+  $id =~ s/\s+$//; # strip trailing whitespace
+  #say "II id: [$id]";
+  $hash{$id} = $id; 
+  $list_ary[$ct] = $id;
+  $ct++;
 }
 
 # Read in the sequence using the Bioperl SeqIO;
@@ -93,27 +97,31 @@ while ( my $seq = $in->next_seq ) {
   my $sequence = $seq->seq();
   
   if ($xclude) {
-    # print "{$display_id} ";
     unless (defined($hash{$display_id})) {
-      print $OUT_FH ">$display_id $desc\n$sequence\n";
+      #say "XX display_id: {$display_id}";
+      say $OUT_FH ">$display_id $desc\n$sequence";
     }
   }
   else { # $xclude is false; therefore, include seqs in the list
     if (defined($hash{$display_id})) {
       if (defined($desc)) { # there IS a $desc
         if ($fasta_order) {
-          print $OUT_FH ">$display_id $desc\n$sequence\n";
+          #say "AA display_id: {$display_id}";
+          say $OUT_FH ">$display_id $desc\n$sequence";
         }
         else { # not in $fasta_order but in list order
+          #say "BB display_id: {$display_id}";
           $seq_hsh{$display_id} = $sequence;
           $desc_hsh{$display_id} = $desc;
         }
       }
       else { # there is NOT a $desc
         if ($fasta_order) {
-          print $OUT_FH ">$display_id\n$sequence\n";
+          #say "CC display_id: {$display_id}";
+          say $OUT_FH ">$display_id\n$sequence";
         }
         else { # not in $fasta_order but in list order
+          #say "DD display_id: {$display_id}";
           $seq_hsh{$display_id} = $sequence;
           $desc_hsh{$display_id} = " ";
         }
@@ -123,18 +131,28 @@ while ( my $seq = $in->next_seq ) {
 }
 
 if ((not $fasta_order) and (not $xclude)) { # Report sequences in list order
+  my $ct=0;
   foreach my $id (@list_ary) {
-    if (defined $id) {
-      print $OUT_FH ">$id $desc_hsh{$id}\n$seq_hsh{$id}\n";
+    #say "YY id $ct: [$id]";
+    if (exists $desc_hsh{$id}) {
+      my $defline = ">$id $desc_hsh{$id}";
+      $defline =~ s/\s+$//; # strip whitespace
+      say $OUT_FH "$defline\n$seq_hsh{$id}";
     }
+    else { # no desc
+      say $OUT_FH ">$id\n$seq_hsh{$id}";
+    }
+    $ct++;
   }
 }
 
 __END__
 VERSIONS
 
-v0.01 2005 S. Cannon. 
-v0.02 May05'07 SC Add getopts; clean up a bit
-v0.03 2015-02-18 SC Add option to report sequences either in fasta or list order
-v0.04 2015-07-13 SC don't clobber existing fasta file
-v0.05 2017-03-28 SC When reading list into file, skip blank lines. Allow clobbering, with -c
+2005 S. Cannon. 
+2007-05-05 Add getopts; clean up a bit
+2015-02-18 Add option to report sequences either in fasta or list order
+2015-07-13 don't clobber existing fasta file
+2017-03-28 When reading list into file, skip blank lines. Allow clobbering, with -c
+2023-03-12 Strip trailing whitespace in list and in fasta output. Add some intermediate/debugging statements.
+
