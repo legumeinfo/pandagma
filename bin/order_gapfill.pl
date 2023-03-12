@@ -455,32 +455,38 @@ foreach my $target_panID (keys %unplaced){
     my $AFT_POS = $posn_known_panIDs_by_chr_used{$main_chr}{$AFT_ID};
     my $MERGED_AFT_ID =  join ("__", $AFT_ID, $main_chr, $AFT_POS, $AFT_ORIENT);
   
-    my $FORE_ID = $consen_IDs_ordered_per_chr{$main_chr}[$transition_idx-1];
-    my $FORE_ORIENT = $orient_known_panIDs_by_chr_used{$main_chr}{$FORE_ID};
-    my $FORE_POS = $posn_known_panIDs_by_chr_used{$main_chr}{$FORE_ID};
-    my $MERGED_FORE_ID = join ("__", $FORE_ID, $main_chr, $FORE_POS, $FORE_ORIENT);
+    my ($FORE_ID, $FORE_ORIENT, $FORE_POS, $MERGED_FORE_ID) = ("", "", "", "");
+    if (exists $consen_IDs_ordered_per_chr{$main_chr}[$transition_idx-1]){
+      $FORE_ID = $consen_IDs_ordered_per_chr{$main_chr}[$transition_idx-1];
+      $FORE_ORIENT = $orient_known_panIDs_by_chr_used{$main_chr}{$FORE_ID};
+      $FORE_POS = $posn_known_panIDs_by_chr_used{$main_chr}{$FORE_ID};
+      $MERGED_FORE_ID = join ("__", $FORE_ID, $main_chr, $FORE_POS, $FORE_ORIENT);
   
-    my $NEW_POS = ($AFT_POS + $FORE_POS)/2;
-  
-    my $HERE_ID = $target_panID;
-    my $HERE_ORIENT = $orient_target_panID{$HERE_ID};
-    my $MERGED_HERE_ID = join ("__", $target_panID, $main_chr, $NEW_POS, $HERE_ORIENT); 
-  
-    # Update the data structures that are indexed by position, to reflect the added panID
-    splice @{$consen_IDs_ordered_per_chr{$main_chr}}, $transition_idx, 0, $target_panID;
-    $signs_by_chr{$main_chr}{$target_panID}{$NEW_POS} = 0;
-    $orient_known_panIDs_by_chr_used{$main_chr}{$target_panID} = $HERE_ORIENT;
-    $posn_known_panIDs_by_chr_used{$main_chr}{$target_panID} = $NEW_POS;
-  
-    my $merged_key = join("__", $target_panID, $main_chr, $NEW_POS, $HERE_ORIENT );
-    $consen_table_entire_used{$main_chr}{$merged_key} = [ $target_panID, $main_chr, $NEW_POS, $HERE_ORIENT ];
-  
-    if ($verbose>1){
-      say join("\t", "FORE:", $FORE_ID, $main_chr, $FORE_POS, $FORE_ORIENT, $FORE_POS );
-      say join("\t", "HERE:", $target_panID, $main_chr, $NEW_POS, $HERE_ORIENT, $NEW_POS );
-      say join("\t", "AFT:", $AFT_ID, $main_chr, $AFT_POS, $AFT_ORIENT, $AFT_POS );
-      say "Size of consen_IDs_ordered on chr $main_chr: ", scalar(@{$consen_IDs_ordered_per_chr{$main_chr}});
-      say "";
+      my $NEW_POS = ($AFT_POS + $FORE_POS)/2;
+    
+      my $HERE_ID = $target_panID;
+      my $HERE_ORIENT = $orient_target_panID{$HERE_ID};
+      my $MERGED_HERE_ID = join ("__", $target_panID, $main_chr, $NEW_POS, $HERE_ORIENT); 
+    
+      # Update the data structures that are indexed by position, to reflect the added panID
+      splice @{$consen_IDs_ordered_per_chr{$main_chr}}, $transition_idx, 0, $target_panID;
+      $signs_by_chr{$main_chr}{$target_panID}{$NEW_POS} = 0;
+      $orient_known_panIDs_by_chr_used{$main_chr}{$target_panID} = $HERE_ORIENT;
+      $posn_known_panIDs_by_chr_used{$main_chr}{$target_panID} = $NEW_POS;
+    
+      my $merged_key = join("__", $target_panID, $main_chr, $NEW_POS, $HERE_ORIENT );
+      $consen_table_entire_used{$main_chr}{$merged_key} = [ $target_panID, $main_chr, $NEW_POS, $HERE_ORIENT ];
+    
+      if ($verbose>1){
+        say join("\t", "FORE:", $FORE_ID, $main_chr, $FORE_POS, $FORE_ORIENT, $FORE_POS );
+        say join("\t", "HERE:", $target_panID, $main_chr, $NEW_POS, $HERE_ORIENT, $NEW_POS );
+        say join("\t", "AFT:", $AFT_ID, $main_chr, $AFT_POS, $AFT_ORIENT, $AFT_POS );
+        say "Size of consen_IDs_ordered on chr $main_chr: ", scalar(@{$consen_IDs_ordered_per_chr{$main_chr}});
+        say "";
+      }
+    }
+    else {
+      say "Transition index failure for ", $transition_idx-1;
     }
   }
   else {
@@ -629,4 +635,4 @@ S. Cannon
 02-27 Fix REGEX for chromosome prefix, removing patterns that can match Mtrun
 02-28 Fix bug in determining the consensus orientation.
 03-05 Improve runtime feedback and debugging info.
-
+03-11 More checking for uninitialized transition index / panID
