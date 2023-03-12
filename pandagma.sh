@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-03-11"
+version="2023-03-12"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -476,17 +476,24 @@ run_add_extra() {
     perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 18_syn_pan_aug_extra.clust.tsv \
       > 18_syn_pan_aug_extra.hsh.tsv
 
-    echo "  Merge fasta sets (time-consuming)"
+    echo "  Merge fasta sets (in parallel)"
+    if [ -d batches ]; then rm -rf batches; fi
+    mkdir -p batches
+    ls 13_pan_aug_fasta | split - batches/
     if [ -d 19_pan_aug_leftover_merged_cds ]; then rm -rf 19_pan_aug_leftover_merged_cds; fi
     mkdir -p 19_pan_aug_leftover_merged_cds
-    time for path in 13_pan_aug_fasta/*; do
-      file=`basename $path`
-      if [[ -f "16_pan_leftovers_extra/$file" ]]; then
-        cat $path 16_pan_leftovers_extra/$file > 19_pan_aug_leftover_merged_cds/$file
-      else
-        cp $path 19_pan_aug_leftover_merged_cds/
-      fi
+    for batch in batches/*; do
+      cat $batch | while read -r panID; do
+        #echo "$batch: $panID"
+        if [[ -f "16_pan_leftovers_extra/$panID" ]]; then
+          cat 13_pan_aug_fasta/$panID 16_pan_leftovers_extra/$panID > 19_pan_aug_leftover_merged_cds/$panID
+        else
+          cp 13_pan_aug_fasta/$panID 19_pan_aug_leftover_merged_cds/
+        fi
+      done & # Do the merging in parallel because of the number of flies
+      if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
     done
+    wait 
   
     echo "  Get all CDS sequences from files in 19_pan_aug_leftover_merged_cds"
     cat /dev/null > 19_pan_aug_leftover_merged_cds.fna
