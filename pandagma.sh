@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-03-05"
+version="2023-03-11"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -257,6 +257,7 @@ run_mmseqs() {
   echo; echo "Run mmseqs -- at ${clust_iden} percent identity and minimum of ${clust_cov}% coverage."
   #
 
+  if [ -d 03_mmseqs ]; then rm -rf 03_mmseqs ; fi
   mkdir -p 03_mmseqs 03_mmseqs_tmp
   for (( file1_num = 0; file1_num < ${#cds_files[@]} ; file1_num++ )); do
     qry_base=$(basename ${cds_files[file1_num]%.*} .$fna)
@@ -285,8 +286,7 @@ run_filter() {
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
       echo "  $outfilebase"
-      cat ${mmseqs_path} | perl -pe 's/__[\+-]\t/\t/; s/__[+-]$//' |
-        filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${outfilebase}_matches.tsv &
+      cat ${mmseqs_path} | filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${outfilebase}_matches.tsv &
 
       # allow to execute up to $NPROC in parallel
       if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
@@ -352,6 +352,7 @@ run_consense() {
   echo; 
   echo "Add previously unclustered sequences into an \"augmented\" pan-gene set, by homology."
   cd "${WORK_DIR}"
+  if [ -d 07_pan_fasta ]; then rm -rf 07_pan_fasta; fi
   mkdir -p 07_pan_fasta lists
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
@@ -421,6 +422,8 @@ run_add_extra() {
   echo; echo "== Add extra annotation sets (if provided) to the augmented clusters, by homology =="
   cd "${WORK_DIR}"
 
+  if [ -d 13_extra_out_dir ]; then rm -rf 13_extra_out_dir; fi
+  if [ -d 13_pan_aug_fasta ]; then rm -rf 13_pan_aug_fasta; fi
   mkdir -p 13_extra_out_dir 13_pan_aug_fasta
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
@@ -460,6 +463,7 @@ run_add_extra() {
       sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 14_syn_pan_extra.clust.tsv
   
     echo "  Retrieve sequences for the extra genes"
+    if [ -d 16_pan_leftovers_extra ]; then rm -rf 16_pan_leftovers_extra; fi
     mkdir -p 16_pan_leftovers_extra
     get_fasta_from_family_file.pl "${cds_files_extra[@]}" \
        -fam 14_syn_pan_extra.clust.tsv -out 16_pan_leftovers_extra/
@@ -473,6 +477,7 @@ run_add_extra() {
       > 18_syn_pan_aug_extra.hsh.tsv
 
     echo "  Merge fasta sets (time-consuming)"
+    if [ -d 19_pan_aug_leftover_merged_cds ]; then rm -rf 19_pan_aug_leftover_merged_cds; fi
     mkdir -p 19_pan_aug_leftover_merged_cds
     time for path in 13_pan_aug_fasta/*; do
       file=`basename $path`
@@ -517,6 +522,7 @@ run_pick_exemplars() {
   done
 
   echo "  Get protein sequences into pan-gene sets, corresponding with 19_pan_aug_leftover_merged_cds.fna"
+  if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot; fi
   mkdir -p 19_pan_aug_leftover_merged_prot
   get_fasta_from_family_file.pl 20_pan_fasta_prot.faa \
               -fam 19_pan_aug_leftover_merged.clust.tsv -out 19_pan_aug_leftover_merged_prot
@@ -593,6 +599,7 @@ run_order_and_name() {
     echo "==  The next several steps will determine panID ordering using the \"alignment\" ordering option,"
     echo "    based on alignment of panID orders in each annotation, for each chromosome."
     echo "  If code_table/pan_to_peptide.tsv doesn't exist, generate it."
+
     mkdir -p code_table
     if [ ! -f code_table/pan_to_peptide.tsv ]; then
       echo "   Generating hash file code_table/pan_to_peptide.tsv"
@@ -684,6 +691,8 @@ run_order_and_name() {
                       -clobber -out 23_syn_pan_pctl${pctl_low}_posn_proteinTMP.faa
 
   echo "  Get directory of protein multifasta sequences for each pangene, for (separate) protein alignments"
+
+  if [ -d 22_syn_pan_aug_extra_pctl${pctl_low} ]; then rm -rf 22_syn_pan_aug_extra_pctl${pctl_low} ; fi
   mkdir -p 22_syn_pan_aug_extra_pctl${pctl_low}
   get_fasta_from_family_file.pl 20_pan_fasta_prot.faa \
     -family_file 22_syn_pan_aug_extra_pctl${pctl_low}.clust.tsv -out_dir 22_syn_pan_aug_extra_pctl${pctl_low}
