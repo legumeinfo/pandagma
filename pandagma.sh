@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-03-12"
+version="2023-03-28"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -52,6 +52,7 @@ Subcommands (in order they are usually run):
                 mcl - Derive clusters, with Markov clustering
            consense - Calculate a consensus sequences from each pan-gene set, 
                       adding sequences missed in the first clustering round.
+       cluster_rest - Retrieve unclustered sequences and cluster those that can be.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
      pick_exemplars - Pick representative sequence for each pan-gene
@@ -89,6 +90,8 @@ Variables in pandagma config file (Set the config with the CONF environment vari
         consen_iden - Minimum identity threshold for consensus generation [0.80]
          extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [90]
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
+        strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs (1)
+                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches.tsv
       consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
        out_dir_base - Base name for the output directory [default: './out']
            pctl_low - Lower percentile bin size cutoff relative to modal count (usu. the count of annots) [25]
@@ -195,10 +198,10 @@ run_ingest() {
   export ANN_REX=${annot_str_regex}
 
   echo "  Get position information from the main annotation sets."
-  cat /dev/null > 02_all_cds.fna # Collect all starting sequences, for later comparisons
+  cat /dev/null > 02_all_main_cds.fna # Collect all starting sequences, for later comparisons
   for (( file_num = 0; file_num < ${#cds_files[@]} ; file_num++ )); do
     file_base=$(basename ${cds_files[file_num]%.*})
-    cat_or_zcat "${cds_files[file_num]}" >> 02_all_cds.fna # Collect original seqs for later comparisons
+    cat_or_zcat "${cds_files[file_num]}" >> 02_all_main_cds.fna # Collect original seqs for later comparisons
     echo "  Adding positional information to fasta file $file_base"
     cat_or_zcat "${annotation_files[file_num]}" | 
       gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
@@ -214,9 +217,10 @@ run_ingest() {
   echo "  Get position information from the extra annotation sets, if any."
   if (( ${#cds_files_extra[@]} > 0 ))
   then
+    cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
     for (( file_num = 0; file_num < ${#cds_files_extra[@]} ; file_num++ )); do
       file_base=$(basename ${cds_files_extra[file_num]%.*})
-      cat_or_zcat "${cds_files_extra[file_num]}" >> 02_all_cds.fna  # Collect original seqs for later comparisons
+      cat_or_zcat "${cds_files_extra[file_num]}" >> 02_all_extra_cds.fna  # Collect original seqs for later comparisons
       echo "  Adding positional information to extra fasta file $file_base"
       cat_or_zcat "${annotation_files_extra[file_num]}" | 
         gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
@@ -286,7 +290,9 @@ run_filter() {
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
       echo "  $outfilebase"
-      cat ${mmseqs_path} | filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${outfilebase}_matches.tsv &
+      cat ${mmseqs_path} | filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} |
+        awk 'NF==8' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
+        cat > 04_dag/${outfilebase}_matches.tsv &
 
       # allow to execute up to $NPROC in parallel
       if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
@@ -296,7 +302,9 @@ run_filter() {
     echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
-      cat ${mmseqs_path} | perl -pe 's/__/\t/g; s/\t[\+-]$//' > 04_dag/${outfilebase}_matches.tsv 
+      cat ${mmseqs_path} | perl -pe 's/__/\t/g; s/\t[\+-]$//' |
+        awk 'NF==8' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
+        cat > 04_dag/${outfilebase}_matches.tsv 
     done
   fi
 }
@@ -326,8 +334,15 @@ run_dagchainer() {
   done
   wait # wait for last jobs to finish
 
-  awk '$1!~/^#/ {print $2 "\t" $6}' 04_dag/*_matches.tsv > 05_homology_pairs.tsv
-  awk '$1!~/^#/ {print $2 "\t" $6}' 04_dag/*.aligncoords > 05_synteny_pairs.tsv
+  if [ "$strict_synt" -eq 1 ]; then
+    # Combine the synteny pairs
+    cat 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | 
+      awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
+  else 
+    # Combine the homology pairs (filtered by chromosome matches if provided) and the synteny pairs
+    cat 04_dag/*_matches.tsv 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | 
+      awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
+  fi
 }
 
 ##########
@@ -335,8 +350,8 @@ run_mcl() {
   # Calculate clusters using Markov clustering
   cd "${WORK_DIR}"
   printf "\nDo Markov clustering with inflation parameter $mcl_inflation and ${NPROC} threads\n"
-  echo "MCL COMMAND: mcl 05_synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv"
-  mcl 05_synteny_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv \
+  echo "MCL COMMAND: mcl 05_filtered_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv"
+  mcl 05_filtered_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv \
     1>/dev/null
  
   echo "  Add cluster IDs"
@@ -418,6 +433,46 @@ run_consense() {
 }
 
 ##########
+run_cluster_rest() {
+  echo
+  echo; echo "== Retrieve unclustered sequences and cluster those that can be =="
+  cd "${WORK_DIR}"
+
+  echo "  Retrieve genes present in the original CDS files but absent from 12_syn_pan_aug.hsh"
+  cut -f2 12_syn_pan_aug.hsh.tsv | LC_ALL=C sort > lists/lis.12_syn_pan_aug_complement
+  get_fasta_subset.pl -in 02_all_main_cds.fna -out 12_syn_pan_aug_complement.fna \
+    -lis lists/lis.12_syn_pan_aug_complement -xclude -clobber
+
+  MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
+  complmt_self_compare="12_syn_pan_aug_complement.x.12_syn_pan_aug_complement"
+  cat 12_syn_pan_aug_complement.fna |
+    mmseqs easy-cluster stdin 03_mmseqs/$complmt_self_compare $MMTEMP \
+    --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
+
+  if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
+    echo "Filtering on chromosome patterns from file ${chr_match_list}"
+    cat 03_mmseqs/${complmt_self_compare}_cluster.tsv |
+      filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${complmt_self_compare}_matches.tsv
+  else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
+    echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
+    cat 03_mmseqs/${complmt_self_compare}_cluster.tsv |
+      perl -pe 's/__/\t/g; s/\t[\+-]$//' > 04_dag/${complmt_self_compare}_matches.tsv 
+  fi
+
+  echo "  Cluster the remaining sequences that have matches"
+  mcl  04_dag/${complmt_self_compare}_matches.tsv -I 2 -te 10 --abc -o 12_syn_pan_aug_complement.clust.tsv
+
+  echo "TO DO: Retrieve the new clusters and add to the main set"
+  
+#  echo "  Retrieve sequences for the extra genes"
+#  if [ -d 16_pan_leftovers_extra ]; then rm -rf 16_pan_leftovers_extra; fi
+#  mkdir -p 16_pan_leftovers_extra
+#  get_fasta_from_family_file.pl "${cds_files_extra[@]}" \
+#     -fam 14_syn_pan_extra.clust.tsv -out 16_pan_leftovers_extra/
+  
+}
+
+##########
 run_add_extra() {
   echo; echo "== Add extra annotation sets (if provided) to the augmented clusters, by homology =="
   cd "${WORK_DIR}"
@@ -435,6 +490,12 @@ run_add_extra() {
     cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
                       $1!~/^>/ {print $1} ' >> 13_pan_aug_fasta.fna 
   done
+
+  # If complement of the "main" annotations was generated, add it to the "extra", 13_pan_aug_fasta.fna
+  if [[ -f 12_syn_pan_aug_complement.fna ]]; then
+    cat 12_syn_pan_aug_complement.fna 13_pan_aug_fasta.fna > 12_13.tmp
+    mv 12_13.tmp 13_pan_aug_fasta.fna
+  fi
 
   if (( ${#cds_files_extra[@]} > 0 ))
   then # handle the "extra" annotation files
@@ -554,11 +615,6 @@ run_pick_exemplars() {
 
   perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_cds.fna
   perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_prot.faa
-
-  echo "  Retrieve genes present in the original CDS files but absent from 18_syn_pan_aug_extra"
-  cut -f2 18_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.18_syn_pan_aug_extra
-  get_fasta_subset.pl -in 02_all_cds.fna -out 18_syn_pan_aug_extra_complement.fna \
-    -lis lists/lis.18_syn_pan_aug_extra -xclude -clobber
 }
 
 ##########
@@ -1104,7 +1160,7 @@ if ! type hash_into_fasta_id.pl &> /dev/null; then
 fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
-commandlist="ingest mmseqs filter dagchainer mcl consense add_extra pick_exemplars \
+commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra pick_exemplars \
              filter_to_pctile order_and_name calc_chr_pairs summarize"
 
 if [[ $step =~ "all" ]]; then
