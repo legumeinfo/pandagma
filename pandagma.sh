@@ -615,6 +615,11 @@ run_pick_exemplars() {
 
   perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_cds.fna
   perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_prot.faa
+
+  echo "  Retrieve genes present in the original CDS files but absent from 18_syn_pan_aug_extra"
+  cut -f2 18_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.18_syn_pan_aug_extra
+  get_fasta_subset.pl -in 02_all_cds.fna -out 18_syn_pan_aug_extra_complement.fna \
+    -lis lists/lis.18_syn_pan_aug_extra -xclude -clobber
 }
 
 ##########
