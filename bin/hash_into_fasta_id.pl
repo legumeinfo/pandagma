@@ -103,7 +103,10 @@ while ( <$FASTA_FH> ){
     }
     #warn "[$base_id] [$suffix]\n";
     
-    $hash{$base_id} = "$base_id HASH UNDEFINED" unless defined ($hash{$base_id});
+    unless (defined $hash{$base_id}){
+      $hash{$base_id} = "$base_id HASH UNDEFINED";
+      warn "WARNING: HASH UNDEFINED for $base_id\n";
+    }
     if ($swap_IDs){
       if ($nodef){ # DON'T print the defline description
         print $OUT_FH ">$hash{$base_id}$suffix $base_id$suffix\n";
@@ -135,7 +138,10 @@ while ( <$FASTA_FH> ){
     }
     #warn "[$base_id] [$suffix]\n";
     
-    $hash{$base_id} = "$base_id HASH UNDEFINED" unless defined ($hash{$base_id});
+    unless (defined $hash{$base_id}){
+      $hash{$base_id} = "$base_id HASH UNDEFINED";
+      warn "WARNING: HASH UNDEFINED for $base_id\n";
+    }
     if ($swap_IDs){
       if ($nodef){ # DON'T print the defline description
         print $OUT_FH ">$hash{$base_id}$suffix $base_id$suffix\n";
@@ -168,7 +174,6 @@ Versions
 2018-02-09 Handle suffixes (e.g. for splice variants)
 2019-05-07 Print original ID if no hash is found
 2021-11-01 Don't print final ">" without ID or sequence!
-2021-11-04 Add warning for undefined hash
 2022-10-04 Remove BioPerl dependency, and take fasta in via STDIN.
             Change handling of the splice variant matching.
 2022-10-11 Take sequence file as parameter, handling compressed and uncompressed files.
@@ -178,3 +183,5 @@ Versions
 2022-11-27 Fix bug in "-strip_regex" code
 2022-12-26 Add option -swap_IDs to print new ID and old ID
 2023-02-16 Add option -swap_IDs to print new ID and old ID ... also in the case where defline has no description.
+2023-03-26 Add warning for undefined hash
+
