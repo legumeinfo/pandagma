@@ -58,13 +58,17 @@ while (my $seqobj = $seqin->next_seq() ) {
   my $seq = $seqobj->seq;
   my $type = $seqobj->alphabet;
 
+  # Remove terminal stop character if present
+  $seq =~ s/\*$//; 
+  $seq =~ s/\.$//; 
+
   if ($nostop){
     if ($type eq 'dna'){
       die "Option -nostop was selected, but the sequence of $gene_ID appears to be nucleotide\n";
     }
     else {
-      if ($seq =~ /\*.+/){
-        warn "Skipping sequence $gene_ID due to an internal stop codon: \n$seq\n";
+      if ($seq =~ /\*.+/ || $seq =~ /\..+/){
+        warn "Skipping sequence $gene_ID due to an internal stop codon\n";
       }
       else { # protein sequence looks OK
         push @{$HoA_PI_lengths{$panID}}, $len;
@@ -184,3 +188,5 @@ __END__
 2022-12-23 Rewrite: Take fasta input on STDIN, and take in an optional "preferred" ID regex
 2022-12-25 Print to either stdout or out-file
 2023-01-27 Add option to check for stop codons in protein sequence
+2023-03-28 Avoid internal stops represented by '.', and strip terminal stop character (* and .)
+
