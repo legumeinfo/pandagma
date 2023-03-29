@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-03-28"
+version="2023-03-29"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -425,11 +425,11 @@ run_consense() {
     -fam 11_syn_pan_leftovers.clust.tsv -out 11_pan_leftovers/
 
   echo "  Make augmented cluster sets"
-  cat /dev/null > 12_syn_pan_aug.clust.tsv
-  augment_cluster_sets.awk leftovers_dir=11_pan_leftovers 07_pan_fasta/* > 12_syn_pan_aug.clust.tsv
+  cat /dev/null > 12_syn_pan_aug_pre.clust.tsv
+  augment_cluster_sets.awk leftovers_dir=11_pan_leftovers 07_pan_fasta/* > 12_syn_pan_aug_pre.clust.tsv
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
-  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 12_syn_pan_aug.clust.tsv > 12_syn_pan_aug.hsh.tsv
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 12_syn_pan_aug_pre.clust.tsv > 12_syn_pan_aug_pre.hsh.tsv
 }
 
 ##########
@@ -439,7 +439,7 @@ run_cluster_rest() {
   cd "${WORK_DIR}"
 
   echo "  Retrieve genes present in the original CDS files but absent from 12_syn_pan_aug.hsh"
-  cut -f2 12_syn_pan_aug.hsh.tsv | LC_ALL=C sort > lists/lis.12_syn_pan_aug_complement
+  cut -f2 12_syn_pan_aug_pre.hsh.tsv | LC_ALL=C sort > lists/lis.12_syn_pan_aug_complement
   get_fasta_subset.pl -in 02_all_main_cds.fna -out 12_syn_pan_aug_complement.fna \
     -lis lists/lis.12_syn_pan_aug_complement -xclude -clobber
 
@@ -460,16 +460,24 @@ run_cluster_rest() {
   fi
 
   echo "  Cluster the remaining sequences that have matches"
-  mcl  04_dag/${complmt_self_compare}_matches.tsv -I 2 -te 10 --abc -o 12_syn_pan_aug_complement.clust.tsv
+  mcl  04_dag/${complmt_self_compare}_matches.tsv -I 2 -te 10 --abc -o tmp.syn_pan_aug_complement.clust.tsv
 
-  echo "TO DO: Retrieve the new clusters and add to the main set"
-  
-#  echo "  Retrieve sequences for the extra genes"
-#  if [ -d 16_pan_leftovers_extra ]; then rm -rf 16_pan_leftovers_extra; fi
-#  mkdir -p 16_pan_leftovers_extra
-#  get_fasta_from_family_file.pl "${cds_files_extra[@]}" \
-#     -fam 14_syn_pan_extra.clust.tsv -out 16_pan_leftovers_extra/
-  
+
+  echo "  Find number of clusters in initial (06) results"
+  clust_count_06=`wc -l 06_syn_pan.clust.tsv | awk '{print $1}'`
+ 
+  echo "  Add cluster IDs"
+  cat tmp.syn_pan_aug_complement.clust.tsv | 
+    awk -v START=$clust_count_06 'NF>1 {padnum=sprintf("%05d", NR+START); print "pan" padnum "\t" $0}' |
+    cat > 12_syn_pan_aug_complement.clust.tsv
+  rm tmp.syn_pan_aug_complement.clust.tsv
+
+  echo "  Combine clusters derived from synteny or restricted homology (12_syn_pan_aug.clust.tsv)"
+  echo "  and clusters from the complement of that set. Skip singletons (\"clusters\" of size 1)."
+  cat 12_syn_pan_aug_pre.clust.tsv 12_syn_pan_aug_complement.clust.tsv | awk 'NF>1' > 12_syn_pan_aug.clust.tsv
+
+  echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 12_syn_pan_aug.clust.tsv > 12_syn_pan_aug.hsh.tsv
 }
 
 ##########
@@ -490,12 +498,6 @@ run_add_extra() {
     cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
                       $1!~/^>/ {print $1} ' >> 13_pan_aug_fasta.fna 
   done
-
-  # If complement of the "main" annotations was generated, add it to the "extra", 13_pan_aug_fasta.fna
-  if [[ -f 12_syn_pan_aug_complement.fna ]]; then
-    cat 12_syn_pan_aug_complement.fna 13_pan_aug_fasta.fna > 12_13.tmp
-    mv 12_13.tmp 13_pan_aug_fasta.fna
-  fi
 
   if (( ${#cds_files_extra[@]} > 0 ))
   then # handle the "extra" annotation files
@@ -618,6 +620,7 @@ run_pick_exemplars() {
 
   echo "  Retrieve genes present in the original CDS files but absent from 18_syn_pan_aug_extra"
   cut -f2 18_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.18_syn_pan_aug_extra
+  cat 02_all_main_cds.fna 02_all_extra_cds.fna > 02_all_cds.fna
   get_fasta_subset.pl -in 02_all_cds.fna -out 18_syn_pan_aug_extra_complement.fna \
     -lis lists/lis.18_syn_pan_aug_extra -xclude -clobber
 }
@@ -1066,7 +1069,7 @@ export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 # mmseqs uses significant number of threads on its own. Set a maximum, which may be below NPROC.
 MMSEQSTHREADS=$(( 4 < ${NPROC} ? 4 : ${NPROC} ))
 
-pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation dagchainer_args 
+pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation strict_synt dagchainer_args 
   out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex order_method preferred_annot work_dir'
 
 ##########
