@@ -121,6 +121,7 @@ Subcommands (in order they are usually run):
                 mcl - Derive clusters, with Markov clustering
            consense - Calculate a consensus sequences from each pan-gene set,
                       adding sequences missed in the first clustering round.
+       cluster_rest - Retrieve unclustered sequences and cluster those that can be.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
      pick_exemplars - Pick representative sequence for each pan-gene
@@ -144,6 +145,8 @@ Variables in pandagma config file:
         consen_iden - Minimum identity threshold for consensus generation [0.80]
          extra_iden - Minimum identity threshold for mmseqs addition of "extra" annotations [80]
       mcl_inflation - Inflation parameter, for Markov clustering [default: 2]
+        strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs (1)
+                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches.tsv
       consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
        out_dir_base - Base name for the output directory [default: './out']
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
