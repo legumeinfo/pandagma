@@ -64,7 +64,7 @@ while (my $seqobj = $seqin->next_seq() ) {
 
   if ($nostop){
     if ($type eq 'dna'){
-      die "Option -nostop was selected, but the sequence of $gene_ID appears to be nucleotide\n";
+      warn "Option -nostop was selected, but the sequence of $gene_ID appears to be nucleotide\n";
     }
     else {
       if ($seq =~ /\*.+/ || $seq =~ /\..+/){
@@ -189,4 +189,4 @@ __END__
 2022-12-25 Print to either stdout or out-file
 2023-01-27 Add option to check for stop codons in protein sequence
 2023-03-28 Avoid internal stops represented by '.', and strip terminal stop character (* and .)
-
+2023-04-22 Change check for sequence type from die to warn
