@@ -50,7 +50,6 @@ Subcommands (in order they are usually run):
        cluster_rest - Retrieve unclustered sequences and cluster those that can be.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
-     pick_exemplars - Pick representative sequence for each pan-gene
    filter_to_pctile - Calculate orthogroup composition and filter fasta files by selected percentiles.
           summarize - Move results into output directory, and report summary statistics.
 
@@ -292,7 +291,7 @@ run_filter() {
     echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
-      cat ${mmseqs_path} | perl -pe 's/__/\t/g; s/\t[\+-]$//' |
+      cat ${mmseqs_path} | perl -pe 's/__/\t/g; s/\t[\+-]//g' |
         awk 'NF==8' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
         cat > 04_dag/${outfilebase}_matches.tsv 
     done
@@ -370,11 +369,6 @@ run_consense() {
     cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
                       $1!~/^>/ {print $1} ' >> 07_pan_fasta_prot.faa 
   done
-
-  echo "  Pick a representative seq. for each orthogroup - as a sequence with the median length for that OG."
-  echo "  cat 07_pan_fasta_prot.faa | 
-    pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_prot.faa"
-  cat 07_pan_fasta_prot.faa | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_prot.faa
 
   echo "  Get sorted list of all genes, from the original fasta files"
   cat_or_zcat "${protein_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
@@ -564,50 +558,6 @@ run_add_extra() {
   fi
 }
 
-##########
-run_pick_exemplars() {
-  echo; echo "== Pick representative (exemplar) sequence for each orthogroup =="
-  cd "${WORK_DIR}"
-
-  echo "  From 19_pan_aug_leftover_merged_prot.faa, derive cluster-format file; used to extract corresponding protein files"
-  cat 19_pan_aug_leftover_merged_prot.faa | awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/^(\w+\d+)__/$1\t/' | 
-    awk -v ORS="" '$1 == prev {print "\t" $2; count++} 
-                   $1 != prev && NR==1 { print $1 "\t" $2; prev=$1 } 
-                   $1 != prev && NR>1 { print "\n" $1 "\t" $2; prev=$1 }' > 19_pan_aug_leftover_merged.clust.tsv
-
-  echo "  Get all protein sequences corresponding with 19_pan_aug_leftover_merged.clust.tsv"
-  cat /dev/null > 20_pan_fasta_prot.faa
-  for filepath in 02_fasta_prot/*.gz; do 
-    zcat $filepath >> 20_pan_fasta_prot.faa
-  done
-
-  echo "  Get protein sequences into orthogroups, corresponding with 19_pan_aug_leftover_merged_prot.faa"
-  if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot; fi
-  mkdir -p 19_pan_aug_leftover_merged_prot
-  get_fasta_from_family_file.pl 20_pan_fasta_prot.faa \
-              -fam 19_pan_aug_leftover_merged.clust.tsv -out 19_pan_aug_leftover_merged_prot
-
-  echo "  Get all protein sequences from files in 19_pan_aug_leftover_merged_prot"
-  cat /dev/null > 19_pan_aug_leftover_merged_prot.faa
-  for path in 19_pan_aug_leftover_merged_prot/*; do
-    pan_file=`basename $path`
-    cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-                      $1!~/^>/ {print $1} ' >> 19_pan_aug_leftover_merged_prot.faa 
-  done
-
-  echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
-  echo "    == first proteins:"
-  cat 19_pan_aug_leftover_merged_prot.faa | pick_family_rep.pl \
-    -nostop -out 21_pan_fasta_clust_rep_prot.faa
-
-  perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_prot.faa
-
-  echo "  Retrieve genes present in the original protein files but absent from 18_syn_pan_aug_extra"
-  cut -f2 18_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.18_syn_pan_aug_extra
-  cat 02_all_main_prot.faa 02_all_extra_protein.faa > 02_all_prot.faa
-  get_fasta_subset.pl -in 02_all_prot.faa -out 18_syn_pan_aug_extra_complement.faa \
-    -lis lists/lis.18_syn_pan_aug_extra -xclude -clobber
-}
 
 ##########
 run_filter_to_pctile() {
@@ -973,7 +923,7 @@ if ! type hash_into_fasta_id.pl &> /dev/null; then
 fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
-commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra pick_exemplars \
+commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra \
              filter_to_pctile summarize"
 
 if [[ $step =~ "all" ]]; then
