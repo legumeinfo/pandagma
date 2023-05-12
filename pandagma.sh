@@ -512,7 +512,7 @@ run_add_extra() {
       echo "Extra: $fasta_file"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       mmseqs easy-search "${path}" 13_pan_aug_fasta.fna 13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
-                   MMTEMP --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
+                   $MMTEMP --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
 
       if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
     done
