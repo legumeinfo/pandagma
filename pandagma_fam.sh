@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Configuration and run script which, with other scripts in this package, generates pan-gene 
-# clusters using the programs mmseqs, dagchainer, and mcl. 
+# Configuration and run script which, with other scripts in this package, generates gene-family 
+# orthogroups using the programs mmseqs, dagchainer, and mcl. 
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
@@ -10,7 +10,7 @@ set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
-HELP_DOC="""Compute pan-gene clusters using a combination of synteny and homology,
+HELP_DOC="""Compute orthogroups using a combination of synteny and homology,
 using the programs mmseqs, dagchainer, and mcl, and additional pre- and post-refinement steps.
 
 Usage:
@@ -23,9 +23,6 @@ Usage:
            -w (working directory, for temporary and intermediate files. 
                 Must be specified in config file if not specified here.)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
-           -o (ordering method, for placing pan-genes. Options: 
-                \"reference\" (default; uses preferred_annot to order, then gap-filling for missing panIDs.)
-                \"alignment\" (uses whole-chromosome alignment of ordered panIDs from all annotations)
            -r (retain. Don't do subcommand \"clean\" after running \"all\".)
            -v (version)
            -h (help)
@@ -37,10 +34,8 @@ Environment requirements: The following packages need to be available in your PA
 Also, please add the pandagma utility programs in the bin directory adjacent to pandagma_fam.sh, e.g.
     PATH=$PWD/bin:\$PATH
 
-Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
-config file, in the arrays cds_files, annotation_files, and protein_files. See example files.
-
-Note that the annotation and CDS files need to be listed in CORRESPONDING ORDER in the config.
+Primary protein sequences and annotation (GFF3 or BED) files must be listed in the
+config file, in the arrays annotation_files and protein_files. See example files.
 
 Subcommands (in order they are usually run):
                 all - All of the steps below, except for clean and ReallyClean
@@ -57,8 +52,6 @@ Subcommands (in order they are usually run):
                       annotation sets that may be of lower or uncertain quality.
      pick_exemplars - Pick representative sequence for each pan-gene
    filter_to_pctile - Calculate orthogroup composition and filter fasta files by selected percentiles.
-     order_and_name - Assign pan-gene names with consensus chromosomes and ordinal positions.
-     calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
 
   Run either of the following subcommands separately if you wish:
@@ -92,7 +85,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
         strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs (1)
                         The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches.tsv
-      consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
+      consen_prefix - Prefix to use in orthogroup names
        out_dir_base - Base name for the output directory [default: './out']
            pctl_low - Lower percentile bin size cutoff relative to modal count (usu. the count of annots) [25]
            pctl_med - Medium percentile bin size cutoff relative to modal count (usu. the count of annots) [50]
@@ -105,7 +98,6 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         This is used for picking representative IDs+sequence from an orthogroup, when
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
-       order_method - Method to determine consensus panID order. reference or alignment [default reference]
            work_dir - Working directory, for temporary and intermediate files. 
 """
 
@@ -118,21 +110,20 @@ version() {
 
 ##########
 canonicalize_paths() {
-  echo "Entering canonicalize_paths. Fasta files: ${cds_files[@]}"
+  echo "Entering canonicalize_paths. Annotation files: ${annotation_files[@]}"
 
-  cds_files=($(realpath --canonicalize-existing "${cds_files[@]}"))
   annotation_files=($(realpath --canonicalize-existing "${annotation_files[@]}"))
   protein_files=($(realpath --canonicalize-existing "${protein_files[@]}"))
-  if (( ${#cds_files_extra[@]} > 0 ))
+  if (( ${#protein_files_extra[@]} > 0 ))
   then
-    cds_files_extra=($(realpath --canonicalize-existing "${cds_files_extra[@]}"))
+    protein_files_extra=($(realpath --canonicalize-existing "${protein_files_extra[@]}"))
     annotation_files_extra=($(realpath --canonicalize-existing "${annotation_files_extra[@]}"))
   fi
   readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
   readonly submit_dir=${PWD}
 
-  fasta_file=$(basename "${cds_files[0]}" .gz)
-  fna="${fasta_file##*.}"
+  fasta_file=$(basename "${protein_files[0]}" .gz)
+  faa="${fasta_file##*.}"
 
   export ANN_REX=${annot_str_regex}
 }
@@ -186,7 +177,7 @@ run_ingest() {
   cd "${WORK_DIR}"
   echo; echo "Run ingest: from fasta and gff or bed data, create fasta with IDs containing positional info."
   
-  mkdir -p 02_fasta_nuc 02_fasta_prot 01_posn_hsh stats
+  mkdir -p 02_fasta_prot 01_posn_hsh stats
 
     # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_pctl??_end.
     # This is captured from the gene IDs using the annot_str_regex set in the config file.
@@ -198,58 +189,49 @@ run_ingest() {
   export ANN_REX=${annot_str_regex}
 
   echo "  Get position information from the main annotation sets."
-  cat /dev/null > 02_all_main_cds.fna # Collect all starting sequences, for later comparisons
-  for (( file_num = 0; file_num < ${#cds_files[@]} ; file_num++ )); do
-    file_base=$(basename ${cds_files[file_num]%.*})
-    cat_or_zcat "${cds_files[file_num]}" >> 02_all_main_cds.fna # Collect original seqs for later comparisons
+  cat /dev/null > 02_all_main_prot.faa # Collect all starting sequences, for later comparisons
+  for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
+    file_base=$(basename ${protein_files[file_num]%.*})
+    cat_or_zcat "${protein_files[file_num]}" >> 02_all_main_prot.faa # Collect original seqs for later comparisons
     echo "  Adding positional information to fasta file $file_base"
     cat_or_zcat "${annotation_files[file_num]}" | 
       gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
-      hash_into_fasta_id.pl -nodef -fasta "${cds_files[file_num]}" \
+      hash_into_fasta_id.pl -nodef -fasta "${protein_files[file_num]}" \
                           -hash 01_posn_hsh/$file_base.hsh \
-                          -out 02_fasta_nuc/$file_base
+                          -out 02_fasta_prot/$file_base
     # calc basic sequence stats
-    annot_name=$(basename 02_fasta_nuc/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
+    annot_name=$(basename 02_fasta_prot/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
     printf "  Main:  " >> stats/tmp.fasta_seqstats
-    cat_or_zcat "${cds_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
+    cat_or_zcat "${protein_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
   done
 
   echo "  Get position information from the extra annotation sets, if any."
-  if (( ${#cds_files_extra[@]} > 0 ))
+  if (( ${#protein_files_extra[@]} > 0 ))
   then
-    cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
-    for (( file_num = 0; file_num < ${#cds_files_extra[@]} ; file_num++ )); do
-      file_base=$(basename ${cds_files_extra[file_num]%.*})
-      cat_or_zcat "${cds_files_extra[file_num]}" >> 02_all_extra_cds.fna  # Collect original seqs for later comparisons
+    cat /dev/null > 02_all_extra_protein.faa # Collect all starting sequences, for later comparisons
+    for (( file_num = 0; file_num < ${#protein_files_extra[@]} ; file_num++ )); do
+      file_base=$(basename ${protein_files_extra[file_num]%.*})
+      cat_or_zcat "${protein_files_extra[file_num]}" >> 02_all_extra_protein.faa  # Collect original seqs for later comparisons
       echo "  Adding positional information to extra fasta file $file_base"
       cat_or_zcat "${annotation_files_extra[file_num]}" | 
         gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
-      hash_into_fasta_id.pl -nodef -fasta "${cds_files_extra[file_num]}" \
+      hash_into_fasta_id.pl -nodef -fasta "${protein_files_extra[file_num]}" \
                             -hash 01_posn_hsh/$file_base.hsh \
-                            -out 02_fasta_nuc/$file_base
+                            -out 02_fasta_prot/$file_base
       # calc basic sequence stats
-      annot_name=$(basename 02_fasta_nuc/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
+      annot_name=$(basename 02_fasta_prot/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
       printf "  Extra: " >> stats/tmp.fasta_seqstats
-      cat_or_zcat "${cds_files_extra[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
+      cat_or_zcat "${protein_files_extra[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
     done
   fi
 
   echo "  Count starting sequences, for later comparisons"
-  for file in 02_fasta_nuc/*.$fna; do
+  for file in 02_fasta_prot/*.$faa; do
     awk '$0~/UNDEFINED/ {ct++} 
       END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' $file
     cat $file | grep '>' | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/.+__$ann_rex.+/$1/' |
       grep -v UNDEFINED | sort | uniq -c | awk '{print $2 "\t" $1}' >> stats/tmp.gene_count_start
   done
-
-  echo "  Also get protein files"
-  if (( ${#protein_files[@]} > 0 ))
-  then
-    for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
-      echo "  Copying protein file ${protein_files[file_num]}"
-      cp "${protein_files[file_num]}" 02_fasta_prot/
-    done
-  fi
 
   sort -o stats/tmp.gene_count_start stats/tmp.gene_count_start
 }
@@ -263,17 +245,25 @@ run_mmseqs() {
 
   if [ -d 03_mmseqs ]; then rm -rf 03_mmseqs ; fi
   mkdir -p 03_mmseqs 03_mmseqs_tmp
-  for (( file1_num = 0; file1_num < ${#cds_files[@]} ; file1_num++ )); do
-    qry_base=$(basename ${cds_files[file1_num]%.*} .$fna)
-    for (( file2_num = $( expr $file1_num + 1 ); file2_num < ${#cds_files[@]} ; file2_num++ )); do
-      sbj_base=$(basename ${cds_files[file2_num]%.*} .$fna)
+  SEQTYPE=1;  # 1=pep; 3=nuc
+  for (( file1_num = 0; file1_num < ${#protein_files[@]} ; file1_num++ )); do
+    qry_base=$(basename ${protein_files[file1_num]%.*} .$faa)
+    for (( file2_num = $( expr $file1_num + 1 ); file2_num < ${#protein_files[@]} ; file2_num++ )); do
+      sbj_base=$(basename ${protein_files[file2_num]%.*} .$faa)
       echo "  Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
-      { cat 02_fasta_nuc/$qry_base.$fna 02_fasta_nuc/$sbj_base.$fna ; } |
+      echo "{ cat 02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa ; } | "
+      echo "mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} $MMTEMP \\"
+      echo "--min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null"
+
+      { cat 02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa ; } |
         mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} $MMTEMP \
-         --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null & # background
+         --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign  1>/dev/null #  & ; XX 
+        #mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} $MMTEMP --search-type ${SEQTYPE} \
+        # --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null #  & ; XX 
+
         # allow to execute up to $MMSEQSTHREADS in parallel
-        if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+        #if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait; fi
     done
     echo
   done
@@ -295,7 +285,7 @@ run_filter() {
         cat > 04_dag/${outfilebase}_matches.tsv &
 
       # allow to execute up to $NPROC in parallel
-      if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
+      if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait; fi
     done
     wait # wait for last jobs to finish
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
@@ -330,7 +320,7 @@ run_dagchainer() {
       rmdir ${tmpdir}
     ) &
     # allow to execute up to $NPROC in parallel
-    [ $(jobs -r -p | wc -l) -ge ${NPROC} ] && wait -n
+    [ $(jobs -r -p | wc -l) -ge ${NPROC} ] && wait 
   done
   wait # wait for last jobs to finish
 
@@ -371,23 +361,23 @@ run_consense() {
   mkdir -p 07_pan_fasta lists
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-  echo "    Fasta file:" "${cds_files[@]}"
-  get_fasta_from_family_file.pl "${cds_files[@]}" -fam 06_syn_pan.clust.tsv -out 07_pan_fasta
+  echo "    Fasta file:" "${protein_files[@]}"
+  get_fasta_from_family_file.pl "${protein_files[@]}" -fam 06_syn_pan.clust.tsv -out 07_pan_fasta
 
-  cat /dev/null > 07_pan_fasta_cds.fna
+  cat /dev/null > 07_pan_fasta_prot.faa
   for path in 07_pan_fasta/*; do
     pan_file=`basename $path`
     cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-                      $1!~/^>/ {print $1} ' >> 07_pan_fasta_cds.fna 
+                      $1!~/^>/ {print $1} ' >> 07_pan_fasta_prot.faa 
   done
 
   echo "  Pick a representative seq. for each orthogroup - as a sequence with the median length for that OG."
-  echo "  cat 07_pan_fasta_cds.fna | 
-    pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_cds.fna"
-  cat 07_pan_fasta_cds.fna | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_cds.fna
+  echo "  cat 07_pan_fasta_prot.faa | 
+    pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_prot.faa"
+  cat 07_pan_fasta_prot.faa | pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_prot.faa
 
   echo "  Get sorted list of all genes, from the original fasta files"
-  cat_or_zcat "${cds_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
+  cat_or_zcat "${protein_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
 
   echo "  Get sorted list of all clustered genes"
   awk '$1~/^>/ {print $1}' 07_pan_fasta/* | sed 's/>//' | sort > lists/09_all_clustered_genes
@@ -396,19 +386,19 @@ run_consense() {
   comm -13 lists/09_all_clustered_genes lists/09_all_genes > lists/09_genes_not_in_clusters
 
   echo "  Retrieve the non-clustered genes"
-  cat_or_zcat "${cds_files[@]}" |
+  cat_or_zcat "${protein_files[@]}" |
     get_fasta_subset.pl -in /dev/stdin -clobber -lis lists/09_genes_not_in_clusters \
-                        -out 09_genes_not_in_clusters.fna 
+                        -out 09_genes_not_in_clusters.faa 
 
   echo "  Search non-clustered genes against genes already clustered."
 
   # Check sequence type (in case this run function is called separately from the usually-prior ones)
-  someseq=$(head 07_pan_fasta_cds.fna | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
+  someseq=$(head 07_pan_fasta_prot.faa | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
   SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
   echo "SEQTYPE is: $SEQTYPE"
 
-  mmseqs easy-search 09_genes_not_in_clusters.fna \
-                     07_pan_fasta_cds.fna \
+  mmseqs easy-search 09_genes_not_in_clusters.faa \
+                     07_pan_fasta_prot.faa \
                      10_unclust.x.07_pan_fasta.m8 \
                      03_mmseqs_tmp \
                      --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
@@ -421,7 +411,7 @@ run_consense() {
 
   echo "  Retrieve sequences for the leftover genes"
   mkdir -p 11_pan_leftovers
-  get_fasta_from_family_file.pl "${cds_files[@]}" \
+  get_fasta_from_family_file.pl "${protein_files[@]}" \
     -fam 11_syn_pan_leftovers.clust.tsv -out 11_pan_leftovers/
 
   echo "  Make augmented cluster sets"
@@ -438,14 +428,14 @@ run_cluster_rest() {
   echo; echo "== Retrieve unclustered sequences and cluster those that can be =="
   cd "${WORK_DIR}"
 
-  echo "  Retrieve genes present in the original CDS files but absent from 12_syn_pan_aug.hsh"
+  echo "  Retrieve genes present in the original protein files but absent from 12_syn_pan_aug.hsh"
   cut -f2 12_syn_pan_aug_pre.hsh.tsv | LC_ALL=C sort > lists/lis.12_syn_pan_aug_complement
-  get_fasta_subset.pl -in 02_all_main_cds.fna -out 12_syn_pan_aug_complement.fna \
+  get_fasta_subset.pl -in 02_all_main_prot.faa -out 12_syn_pan_aug_complement.faa \
     -lis lists/lis.12_syn_pan_aug_complement -xclude -clobber
 
   MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
   complmt_self_compare="12_syn_pan_aug_complement.x.12_syn_pan_aug_complement"
-  cat 12_syn_pan_aug_complement.fna |
+  cat 12_syn_pan_aug_complement.faa |
     mmseqs easy-cluster stdin 03_mmseqs/$complmt_self_compare $MMTEMP \
     --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
@@ -490,31 +480,31 @@ run_add_extra() {
   mkdir -p 13_extra_out_dir 13_pan_aug_fasta
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-  get_fasta_from_family_file.pl "${cds_files[@]}" -fam 12_syn_pan_aug.clust.tsv -out 13_pan_aug_fasta
+  get_fasta_from_family_file.pl "${protein_files[@]}" -fam 12_syn_pan_aug.clust.tsv -out 13_pan_aug_fasta
   
-  cat /dev/null > 13_pan_aug_fasta.fna
+  cat /dev/null > 13_pan_aug_fasta.faa
   for path in 13_pan_aug_fasta/*; do
     pan_file=`basename $path`
     cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-                      $1!~/^>/ {print $1} ' >> 13_pan_aug_fasta.fna 
+                      $1!~/^>/ {print $1} ' >> 13_pan_aug_fasta.faa 
   done
 
-  if (( ${#cds_files_extra[@]} > 0 ))
+  if (( ${#protein_files_extra[@]} > 0 ))
   then # handle the "extra" annotation files
     echo "  Search non-clustered genes against pan-gene consensus sequences"
     # Check sequence type (in case this run function is called separately from the usually-prior ones)
-    someseq=$(head 07_pan_fasta_cds.fna | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
+    someseq=$(head 07_pan_fasta_prot.faa | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
     SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
     echo "SEQTYPE is: $SEQTYPE"
 
-    for path in "${cds_files_extra[@]}"; do
+    for path in "${protein_files_extra[@]}"; do
       fasta_file=`basename ${path%.*}`
       echo "Extra: $fasta_file"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
-      mmseqs easy-search "${path}" 13_pan_aug_fasta.fna 13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
-                   MMTEMP --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
+      mmseqs easy-search "${path}" 13_pan_aug_fasta.faa 13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
+                   $MMTEMP --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
 
-      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait; fi
     done
     wait # wait for jobs to finish
   
@@ -528,7 +518,7 @@ run_add_extra() {
     echo "  Retrieve sequences for the extra genes"
     if [ -d 16_pan_leftovers_extra ]; then rm -rf 16_pan_leftovers_extra; fi
     mkdir -p 16_pan_leftovers_extra
-    get_fasta_from_family_file.pl "${cds_files_extra[@]}" \
+    get_fasta_from_family_file.pl "${protein_files_extra[@]}" \
        -fam 14_syn_pan_extra.clust.tsv -out 16_pan_leftovers_extra/
   
     echo "  Make augmented cluster sets"
@@ -543,32 +533,32 @@ run_add_extra() {
     if [ -d batches ]; then rm -rf batches; fi
     mkdir -p batches
     ls 13_pan_aug_fasta | split - batches/
-    if [ -d 19_pan_aug_leftover_merged_cds ]; then rm -rf 19_pan_aug_leftover_merged_cds; fi
-    mkdir -p 19_pan_aug_leftover_merged_cds
+    if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot; fi
+    mkdir -p 19_pan_aug_leftover_merged_prot
     for batch in batches/*; do
       cat $batch | while read -r panID; do
         #echo "$batch: $panID"
         if [[ -f "16_pan_leftovers_extra/$panID" ]]; then
-          cat 13_pan_aug_fasta/$panID 16_pan_leftovers_extra/$panID > 19_pan_aug_leftover_merged_cds/$panID
+          cat 13_pan_aug_fasta/$panID 16_pan_leftovers_extra/$panID > 19_pan_aug_leftover_merged_prot/$panID
         else
-          cp 13_pan_aug_fasta/$panID 19_pan_aug_leftover_merged_cds/
+          cp 13_pan_aug_fasta/$panID 19_pan_aug_leftover_merged_prot/
         fi
       done & # Do the merging in parallel because of the number of flies
-      if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+      if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait; fi
     done
     wait 
   
-    echo "  Get all CDS sequences from files in 19_pan_aug_leftover_merged_cds"
-    cat /dev/null > 19_pan_aug_leftover_merged_cds.fna
-    for path in 19_pan_aug_leftover_merged_cds/*; do
+    echo "  Get all protein sequences from files in 19_pan_aug_leftover_merged_prot"
+    cat /dev/null > 19_pan_aug_leftover_merged_prot.faa
+    for path in 19_pan_aug_leftover_merged_prot/*; do
       pan_file=`basename $path`
       cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-                        $1!~/^>/ {print $1} ' >> 19_pan_aug_leftover_merged_cds.fna 
+                        $1!~/^>/ {print $1} ' >> 19_pan_aug_leftover_merged_prot.faa 
     done
 
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
-    cp 07_pan_fasta_cds.fna 19_pan_aug_leftover_merged_cds.fna
+    cp 07_pan_fasta_prot.faa 19_pan_aug_leftover_merged_prot.faa
     cp 12_syn_pan_aug.clust.tsv 18_syn_pan_aug_extra.clust.tsv
     cp 12_syn_pan_aug.hsh.tsv 18_syn_pan_aug_extra.hsh.tsv
   fi
@@ -576,11 +566,11 @@ run_add_extra() {
 
 ##########
 run_pick_exemplars() {
-  echo; echo "== Pick representative (exemplar) sequence for each pan-gene set (protein and CDS) =="
+  echo; echo "== Pick representative (exemplar) sequence for each orthogroup =="
   cd "${WORK_DIR}"
 
-  echo "  From 19_pan_aug_leftover_merged_cds.fna, derive cluster-format file; used to extract corresponding protein files"
-  cat 19_pan_aug_leftover_merged_cds.fna | awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/^(\w+\d+)__/$1\t/' | 
+  echo "  From 19_pan_aug_leftover_merged_prot.faa, derive cluster-format file; used to extract corresponding protein files"
+  cat 19_pan_aug_leftover_merged_prot.faa | awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/^(\w+\d+)__/$1\t/' | 
     awk -v ORS="" '$1 == prev {print "\t" $2; count++} 
                    $1 != prev && NR==1 { print $1 "\t" $2; prev=$1 } 
                    $1 != prev && NR>1 { print "\n" $1 "\t" $2; prev=$1 }' > 19_pan_aug_leftover_merged.clust.tsv
@@ -591,7 +581,7 @@ run_pick_exemplars() {
     zcat $filepath >> 20_pan_fasta_prot.faa
   done
 
-  echo "  Get protein sequences into pan-gene sets, corresponding with 19_pan_aug_leftover_merged_cds.fna"
+  echo "  Get protein sequences into orthogroups, corresponding with 19_pan_aug_leftover_merged_prot.faa"
   if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot; fi
   mkdir -p 19_pan_aug_leftover_merged_prot
   get_fasta_from_family_file.pl 20_pan_fasta_prot.faa \
@@ -608,20 +598,14 @@ run_pick_exemplars() {
   echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
   echo "    == first proteins:"
   cat 19_pan_aug_leftover_merged_prot.faa | pick_family_rep.pl \
-    -nostop -prefer $preferred_annot -out 21_pan_fasta_clust_rep_prot.faa
+    -nostop -out 21_pan_fasta_clust_rep_prot.faa
 
-  echo "    == then CDS sequences, corresponding with 21_pan_fasta_clust_rep_prot.faa:"
-  cat 21_pan_fasta_clust_rep_prot.faa | awk '$1~/^>/ {print substr($1,2)}' > lists/lis.21_pan_fasta_clust_rep
-  get_fasta_subset.pl -in 19_pan_aug_leftover_merged_cds.fna -list lists/lis.21_pan_fasta_clust_rep \
-                    -clobber -out 21_pan_fasta_clust_rep_cds.fna
-
-  perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_cds.fna
   perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_prot.faa
 
-  echo "  Retrieve genes present in the original CDS files but absent from 18_syn_pan_aug_extra"
+  echo "  Retrieve genes present in the original protein files but absent from 18_syn_pan_aug_extra"
   cut -f2 18_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.18_syn_pan_aug_extra
-  cat 02_all_main_cds.fna 02_all_extra_cds.fna > 02_all_cds.fna
-  get_fasta_subset.pl -in 02_all_cds.fna -out 18_syn_pan_aug_extra_complement.fna \
+  cat 02_all_main_prot.faa 02_all_extra_protein.faa > 02_all_prot.faa
+  get_fasta_subset.pl -in 02_all_prot.faa -out 18_syn_pan_aug_extra_complement.faa \
     -lis lists/lis.18_syn_pan_aug_extra -xclude -clobber
 }
 
@@ -641,9 +625,9 @@ run_filter_to_pctile() {
         cat > lists/lis.18_syn_pan_aug_extra.pctl${percentile}
 
     echo "  Get a fasta subset with only genes from at least $(($max_annot_ct*$pctl_low/100)) annotation sets"
-    get_fasta_subset.pl -in 21_pan_fasta_clust_rep_cds.fna \
+    get_fasta_subset.pl -in 21_pan_fasta_clust_rep_prot.faa \
                         -list lists/lis.18_syn_pan_aug_extra.pctl${percentile} \
-                        -clobber -out 22_pan_fasta_rep_pctl${percentile}_cds.fna
+                        -clobber -out 22_pan_fasta_rep_pctl${percentile}_prot.faa
 
     echo "  Get a clust.tsv file with orthogroups with at least min_core_prop*max_annot_ct annotation sets"
     join <(LC_ALL=C sort -k1,1 lists/lis.18_syn_pan_aug_extra.pctl${percentile}) \
@@ -653,170 +637,9 @@ run_filter_to_pctile() {
 }
 
 ##########
-run_order_and_name() {
-  cd "${WORK_DIR}"
-
-  echo "  Reshape from mcl output format, clustered IDs on one line, to a hash format"
-  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 22_syn_pan_aug_extra_pctl${pctl_low}.clust.tsv |
-    cat > 22_syn_pan_aug_extra_pctl${pctl_low}.hsh.tsv
-
-  echo "  Add positional information to the hash output."
-  join -a 1 -1 2 -2 1 <(sort -k2,2 22_syn_pan_aug_extra_pctl${pctl_low}.hsh.tsv) <(cat 01_posn_hsh/*hsh | sort -k1,1) | 
-    perl -pe 's/__/\t/g; s/ /\t/g' | awk -v OFS="\t" '{print $2, $1, $3, $5, $6, $7}' |
-    sort -k1,1 -k2,2 > 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv
-
-  echo "Order method: $order_method"
-  if [[ $order_method =~ "align" ]]; then
-    echo "==  The next several steps will determine panID ordering using the \"alignment\" ordering option,"
-    echo "    based on alignment of panID orders in each annotation, for each chromosome."
-    echo "  If code_table/pan_to_peptide.tsv doesn't exist, generate it."
-
-    mkdir -p code_table
-    if [ ! -f code_table/pan_to_peptide.tsv ]; then
-      echo "   Generating hash file code_table/pan_to_peptide.tsv"
-      make_peptide_hash.pl > code_table/pan_to_peptide.tsv
-    fi
-  
-    echo "  Encode pan-genes as unique peptide strings, and extract annotation sets with encoded"
-    echo "  IDs ordered along chromosomes, permitting whole-chromosome alignments of gene order."
-    echo "  Calling script order_encode.pl on file 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv"
-    mkdir -p 23_encoded_chroms
-    order_encode.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
-                          -code_table code_table/pan_to_peptide.tsv -utilized code_table/utilized.tsv \
-                          -annot_regex "${ANN_REX}" -outdir 23_encoded_chroms 
-  
-    echo "  Align chromosome sequences with peptide-encoded-gene-orders."
-    mkdir -p 23_encoded_chroms_aligned
-    do_align.sh 23_encoded_chroms 23_encoded_chroms_aligned $(( $NPROC/2 ))
-  
-    echo "  Filter chromosome alignments to consensus motifs"
-    mkdir -p 23_encoded_chroms_filt1
-    for filepath in 23_encoded_chroms_aligned/*; do 
-      base=`basename $filepath`
-      cons -sequence $filepath -outseq 23_encoded_chroms_filt1/$base -name $base &
-      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
-    done
-    wait
-  
-    echo "  Decode motifs to recover pangene IDs in order along each chromosome."
-    cat /dev/null > consen_gene_order.tsv
-    for filepath in 23_encoded_chroms_filt1/*; do
-      chr=`basename $filepath`
-      order_decode.pl -align $filepath -code code_table/utilized.tsv -verbose |
-        top_line.awk >> consen_gene_order.tsv 
-    done
-  
-    echo "  Find panIDs that weren't placed"
-    comm -23 <( cut -f1 code_table/utilized.tsv ) <( cut -f1 consen_gene_order.tsv | sort -u ) |
-      awk '{print $1}' > consen_pan_unplaced.txt
-
-  elif [[ $order_method =~ "reference" ]]; then
-    echo "==  The next several steps will determine panID ordering using the \"reference\" ordering option,"
-    echo "    based on the panID order from the supplied \"preferred annotation\", $preferred_annot"
-    echo " order_by_reference.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \\ "
-    echo "   -annot_regex \"${ANN_REX}\" -pref_annot $preferred_annot \\ "
-    echo "   -consen_out consen_gene_order.tsv -unplaced_out consen_pan_unplaced.txt -verbose "
-    order_by_reference.pl -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
-                          -annot_regex "${ANN_REX}" -pref_annot $preferred_annot \
-                          -consen_out consen_gene_order.tsv -unplaced_out consen_pan_unplaced.txt -verbose 
-  else 
-    echo "Ordering method (-o $order_method ) is not one of \"alignment\" or \"reference\". Aborting."
-    exit 1
-  fi # End of $order_method =~ /align/
-
-  gapfill_threads=$(($NPROC/2))
-  echo "  Fill gaps in the alignment-based pangene ordering. This step is time-consuming."
-  echo "  so is run in parallel, using $gapfill_threads threads."
-  echo "   order_gapfill.pl -verbose -annot_regex \"${ANN_REX}\" -consen consen_gene_order.tsv \\";
-  echo "     -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \\";
-  echo "     -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv -nproc $gapfill_threads";
-  order_gapfill.pl -verbose -annot_regex "${ANN_REX}" -consen consen_gene_order.tsv \
-    -pan_table 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
-    -unplaced consen_pan_unplaced.txt -out consen_gene_order_gapfilled.tsv -nproc $gapfill_threads
-
-  echo "  Reshape defline into a hash, e.g. pan20175 Phaseolus.pan2.chr11_222300_pan20175 222300 223300 -"
-  echo "  Note: these \"positions\" and sizes are artificial, representing only inferred relative positions."
-  cat consen_gene_order_gapfilled.tsv | awk -v PRE=$consen_prefix '
-    {printf("%s\t%s.%s_%06d_%s\t%d\t%d\t%s\n", $1, PRE, $2, $3, $1, $3*100, $3*100+1000, $4)}' > consen_posn.hsh
-
-  echo "  Extract a version of the consen_gene_order file with immediate tandem duplicates collapsed"
-  cat consen_posn.hsh | top_line.awk > consen_posn_trim.hsh
-
-  echo "  Hash position information into fasta file (CDS)"
-  hash_into_fasta_id.pl -fasta 22_pan_fasta_rep_pctl${pctl_low}_cds.fna -hash consen_posn_trim.hsh |
-    grep -v "HASH UNDEFINED" > 22_pan_fasta_rep_pctl${pctl_low}_posn_cdsTMP.fna
-
-  echo "  Reshape defline, and sort by position (CDS)"
-  fasta_to_table.awk 22_pan_fasta_rep_pctl${pctl_low}_posn_cdsTMP.fna | sed 's/__/\t/g; s/ /\t/' | 
-    sort | awk '{print ">" $1, $2, $3, $4, $5; print $6}' > 23_syn_pan_pctl${pctl_low}_posn_cds.fna
-
-  echo "  Also get corresponding protein sequences for genes in lists/lis.18_syn_pan_aug_extra.pctl${pctl_low}"
-  if [ ! -f 20_pan_fasta_prot.faa ]; then
-    for filepath in 02_fasta_prot/*.gz; do 
-      zcat $filepath >> 20_pan_fasta_prot.faa
-    done
-  fi
-
-  cat 23_syn_pan_pctl${pctl_low}_posn_cds.fna | awk '$1~/^>/ {print $5}' > lists/lis.23_syn_pan_pctl${pctl_low}_posn
-  get_fasta_subset.pl -in 20_pan_fasta_prot.faa -list lists/lis.23_syn_pan_pctl${pctl_low}_posn \
-                      -clobber -out 23_syn_pan_pctl${pctl_low}_posn_proteinTMP.faa
-
-  echo "  Get directory of protein multifasta sequences for each pangene, for (separate) protein alignments"
-
-  if [ -d 22_syn_pan_aug_extra_pctl${pctl_low} ]; then rm -rf 22_syn_pan_aug_extra_pctl${pctl_low} ; fi
-  mkdir -p 22_syn_pan_aug_extra_pctl${pctl_low}
-  get_fasta_from_family_file.pl 20_pan_fasta_prot.faa \
-    -family_file 22_syn_pan_aug_extra_pctl${pctl_low}.clust.tsv -out_dir 22_syn_pan_aug_extra_pctl${pctl_low}
-
-  echo "  Hash pan-ID into protein fasta file"
-  cat 23_syn_pan_pctl${pctl_low}_posn_cds.fna |
-    awk '$1~/^>/ { print $5 "\t" substr($1,2) "__" $2 "__" $3 "__" $4 }' > lists/23_syn_pan_pctl${pctl_low}_posn.hsh
-  hash_into_fasta_id.pl -hash lists/23_syn_pan_pctl${pctl_low}_posn.hsh -swap_IDs -nodef \
-    -fasta 23_syn_pan_pctl${pctl_low}_posn_proteinTMP.faa |
-    perl -pe 's/__/ /g' > 23_syn_pan_pctl${pctl_low}_posn_prot.faa
-}
-
-##########
-run_calc_chr_pairs() {
-  cd "${WORK_DIR}"
-  echo "Generate a report of observed chromosome pairs"
-
-  echo "  Identify gene pairs, using mmseqs --easy_cluster"
-    mmseqs easy-cluster 19_pan_aug_leftover_merged_cds.fna 24_pan_fasta_clust 03_mmseqs_tmp \
-    --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
-
-  echo "   Extract chromosome-chromosome correspondences"
-  cut -f2,3 22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv | sort -k1,1 > 22_syn_pan_aug_extra_pctl${pctl_low}_posn.gene_chr.hsh
-
-  echo "   From mmseqs cluster table, prune gene pairs, keeping only those in the same pangene cluster"
-  cat 24_pan_fasta_clust_cluster.tsv | perl -pe 's/__/\t/g' | awk '$1==$3' |
-    perl -pe 's/(pan\d+)\t/$1__/g' > 24_pan_fasta_cluster_pruned.tsv
-
-  echo "   Join chromosome numbers to gene pairs and count chromosome correspondences among the pairs."
-  join <(perl -pe 's/pan\d+__//g' 24_pan_fasta_cluster_pruned.tsv | sort -k1,1) \
-       22_syn_pan_aug_extra_pctl${pctl_low}_posn.gene_chr.hsh | perl -pe 's/ /\t/g' | sort -k2,2 | 
-     join -1 2 -2 1 - 22_syn_pan_aug_extra_pctl${pctl_low}_posn.gene_chr.hsh | 
-     awk 'BEGIN{IGNORECASE=1; OFS="\t"} 
-          $3!~/cont|scaff|sc|pilon|ctg|contig|tig|mito|mt$|cp$|pt$|chl|unanchor|unkn/ && \
-          $4!~/cont|scaff|sc|pilon|ctg|contig|tig|mito|mt$|cp$|pt$|chl|unanchor|unkn/ \
-          {print $3, $4}' | perl -pe 's/^\S+\.\D+(\d+)\s+\S+\.\D+(\d+)/$1\t$2/' |
-          perl -pe 's/^0(\d+)/$1/; s/\t0(\d+)/\t$1/' |
-     awk -v OFS="\t" '$1<=$2 {print $1, $2} $1>$2 {print $2, $1}' |
-     sort | uniq -c | awk -v OFS="\t" '{print $2, $3, $1}' | sort -k3nr,3nr > observed_chr_pairs.tsv
-}
-
-##########
 run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
  
-  # Determine if the sequence looks like nucleotide or like protein.
-  someseq=$(head ${WORK_DIR}/07_pan_fasta_cds.fna | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
-  SEQTYPE=$(check_seq_type "${someseq}")
-  case "$SEQTYPE" in 
-    3) ST="NUC" ;;
-    1) ST="PEP" ;;
-  esac
-
   #param_string="${ST}.id${clust_iden}.cov${clust_cov}.cns${consen_iden}.ext${extra_iden}.I${mcl_inflation}"
   conf_base=`basename $CONF .conf`
   full_out_dir="${out_dir_base}_$conf_base"
@@ -833,13 +656,10 @@ run_summarize() {
   for file in 06_syn_pan.clust.tsv 06_syn_pan.hsh.tsv \
               12_syn_pan_aug.clust.tsv 12_syn_pan_aug.hsh.tsv \
               18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv 18_syn_pan_aug_extra.counts.tsv \
-              18_syn_pan_aug_extra_complement.fna \
-              21_pan_fasta_clust_rep_cds.fna 21_pan_fasta_clust_rep_prot.faa \
-              22_pan_fasta_rep_pctl${pctl_low}_cds.fna \
-              22_pan_fasta_rep_pctl${pctl_med}_cds.fna \
-              22_pan_fasta_rep_pctl${pctl_hi}_cds.fna \
+              18_syn_pan_aug_extra_complement.faa \
+              21_pan_fasta_clust_rep_prot.faa \
               22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
-              23_syn_pan_pctl${pctl_low}_posn_cds.fna 23_syn_pan_pctl${pctl_low}_posn_prot.faa \
+              23_syn_pan_pctl${pctl_low}_posn_prot.faa \
               observed_chr_pairs.tsv ; do
     if [ -f ${WORK_DIR}/$file ]; then
       cp ${WORK_DIR}/$file ${full_out_dir}/
@@ -853,13 +673,6 @@ run_summarize() {
   end_time=`date`
   cat ${WORK_DIR}/stats/tmp.timing >> ${stats_file}
   printf "Run ended at:   $end_time\n\n" >> ${stats_file}
-
-  # Report sequence type 
-  if [[ "$SEQTYPE" == 3 ]]; then
-    echo "Sequence type: nucleotide" >> ${stats_file}
-  else
-    echo "Sequence type: protein" >> ${stats_file}
-  fi
 
   echo "  Report parameters from config file"
   printf "Parameter  \tvalue\n" >> ${stats_file}
@@ -931,7 +744,7 @@ run_summarize() {
   done
 
   echo "  Print sequence composition statistics for each annotation set"
-  printf "\n== Sequence stats for CDS files\n" >> ${stats_file}
+  printf "\n== Sequence stats for protein files\n" >> ${stats_file}
   printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
   if [ -f ${WORK_DIR}/stats/tmp.fasta_seqstats ]; then
     cat ${WORK_DIR}/stats/tmp.fasta_seqstats >> ${stats_file}
@@ -946,11 +759,11 @@ run_summarize() {
                  }' >> ${stats_file}
   fi
 
-  printf "\n== Sequence stats for final pangene CDS files -- pctl${pctl_low} and trimmed\n" >> ${stats_file}
+  printf "\n== Sequence stats for final protein files -- pctl${pctl_low} and trimmed\n" >> ${stats_file}
   printf "  Class:   seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
-  annot_name=23_syn_pan_pctl${pctl_low}_posn_cds.fna
+  annot_name=23_syn_pan_pctl${pctl_low}_posn_prot.faa
     printf "  pctl${pctl_low}: " >> ${stats_file}
-    cat_or_zcat "${WORK_DIR}/23_syn_pan_pctl${pctl_low}_posn_cds.fna" | calc_seq_stats >> ${stats_file}
+    cat_or_zcat "${WORK_DIR}/23_syn_pan_pctl${pctl_low}_posn_prot.faa" | calc_seq_stats >> ${stats_file}
 
   echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
   #   tmp.gene_count_start was generated during run_ingest
@@ -1059,7 +872,6 @@ run_ReallyClean() {
 NPROC=$(command -v nproc > /dev/null && nproc || getconf _NPROCESSORS_ONLN)
 CONFIG="null"
 optarg_work_dir="null"
-optarg_order_method="null"
 step="all"
 retain="no"
 
@@ -1070,7 +882,7 @@ export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 MMSEQSTHREADS=$(( 4 < ${NPROC} ? 4 : ${NPROC} ))
 
 pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation strict_synt dagchainer_args 
-  out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex order_method preferred_annot work_dir'
+  out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex work_dir'
 
 ##########
 # Command-line interpreter
@@ -1082,7 +894,6 @@ do
     w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
     s) step=$OPTARG; echo "step(s): $step" ;;
     n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
-    o) optarg_order_method=$OPTARG; echo "order method: $optarg_order_method" ;;
     r) retain="yes" ;;
     v) version ;;
     h) printf >&2 "$HELP_DOC\n" && exit 0 ;;
@@ -1107,12 +918,6 @@ if [ "$#" -eq 0 ]; then
 fi
 
 shift $(expr $OPTIND - 1)
-
-if [ "$order_method" != "$optarg_order_method" ] && [ "$optarg_order_method" != "null" ]; then
-  echo "Command-line option for order_method was \"$optarg_order_method\", overriding"
-  echo "the setting of \"$order_method\" from the config."
-  order_method=$optarg_order_method
-fi
 
 ##########
 # Check for existence of work directory.
@@ -1169,7 +974,7 @@ fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
 commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra pick_exemplars \
-             filter_to_pctile order_and_name calc_chr_pairs summarize"
+             filter_to_pctile summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do
