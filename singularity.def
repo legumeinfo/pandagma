@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: debian:bullseye-slim
+From: ubuntu:22.04
 Stage: deps
 
 %post
