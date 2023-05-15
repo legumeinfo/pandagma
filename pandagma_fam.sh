@@ -247,22 +247,15 @@ run_mmseqs() {
   SEQTYPE=1;  # 1=pep; 3=nuc
   for (( file1_num = 0; file1_num < ${#protein_files[@]} ; file1_num++ )); do
     qry_base=$(basename ${protein_files[file1_num]%.*} .$faa)
-    for (( file2_num = $( expr $file1_num + 1 ); file2_num < ${#protein_files[@]} ; file2_num++ )); do
+    for (( file2_num = $file1_num; file2_num < ${#protein_files[@]} ; file2_num++ )); do  # file2_num = $file1_num includes self-comparisons
       sbj_base=$(basename ${protein_files[file2_num]%.*} .$faa)
       echo "  Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
-      echo "{ cat 02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa ; } | "
-      echo "mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} $MMTEMP \\"
-      echo "--min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null"
 
-      { cat 02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa ; } |
-        mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} $MMTEMP \
-         --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign  1>/dev/null #  & ; XX 
-        #mmseqs easy-cluster stdin 03_mmseqs/${qry_base}.x.${sbj_base} $MMTEMP --search-type ${SEQTYPE} \
-        # --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null #  & ; XX 
+      mmseqs easy-search \
+        02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa 03_mmseqs/${qry_base}.x.${sbj_base}.m8 $MMTEMP \
+        --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} --min-seq-id ${clust_iden} 1>/dev/null 
 
-        # allow to execute up to $MMSEQSTHREADS in parallel
-        #if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait; fi
     done
     echo
   done

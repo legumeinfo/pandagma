@@ -15,7 +15,7 @@ Stage: deps
      
 
 Bootstrap: docker
-From: debian:bullseye-slim
+From: ubuntu:22.04
 
 %files
     *.sh /usr/local/bin
