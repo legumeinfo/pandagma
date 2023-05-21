@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-05-11"
+version="2023-05-20"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -50,7 +50,6 @@ Subcommands (in order they are usually run):
        cluster_rest - Retrieve unclustered sequences and cluster those that can be.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
-   filter_to_pctile - Calculate orthogroup composition and filter fasta files by selected percentiles.
           summarize - Move results into output directory, and report summary statistics.
 
   Run either of the following subcommands separately if you wish:
@@ -63,17 +62,26 @@ Subcommands (in order they are usually run):
 """
 
 MORE_INFO="""
-Optionally, a file specified in the expected_chr_matches variable can be specified in pandagma.conf,
-which provides anticipated chromosome pairings, e.g.
-  01 01
-  02 02
-  ...
-  11 13  # allows for translocation between 11 and 13
-  12 12
-These pairings are used in a regular expression to identify terminal portions of molecule IDs, e.g.
-  glyma.Wm82.gnm2.Gm01  glyso.PI483463.gnm1.Gs01
-  glyma.Wm82.gnm2.Gm13  glyso.W05.gnm1.Chr11
-If an expected_chr_matches file is not provided, then no such filtering will be done.
+Optionally, a file specified in the expected_quotas variable can be specified in pandagma.conf,
+which provides the number of expected gene matches in a gene family at the desired evolutionary depth,
+considering a known history of whole-genome duplications that affect the included species. For example,
+for the legume family, originating ~70 mya:
+Arachis    Arachis     4
+Arachis    Cercis      1
+Arachis    Glycine     4
+Arachis    Phaseolus   2
+Cercis     Arachis     4
+Cercis     Cercis      1
+Cercis     Glycine     4
+Cercis     Phaseolus   2
+...
+
+These quotas are used in a regular expression to identify the initial portion of the prefixed seqIDs,
+for example, \"Cicer\" and \"cerca\" matching the genus and \"gensp\" matching prefixes for these seqIDs:
+  Cicer.pan1.chr06
+  cerca.ISC453364.gnm3.Chr03
+
+If an expected_quotas.tsv file is not provided, then no such filtering will be done.
 
 Variables in pandagma config file (Set the config with the CONF environment variable)
     dagchainer_args - Argument for DAGchainer command
@@ -83,12 +91,9 @@ Variables in pandagma config file (Set the config with the CONF environment vari
          extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [90]
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
         strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs (1)
-                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches.tsv
+                        The alternative (0) is to use all homologous pairs that satisfy expected_quotas.tsv
       consen_prefix - Prefix to use in orthogroup names
        out_dir_base - Base name for the output directory [default: './out']
-           pctl_low - Lower percentile bin size cutoff relative to modal count (usu. the count of annots) [25]
-           pctl_med - Medium percentile bin size cutoff relative to modal count (usu. the count of annots) [50]
-            pctl_hi - High percentile bin size cutoff relative to modal count (usu. the count of annots) [75]
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
                         \"([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+\" 
                           for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1
@@ -118,7 +123,7 @@ canonicalize_paths() {
     protein_files_extra=($(realpath --canonicalize-existing "${protein_files_extra[@]}"))
     annotation_files_extra=($(realpath --canonicalize-existing "${annotation_files_extra[@]}"))
   fi
-  readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
+  readonly expected_quotas=${expected_quotas:+$(realpath "${expected_quotas}")}
   readonly submit_dir=${PWD}
 
   fasta_file=$(basename "${protein_files[0]}" .gz)
@@ -252,10 +257,15 @@ run_mmseqs() {
       echo "  Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
 
-      mmseqs easy-search \
-        02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa 03_mmseqs/${qry_base}.x.${sbj_base}.m8 $MMTEMP \
-        --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} --min-seq-id ${clust_iden} 1>/dev/null 
-
+      if [[ ${qry_base} == ${sbj_base} ]]; then # self-comparison, so use flag --add-self-matches
+        mmseqs easy-search \
+          02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa 03_mmseqs/${qry_base}.x.${sbj_base}.m8 $MMTEMP \
+          --add-self-matches --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} --min-seq-id ${clust_iden} 1>/dev/null 
+      else # not a self-comparison, do omit flag --add-self-matches
+        mmseqs easy-search \
+          02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa 03_mmseqs/${qry_base}.x.${sbj_base}.m8 $MMTEMP \
+          --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} --min-seq-id ${clust_iden} 1>/dev/null 
+      fi
     done
     echo
   done
@@ -264,27 +274,36 @@ run_mmseqs() {
 
 ##########
 run_filter() {
-  echo; echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
+  echo; echo "From homology (mmseqs -m8) output, split out the following fields: molecule, gene, start, stop."
   cd "${WORK_DIR}"
+  if [ -d 04_dag ]; then rm -rf 04_dag ; fi
   mkdir -p 04_dag
-  if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
-    echo "Filtering on chromosome patterns from file ${chr_match_list}"
-    for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
-      outfilebase=`basename $mmseqs_path _cluster.tsv`
-      echo "  $outfilebase"
-      cat ${mmseqs_path} | filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} |
+  if [[ -f ${expected_quotas} ]]; then  # filter based on list of match quotas if provided
+    echo "Filtering on quotas from file ${expected_quotas}"
+    for mmseqs_path in 03_mmseqs/*.m8; do
+      outfilebase=`basename $mmseqs_path .m8`
+      qry=`echo $outfilebase | perl -pe 's/(^[^.]+)\..+/$1/'`;
+      sbj=`echo $outfilebase | perl -pe 's/.+\.x\.([^\.]+)\..+/$1/'`;
+      echo "  $outfilebase $qry $sbj"
+      cat ${mmseqs_path} | filter_mmseqs_by_quotas.pl -quotas ${expected_quotas} -qry_pre $qry -sbj_pre $sbj |
+        perl -pe 's/\t[\+-]//g' |  # strip orientation, which isn't used by DAGChainer 
+        cat | # Next: for self-comparisons, suppress same chromosome && different gene ID (local dups)
+        perl -lane 'print $_ unless($F[0] eq $F[4] && $F[1] ne $F[5])' |
         awk 'NF==8' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
         cat > 04_dag/${outfilebase}_matches.tsv &
 
       # allow to execute up to $NPROC in parallel
-      if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait; fi
+      if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
     done
     wait # wait for last jobs to finish
-  else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
-    echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
+  else   # don't filter, since quotas file isn't provided; just remove orientation, which isn't used by DAGChainer
+    echo "No expected_quotas.tsv file was provided, so proceeding without quota (expected gene-count) filtering."
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=`basename $mmseqs_path _cluster.tsv`
-      cat ${mmseqs_path} | perl -pe 's/__/\t/g; s/\t[\+-]//g' |
+      cat ${mmseqs_path} | cut -f1,2 | 
+        perl -pe 's/__/\t/g; s/\t[\+-]//g' | 
+        cat | # Next: or self-comparisons, suppress same chromosome && different gene ID (local dups)
+        perl -lane 'print $_ unless($F[0] eq $F[4] && $F[1] ne $F[5])' |
         awk 'NF==8' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
         cat > 04_dag/${outfilebase}_matches.tsv 
     done
@@ -312,7 +331,7 @@ run_dagchainer() {
       rmdir ${tmpdir}
     ) &
     # allow to execute up to $NPROC in parallel
-    [ $(jobs -r -p | wc -l) -ge ${NPROC} ] && wait 
+    if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait # wait for last jobs to finish
 
@@ -321,7 +340,7 @@ run_dagchainer() {
     cat 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | 
       awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
   else 
-    # Combine the homology pairs (filtered by chromosome matches if provided) and the synteny pairs
+    # Combine the homology pairs (filtered by quota if provided) and the synteny pairs
     cat 04_dag/*_matches.tsv 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | 
       awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
   fi
@@ -331,6 +350,8 @@ run_dagchainer() {
 run_mcl() {
   # Calculate clusters using Markov clustering
   cd "${WORK_DIR}"
+  mkdir -p lists
+
   printf "\nDo Markov clustering with inflation parameter $mcl_inflation and ${NPROC} threads\n"
   echo "MCL COMMAND: mcl 05_filtered_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv"
   mcl 05_filtered_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv \
@@ -340,8 +361,12 @@ run_mcl() {
   awk '{padnum=sprintf("%05d", NR); print "pan" padnum "\t" $0}' tmp.syn_pan.clust.tsv > 06_syn_pan.clust.tsv
   rm tmp.syn_pan.clust.tsv
 
+  echo "  Move singleton and doubleton clusters into a list of leftovers"
+  cat 06_syn_pan.clust.tsv | awk 'NF==2 {print $2} NF==3 {print $2; print $3}' > lists/lis.06_syn_pan_1s_2s
+  cat 06_syn_pan.clust.tsv | awk 'NF>3 {print $0}' > 06_syn_pan_ge3.clust.tsv
+
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
-  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 06_syn_pan.clust.tsv > 06_syn_pan.hsh.tsv
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 06_syn_pan_ge3.clust.tsv > 06_syn_pan_ge3.hsh.tsv
 }
 
 ##########
@@ -352,9 +377,10 @@ run_consense() {
   if [ -d 07_pan_fasta ]; then rm -rf 07_pan_fasta; fi
   mkdir -p 07_pan_fasta lists
 
+
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
   echo "    Fasta file:" "${protein_files[@]}"
-  get_fasta_from_family_file.pl "${protein_files[@]}" -fam 06_syn_pan.clust.tsv -out 07_pan_fasta
+  get_fasta_from_family_file.pl "${protein_files[@]}" -fam 06_syn_pan_ge3.clust.tsv -out 07_pan_fasta
 
   cat /dev/null > 07_pan_fasta_prot.faa
   for path in 07_pan_fasta/*; do
@@ -421,27 +447,17 @@ run_cluster_rest() {
     -lis lists/lis.12_syn_pan_aug_complement -xclude -clobber
 
   MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
+  mkdir -p 03_mmseqs_rest
   complmt_self_compare="12_syn_pan_aug_complement.x.12_syn_pan_aug_complement"
   cat 12_syn_pan_aug_complement.faa |
-    mmseqs easy-cluster stdin 03_mmseqs/$complmt_self_compare $MMTEMP \
+    mmseqs easy-cluster stdin 03_mmseqs_rest/$complmt_self_compare $MMTEMP \
     --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
-  if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
-    echo "Filtering on chromosome patterns from file ${chr_match_list}"
-    cat 03_mmseqs/${complmt_self_compare}_cluster.tsv |
-      filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${complmt_self_compare}_matches.tsv
-  else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
-    echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
-    cat 03_mmseqs/${complmt_self_compare}_cluster.tsv |
-      perl -pe 's/__/\t/g; s/\t[\+-]$//' > 04_dag/${complmt_self_compare}_matches.tsv 
-  fi
-
   echo "  Cluster the remaining sequences that have matches"
-  mcl  04_dag/${complmt_self_compare}_matches.tsv -I 2 -te 10 --abc -o tmp.syn_pan_aug_complement.clust.tsv
-
+  mcl 03_mmseqs_rest/${complmt_self_compare}_cluster.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan_aug_complement.clust.tsv
 
   echo "  Find number of clusters in initial (06) results"
-  clust_count_06=`wc -l 06_syn_pan.clust.tsv | awk '{print $1}'`
+  clust_count_06=`wc -l 06_syn_pan_ge3.clust.tsv | awk '{print $1}'`
  
   echo "  Add cluster IDs"
   cat tmp.syn_pan_aug_complement.clust.tsv | 
@@ -491,7 +507,7 @@ run_add_extra() {
       mmseqs easy-search "${path}" 13_pan_aug_fasta.faa 13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
                    $MMTEMP --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
 
-      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait; fi
+      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
     done
     wait # wait for jobs to finish
   
@@ -531,7 +547,7 @@ run_add_extra() {
           cp 13_pan_aug_fasta/$panID 19_pan_aug_leftover_merged_prot/
         fi
       done & # Do the merging in parallel because of the number of flies
-      if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait; fi
+      if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
     done
     wait 
   
@@ -551,34 +567,6 @@ run_add_extra() {
   fi
 }
 
-
-##########
-run_filter_to_pctile() {
-  cd "${WORK_DIR}"
-
-  echo "  Calculate matrix of gene counts per orthogroup and annotation set"
-  calc_pan_stats.pl -annot_regex $ANN_REX -pan 18_syn_pan_aug_extra.clust.tsv -out 18_syn_pan_aug_extra.counts.tsv
-  max_annot_ct=$(cat 18_syn_pan_aug_extra.counts.tsv | 
-                       awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
-
-  echo "  Select orthogroups with genes from selected percentiles of max_annot_ct annotation sets"
-  for percentile in $pctl_low $pctl_med $pctl_hi; do
-    cat 18_syn_pan_aug_extra.counts.tsv | 
-      awk -v PCTL=$percentile -v ANNCT=$max_annot_ct '$2>=ANNCT*(PCTL/100)&& $1!~/^#/ {print $1}' |
-        cat > lists/lis.18_syn_pan_aug_extra.pctl${percentile}
-
-    echo "  Get a fasta subset with only genes from at least $(($max_annot_ct*$pctl_low/100)) annotation sets"
-    get_fasta_subset.pl -in 21_pan_fasta_clust_rep_prot.faa \
-                        -list lists/lis.18_syn_pan_aug_extra.pctl${percentile} \
-                        -clobber -out 22_pan_fasta_rep_pctl${percentile}_prot.faa
-
-    echo "  Get a clust.tsv file with orthogroups with at least min_core_prop*max_annot_ct annotation sets"
-    join <(LC_ALL=C sort -k1,1 lists/lis.18_syn_pan_aug_extra.pctl${percentile}) \
-         <(LC_ALL=C sort -k1,1 18_syn_pan_aug_extra.clust.tsv) |
-            cat > 22_syn_pan_aug_extra_pctl${percentile}.clust.tsv
-  done
-}
-
 ##########
 run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
@@ -596,14 +584,11 @@ run_summarize() {
       mkdir -p $full_out_dir
   fi
 
-  for file in 06_syn_pan.clust.tsv 06_syn_pan.hsh.tsv \
+  for file in 06_syn_pan.clust.tsv 06_syn_pan_ge3.hsh.tsv \
               12_syn_pan_aug.clust.tsv 12_syn_pan_aug.hsh.tsv \
               18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv 18_syn_pan_aug_extra.counts.tsv \
               18_syn_pan_aug_extra_complement.faa \
-              21_pan_fasta_clust_rep_prot.faa \
-              22_syn_pan_aug_extra_pctl${pctl_low}_posn.hsh.tsv \
-              23_syn_pan_pctl${pctl_low}_posn_prot.faa \
-              observed_chr_pairs.tsv ; do
+              21_pan_fasta_clust_rep_prot.faa ; do
     if [ -f ${WORK_DIR}/$file ]; then
       cp ${WORK_DIR}/$file ${full_out_dir}/
     else 
@@ -625,66 +610,61 @@ run_summarize() {
 
   printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
 
-  echo "  Report threshold for inclusion in \"pctl${pctl_low}\""
-  max_annot_ct=$(cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv |
-                       awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
-  pctl_low_threshold=$(awk -v MCP=$pctl_low -v MAC=$max_annot_ct 'BEGIN{print MCP*MAC/100}')
-
   echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
 
   printf '\n  %-20s\t%s\n' "Statistic" "value" >> ${stats_file}
   printf "The global mode may be for a smaller OG size. Modes below are greater than the specified core threshold.\n" \
 
-  clustcount=1
-  # When the number of main annotation sets is small (<4), the core-threshold-ceiling may be lower than 
-  # the largest number of clusters. In that case, set $CTceil=2 to the smallest cluster size ($CTceil=2)
-  for clustering in 06_syn_pan 12_syn_pan_aug 18_syn_pan_aug_extra; do
-    clustfile=${full_out_dir}/$clustering.clust.tsv
-    if [[ -f $clustfile ]]; then
-      if [[ $clustcount == 1 ]]; then
-        printf "\n== Initial clusters (containing only genes within synteny blocks)\n" >> ${stats_file}
-        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
-        (( mode=$(awk "{print NF-1}" $clustfile |
-          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
-      elif [[ $clustcount == 2 ]]; then
-        printf "\n== Augmented clusters (unanchored sequences added to the initial clusters)\n" >> ${stats_file}
-        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
-        (( mode=$(awk "{print NF-1}" $clustfile |
-          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
-      elif [[ $clustcount == 3 ]]; then
-        printf "\n== Augmented-extra clusters (with sequences from extra annotation sets)\n" >> ${stats_file}
-        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
-        CTceil=$(echo $pctl_low_threshold | awk '{print int($1+1)}')
-        if (( $CTceil>$largest )); then let "CTceil=2"; fi; export CTceil
-        (( mode=$(awk -v CT=$CTceil "(NF-1)>=CT {print NF-1}" $clustfile |
-          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
-        printf "    The pctl${pctl_low} set consists of orthogroups with at least %.0f genes per OG (>= %d * %d/100 sets).\n" \
-           $CTceil $max_annot_ct $pctl_low >> ${stats_file} >> ${stats_file}
-      fi
-
-      export mode
-      (( clusters=$(wc -l < $clustfile) ))
-      (( num_at_mode=$(awk -v MODE=$mode '(NF-1)==MODE {ct++} END{print ct}' $clustfile) ))
-      (( seqs_clustered=$(awk '{sum+=NF-1} END{print sum}' $clustfile) ))
-
-      printf "  %-20s\t%s\n" "Cluster file" "$clustering.clust.tsv" >> ${stats_file}
-      printf "  %-20s\t%s\n" "num_of_clusters" $clusters >> ${stats_file}
-      printf "  %-20s\t%s\n" "largest_cluster" $largest >> ${stats_file}
-      if (( $clustcount<3 )); then
-        printf "  %-20s\t%d\n" "modal_clst_size" $mode >> ${stats_file}
-        printf "  %-20s\t%d\n" "num_at_mode" $num_at_mode >> ${stats_file}
-      else
-        printf "  %-20s\t%d\n" "modal_clst_size>=$CTceil" $mode >> ${stats_file}
-        printf "  %-20s\t%d\n" "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
-      fi
-      printf "  %-20s\t%d\n" "seqs_clustered" $seqs_clustered >> ${stats_file}
-  
-      (( clustcount=$((clustcount+1)) ))
-    else
-      printf "File $clustfile is not available; skipping\n"
-      printf "File $clustfile is not available; skipping\n" >> ${stats_file}
-    fi
-  done
+#  clustcount=1
+#  # When the number of main annotation sets is small (<4), the core-threshold-ceiling may be lower than 
+#  # the largest number of clusters. In that case, set $CTceil=2 to the smallest cluster size ($CTceil=2)
+#  for clustering in 06_syn_pan 12_syn_pan_aug 18_syn_pan_aug_extra; do
+#    clustfile=${full_out_dir}/$clustering.clust.tsv
+#    if [[ -f $clustfile ]]; then
+#      if [[ $clustcount == 1 ]]; then
+#        printf "\n== Initial clusters (containing only genes within synteny blocks)\n" >> ${stats_file}
+#        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
+#        (( mode=$(awk "{print NF-1}" $clustfile |
+#          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
+#      elif [[ $clustcount == 2 ]]; then
+#        printf "\n== Augmented clusters (unanchored sequences added to the initial clusters)\n" >> ${stats_file}
+#        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
+#        (( mode=$(awk "{print NF-1}" $clustfile |
+#          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
+#      elif [[ $clustcount == 3 ]]; then
+#        printf "\n== Augmented-extra clusters (with sequences from extra annotation sets)\n" >> ${stats_file}
+#        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
+#        CTceil=$(echo $pctl_low_threshold | awk '{print int($1+1)}')
+#        if (( $CTceil>$largest )); then let "CTceil=2"; fi; export CTceil
+#        (( mode=$(awk -v CT=$CTceil "(NF-1)>=CT {print NF-1}" $clustfile |
+#          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
+#        printf "    The pctl${pctl_low} set consists of orthogroups with at least %.0f genes per OG (>= %d * %d/100 sets).\n" \
+#           $CTceil $max_annot_ct $pctl_low >> ${stats_file} >> ${stats_file}
+#      fi
+#
+#      export mode
+#      (( clusters=$(wc -l < $clustfile) ))
+#      (( num_at_mode=$(awk -v MODE=$mode '(NF-1)==MODE {ct++} END{print ct}' $clustfile) ))
+#      (( seqs_clustered=$(awk '{sum+=NF-1} END{print sum}' $clustfile) ))
+#
+#      printf "  %-20s\t%s\n" "Cluster file" "$clustering.clust.tsv" >> ${stats_file}
+#      printf "  %-20s\t%s\n" "num_of_clusters" $clusters >> ${stats_file}
+#      printf "  %-20s\t%s\n" "largest_cluster" $largest >> ${stats_file}
+#      if (( $clustcount<3 )); then
+#        printf "  %-20s\t%d\n" "modal_clst_size" $mode >> ${stats_file}
+#        printf "  %-20s\t%d\n" "num_at_mode" $num_at_mode >> ${stats_file}
+#      else
+#        printf "  %-20s\t%d\n" "modal_clst_size>=$CTceil" $mode >> ${stats_file}
+#        printf "  %-20s\t%d\n" "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
+#      fi
+#      printf "  %-20s\t%d\n" "seqs_clustered" $seqs_clustered >> ${stats_file}
+#  
+#      (( clustcount=$((clustcount+1)) ))
+#    else
+#      printf "File $clustfile is not available; skipping\n"
+#      printf "File $clustfile is not available; skipping\n" >> ${stats_file}
+#    fi
+#  done
 
   echo "  Print sequence composition statistics for each annotation set"
   printf "\n== Sequence stats for protein files\n" >> ${stats_file}
@@ -702,28 +682,23 @@ run_summarize() {
                  }' >> ${stats_file}
   fi
 
-  printf "\n== Sequence stats for final protein files -- pctl${pctl_low} and trimmed\n" >> ${stats_file}
-  printf "  Class:   seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
-  annot_name=23_syn_pan_pctl${pctl_low}_posn_prot.faa
-    printf "  pctl${pctl_low}: " >> ${stats_file}
-    cat_or_zcat "${WORK_DIR}/23_syn_pan_pctl${pctl_low}_posn_prot.faa" | calc_seq_stats >> ${stats_file}
+#  printf "\n== Sequence stats for final protein files -- pctl${pctl_low} and trimmed\n" >> ${stats_file}
+#  printf "  Class:   seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
+#  annot_name=23_syn_pan_pctl${pctl_low}_posn_prot.faa
+#    printf "  pctl${pctl_low}: " >> ${stats_file}
+#    cat_or_zcat "${WORK_DIR}/23_syn_pan_pctl${pctl_low}_posn_prot.faa" | calc_seq_stats >> ${stats_file}
 
   echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
   #   tmp.gene_count_start was generated during run_ingest
-  printf "\n== Proportion of initial genes retained in the \"aug_extra\" and \"pctl${pctl_low}\" sets:\n" \
+  printf "\n== Proportion of initial genes retained in the \"aug_extra\" set:\n" \
     >> ${stats_file}
 
   cut -f2 ${WORK_DIR}/18_syn_pan_aug_extra.hsh.tsv | 
     perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' |
     sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_all_end
 
-  cut -f2 ${WORK_DIR}/22_syn_pan_aug_extra_pctl${pctl_low}.hsh.tsv | 
-    perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' |
-    sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_pctl${pctl_low}_end
-
   paste ${WORK_DIR}/stats/tmp.gene_count_start \
-        ${WORK_DIR}/stats/tmp.gene_count_all_end \
-        ${WORK_DIR}/stats/tmp.gene_count_pctl${pctl_low}_end | 
+        ${WORK_DIR}/stats/tmp.gene_count_all_end |
     awk 'BEGIN{print "  Start\tEnd_all\tEnd_core\tPct_kept_all\tPct_kept_core\tAnnotation_name"} 
         { printf "  %i\t%i\t%i\t%2.1f\t%2.1f\t%s\n", $2, $4, $6, 100*($4/$2), 100*($6/$2), $1 }'  >> ${stats_file}
 
@@ -772,8 +747,7 @@ run_clean() {
   echo "  work_dir: $PWD"
   if [ -d MMTEMP ]; then rm -rf MMTEMP/*; 
   fi
-  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_pan_aug_leftover_merged_prot \
-    22_syn_pan_aug_extra_pctl${pctl_low}; do
+  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_pan_aug_leftover_merged_prot; do
     if [ -d $dir ]; then echo "  Removing directory $dir"; rm -rf $dir &
     fi
   done
@@ -916,8 +890,7 @@ if ! type hash_into_fasta_id.pl &> /dev/null; then
 fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
-commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra \
-             filter_to_pctile summarize"
+commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do
