@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-05-20"
+version="2023-05-22"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -50,6 +50,8 @@ Subcommands (in order they are usually run):
        cluster_rest - Retrieve unclustered sequences and cluster those that can be.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
+     align_and_trim - align families, calculate HMMs, and trim to match-states
+         calc_trees - calculate gene tree
           summarize - Move results into output directory, and report summary statistics.
 
   Run either of the following subcommands separately if you wish:
@@ -568,6 +570,57 @@ run_add_extra() {
 }
 
 ##########
+run_align_and_trim() {
+  echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
+  cd "${WORK_DIR}"
+  if [[ -d 19_pan_aug_leftover_merged_prot ]]; then
+    : # do nothing; the directory and file(s) exist
+  else 
+    mkdir -p 19_pan_aug_leftover_merged_prot
+    echo "  For each pan-gene set, retrieve sequences into a multifasta file."
+    get_fasta_from_family_file.pl "${protein_files[@]}" \
+      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
+  fi
+ 
+  echo; echo "== Align the gene families =="
+  mkdir -p 20_aligns
+  for filepath in 19_pan_aug_leftover_merged_prot/*; do 
+    file=`basename $filepath`;
+    echo "  Computing alignment, using program famsa, for file $file"
+    famsa 19_pan_aug_leftover_merged_prot/$file 20_aligns/$file
+  done
+ 
+  # echo; echo "== Build HMMs =="
+  # mkdir -p 21_hmm
+  # for filepath in 20_aligns/*; do 
+  #   file=`basename $filepath`;
+  #   
+  # done
+  # wait
+
+# hmm realign
+
+# hmm trim
+
+# filter align, filter_align.pl
+
+}
+
+##########
+run_calc_trees() {
+  echo; echo "== Calculate trees =="
+  cd "${WORK_DIR}"
+  if [[ -d XX ]]; then
+    : 
+  fi
+
+# fasttree
+# do_raxml_outgrp_root.ksh
+
+
+}
+
+##########
 run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
  
@@ -890,7 +943,7 @@ if ! type hash_into_fasta_id.pl &> /dev/null; then
 fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
-commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra summarize"
+commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra align_and_trim calc_trees summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do
