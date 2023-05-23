@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-05-22"
+version="2023-05-23"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -581,42 +581,91 @@ run_align_and_trim() {
     get_fasta_from_family_file.pl "${protein_files[@]}" \
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
   fi
- 
+
+  echo; echo "== Move small (<4) and highly low-entropy families (sequences are all identical) to the side =="
+  mkdir 19_pan_aug_small_or_identical
+  
+  min_seq_count=4
+
+  for filepath in 19_pan_aug_leftover_merged_prot/*; do
+    file=`basename $filepath`
+    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' $filepath | sort -u | wc -l);  
+    if [[ $count < 4 ]]; then 
+      echo "Set aside small or low-entropy family $file";
+      mv $filepath 19_pan_aug_small_or_identical/
+    fi; 
+  done
+
   echo; echo "== Align the gene families =="
   mkdir -p 20_aligns
   for filepath in 19_pan_aug_leftover_merged_prot/*; do 
     file=`basename $filepath`;
     echo "  Computing alignment, using program famsa, for file $file"
-    famsa 19_pan_aug_leftover_merged_prot/$file 20_aligns/$file
+    famsa -t 2 19_pan_aug_leftover_merged_prot/$file 20_aligns/$file
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
+  wait
  
-  # echo; echo "== Build HMMs =="
-  # mkdir -p 21_hmm
-  # for filepath in 20_aligns/*; do 
-  #   file=`basename $filepath`;
-  #   
-  # done
-  # wait
+  echo; echo "== Build HMMs =="
+  mkdir -p 21_hmm
+  for filepath in 20_aligns/*; do 
+    file=`basename $filepath`;
+    hmmbuild -n $file 21_hmm/$file $filepath &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+ 
+  echo; echo "== Realign to HMMs =="
+  mkdir -p 22_hmmalign
+  for filepath in 19_pan_aug_leftover_merged_prot/*; do 
+    file=`basename $filepath`;
+    hmmalign --trim --outformat A2M --amino \
+      -o 22_hmmalign/$file 20_aligns/$file 19_pan_aug_leftover_merged_prot/$file &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
 
-# hmm realign
+  echo; echo "== Trim HMM alignments to match-states =="
+  mkdir -p 23_hmmalign_trim1
+  for filepath in 22_hmmalign/*; do 
+    file=`basename $filepath`;
+    cat $filepath | 
+      perl -ne 'if ($_ =~ />/) {print $_} else {$line = $_; $line =~ s/[a-z]//g; print $line}' |
+      sed '/^$/d' > 23_hmmalign_trim1/$file &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
 
-# hmm trim
-
-# filter align, filter_align.pl
-
+  echo; echo "== Filter alignments prior to tree calculation =="
+  mkdir -p 23_hmmalign_trim2 23_hmmalign_trim2_log
+  min_depth=3
+  min_pct_depth=20
+  min_pct_aligned=20
+  for filepath in 23_hmmalign_trim1/*; do 
+    file=`basename $filepath`
+    filter_align.pl -in $path -out 23_hmmalign_trim2/$file -log 23_hmmalign_trim2_log/$file \
+                    -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
 }
 
 ##########
 run_calc_trees() {
   echo; echo "== Calculate trees =="
   cd "${WORK_DIR}"
-  if [[ -d XX ]]; then
-    : 
-  fi
-
-# fasttree
-# do_raxml_outgrp_root.ksh
-
+  
+  mkdir -p 24_trees
+  
+  # By default, FastTreeMP uses all machine cores, e.g. 64 on lathyrus. 
+  # It is more efficient to run more jobs on one core each by setting an environment variable.
+  OMP_NUM_THREADS=1
+  export OMP_NUM_THREADS
+  for filepath in 23_hmmalign_trim2/*; do
+    file=`basename $path`
+    FastTreeMP -quiet $filepath > 24_trees/$file &
+  done
+  wait
 
 }
 
