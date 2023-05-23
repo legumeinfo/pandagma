@@ -27,8 +27,18 @@ ml singularity
 ##source activate pandagma
 
 ##singularity run $IMAGE -c $CONFIG
-SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec --cleanenv $IMAGE which pandagma_fam.sh
-SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec --cleanenv $IMAGE pandagma_fam.sh -c $CONFIG
+#SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec --cleanenv $IMAGE which pandagma_fam.sh
+#SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec --cleanenv $IMAGE pandagma_fam.sh -c $CONFIG
+
+# Run indicated steps
+#SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec $IMAGE pandagma_fam.sh -c $CONFIG -s mmseqs
+#SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec $IMAGE pandagma_fam.sh -c $CONFIG -s filter
+#SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec $IMAGE pandagma_fam.sh -c $CONFIG -s dagchainer
+#SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec $IMAGE pandagma_fam.sh -c $CONFIG -s mcl
+#SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec $IMAGE pandagma_fam.sh -c $CONFIG -s consense
+#SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec $IMAGE pandagma_fam.sh -c $CONFIG -s cluster_rest
+#SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec $IMAGE pandagma_fam.sh -c $CONFIG -s add_extra
+SINGULARITYENV_PREPEND_PATH=$PDGPATH:$PDGPATH/bin singularity exec $IMAGE pandagma_fam.sh -c $CONFIG -s align_and_trim
 
 date   # print timestamp
 

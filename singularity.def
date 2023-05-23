@@ -31,7 +31,7 @@ From: ubuntu:22.04
 
 %post
     apt update
-    apt install -y --no-install-recommends libbio-perl-perl libparallel-forkmanager-perl mcl mmseqs2 emboss
+    apt install -y --no-install-recommends libbio-perl-perl libparallel-forkmanager-perl mcl mmseqs2 emboss hmmer fasttree
     rm -rf /var/lib/apt/lists/*
     chmod +x /usr/local/bin/*
 
