@@ -50,8 +50,9 @@ Subcommands (in order they are usually run):
        cluster_rest - Retrieve unclustered sequences and cluster those that can be.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
-     align_and_trim - align families, calculate HMMs, and trim to match-states
-         calc_trees - calculate gene tree
+              align - Align families.
+     model_and_trim - Build HMMs and trim the alignments, preparatory to calculating trees.
+         calc_trees - Calculate gene trees.
           summarize - Move results into output directory, and report summary statistics.
 
   Run either of the following subcommands separately if you wish:
@@ -570,10 +571,10 @@ run_add_extra() {
 }
 
 ##########
-run_align_and_trim() {
+run_align() {
   echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
   cd "${WORK_DIR}"
-  if [[ -d 19_pan_aug_leftover_merged_prot ]]; then
+  if [[ -d 19_pan_aug_leftover_merged_prot ]] && [[ -f 19_pan_aug_leftover_merged_prot/pan00001 ]]; then
     : # do nothing; the directory and file(s) exist
   else 
     mkdir -p 19_pan_aug_leftover_merged_prot
@@ -583,14 +584,12 @@ run_align_and_trim() {
   fi
 
   echo; echo "== Move small (<4) and highly low-entropy families (sequences are all identical) to the side =="
-  mkdir 19_pan_aug_small_or_identical
-  
+  mkdir -p 19_pan_aug_small_or_identical
   min_seq_count=4
-
   for filepath in 19_pan_aug_leftover_merged_prot/*; do
     file=`basename $filepath`
     count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' $filepath | sort -u | wc -l);  
-    if [[ $count < 4 ]]; then 
+    if [[ $count -lt $min_seq_count ]]; then 
       echo "Set aside small or low-entropy family $file";
       mv $filepath 19_pan_aug_small_or_identical/
     fi; 
@@ -605,22 +604,25 @@ run_align_and_trim() {
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
- 
+}
+
+##########
+run_model_and_trim() {
   echo; echo "== Build HMMs =="
+  cd "${WORK_DIR}"
   mkdir -p 21_hmm
   for filepath in 20_aligns/*; do 
     file=`basename $filepath`;
-    hmmbuild -n $file 21_hmm/$file $filepath &
+    hmmbuild -n $file 21_hmm/$file $filepath 1>/dev/null &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
  
   echo; echo "== Realign to HMMs =="
   mkdir -p 22_hmmalign
-  for filepath in 19_pan_aug_leftover_merged_prot/*; do 
+  for filepath in 21_hmm/*; do 
     file=`basename $filepath`;
-    hmmalign --trim --outformat A2M --amino \
-      -o 22_hmmalign/$file 20_aligns/$file 19_pan_aug_leftover_merged_prot/$file &
+    hmmalign --trim --outformat A2M --amino -o 22_hmmalign/$file 21_hmm/$file 19_pan_aug_leftover_merged_prot/$file &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -643,7 +645,7 @@ run_align_and_trim() {
   min_pct_aligned=20
   for filepath in 23_hmmalign_trim1/*; do 
     file=`basename $filepath`
-    filter_align.pl -in $path -out 23_hmmalign_trim2/$file -log 23_hmmalign_trim2_log/$file \
+    filter_align.pl -in $filepath -out 23_hmmalign_trim2/$file -log 23_hmmalign_trim2_log/$file \
                     -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
@@ -662,11 +664,11 @@ run_calc_trees() {
   OMP_NUM_THREADS=1
   export OMP_NUM_THREADS
   for filepath in 23_hmmalign_trim2/*; do
-    file=`basename $path`
-    FastTreeMP -quiet $filepath > 24_trees/$file &
+    echo "  Calculating tree for $file"
+    file=`basename $filepath`
+    fasttree -quiet $filepath > 24_trees/$file &
   done
   wait
-
 }
 
 ##########
@@ -992,7 +994,7 @@ if ! type hash_into_fasta_id.pl &> /dev/null; then
 fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
-commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra align_and_trim calc_trees summarize"
+commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra align model_and_trim calc_trees summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do
