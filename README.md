@@ -1,20 +1,35 @@
 # pandagma
-Pandagma is a workflow that derives pan-gene sets, given input of gene sequences (CDS and peptide) and
-annotations (BED or GFF) from several annotations. It is designed to be suitable for constructing
-pan-genes for annotations across several different species within a genus, or annotations within
-one species.
+Pandagma is a collection of workflows for calculating pangene sets and gene families. 
+There are two main workflows: pandagma_pan.sh for pangene sets, and pandagma_fam for gene families.
+The pangene workflow is designed to operate primarily on CDS sequences, at the level of a species or genus.
+The family workflow is designed to operate on protein sequences, at the level of an organismal family or order.
 
 Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023.
 
-The workflow is essentially as follows:
+The pangene workflow (pandagma_pan.sh) is essentially as follows:
 * Add positional information to the gene IDs
 * Find gene homologies among pairs of annotation sets, using mmseqs2
 * Filter by synteny (DAGChainer) -- and, optionally, by a list of allowed chromosome pairings.
 * Cluster (mcl)
 * Add back the genes that were excluded to this point 
 * Add "extra" annotation sets by homology 
-* Identify a representative sequence for each pan-gene
-* Calculate consensus order of the pan-genes, based on whole-chromosome multiple alignments of ordered panIDs
+* Identify a representative sequence for each pangene
+* Calculate consensus order of the pangenes, based on whole-chromosome multiple alignments of ordered panIDs
+* Calculate and report statistics
+
+The gene family workflow (pandagma_fam.sh) is similar to the pangene workflow, but operates on proteins rather than CDS,
+and uses an option "quotas" file to determine the initial expected gene duplication relationships between species,
+considering known or suspected whole-genome duplication histories at the evolutionary depth of interest.
+* Add positional information to the gene IDs
+* Find gene homologies among pairs of annotation sets, using mmseqs2
+* Filter by synteny (DAGChainer) -- and, optionally, by a "quotas" file with expected ortholog and paralog counts per species pairs.
+* Cluster (mcl)
+* Add back the genes that were excluded to this point 
+* Add "extra" annotation sets by homology 
+* Align sequences in each family
+* Build HMMs for each alignment
+* Realign to the HMMs and trim to HMM match-states
+* Calculate gene trees
 * Calculate and report statistics
 
 ## Installation methods <a name="installation"></a>
@@ -119,14 +134,14 @@ Subcommands (in order they are usually run):
              filter - Filter the synteny results for chromosome pairings, returning gene pairs.
          dagchainer - Run DAGchainer to filter for syntenic blocks
                 mcl - Derive clusters, with Markov clustering
-           consense - Calculate a consensus sequences from each pan-gene set,
+           consense - Calculate a consensus sequences from each pangene set,
                       adding sequences missed in the first clustering round.
        cluster_rest - Retrieve unclustered sequences and cluster those that can be.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
-     pick_exemplars - Pick representative sequence for each pan-gene
+     pick_exemplars - Pick representative sequence for each pangene
      filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
-      order_and_name - Assign pan-gene names with consensus chromosomes and ordinal positions.
+      order_and_name - Assign pangene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
 
@@ -136,7 +151,7 @@ Subcommands (in order they are usually run):
                         By default, \"clean\" is run as part of \"all\" unless the -r flag is set.
         ReallyClean - Do complete clean-up of files in the working directory.
                         Use this if you want to start over, OR if you are satisified with the results and
-                        don't anticipate adding other annotation sets to this pan-gene set.
+                        don't anticipate adding other annotation sets to this pangene set.
 
 Variables in pandagma config file:
     dagchainer_args - Argument for DAGchainer command
