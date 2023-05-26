@@ -134,15 +134,20 @@ if ((not $fasta_order) and (not $xclude)) { # Report sequences in list order
   my $ct=0;
   foreach my $id (@list_ary) {
     #say "YY id $ct: [$id]";
-    if (exists $desc_hsh{$id}) {
-      my $defline = ">$id $desc_hsh{$id}";
-      $defline =~ s/\s+$//; # strip whitespace
-      say $OUT_FH "$defline\n$seq_hsh{$id}";
+    if (exists $seq_hsh{$id}){
+      if (exists $desc_hsh{$id}) {
+        my $defline = ">$id $desc_hsh{$id}";
+        $defline =~ s/\s+$//; # strip whitespace
+        say $OUT_FH "$defline\n$seq_hsh{$id}";
+      }
+      else { # no desc
+        say $OUT_FH ">$id\n$seq_hsh{$id}";
+      }
+      $ct++;
     }
-    else { # no desc
-      say $OUT_FH ">$id\n$seq_hsh{$id}";
+    else {
+      warn "No sequence for ID $id; skipping";
     }
-    $ct++;
   }
 }
 
@@ -155,4 +160,4 @@ VERSIONS
 2015-07-13 don't clobber existing fasta file
 2017-03-28 When reading list into file, skip blank lines. Allow clobbering, with -c
 2023-03-12 Strip trailing whitespace in list and in fasta output. Add some intermediate/debugging statements.
-
+2023-05-25 If listed sequence is missing, print nothing.
