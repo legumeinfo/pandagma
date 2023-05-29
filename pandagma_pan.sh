@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-03-29"
+version="2023-05-29"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -235,10 +235,11 @@ run_ingest() {
   fi
 
   echo "  Count starting sequences, for later comparisons"
-  for file in 02_fasta_nuc/*.$fna; do
+  for file in 02_fasta_prot/*.$fna; do
     awk '$0~/UNDEFINED/ {ct++} 
       END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' $file
-    cat $file | grep '>' | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/.+__$ann_rex.+/$1/' |
+    cat $file | grep '>' | perl -pe 's/__/\t/g' | cut -f2 | # extracts the GeneName from combined genspchr__GeneName__start__end__orient
+      perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex.+/$1/' |
       grep -v UNDEFINED | sort | uniq -c | awk '{print $2 "\t" $1}' >> stats/tmp.gene_count_start
   done
 
