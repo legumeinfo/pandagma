@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-05-23"
+version="2023-05-28"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -236,7 +236,8 @@ run_ingest() {
   for file in 02_fasta_prot/*.$faa; do
     awk '$0~/UNDEFINED/ {ct++} 
       END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' $file
-    cat $file | grep '>' | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/.+__$ann_rex.+/$1/' |
+    cat $file | grep '>' | perl -pe 's/__/\t/g' | cut -f2 | # extracts the GeneName from combined genspchr__GeneName__start__end__orient
+      perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex.+/$1/' |
       grep -v UNDEFINED | sort | uniq -c | awk '{print $2 "\t" $1}' >> stats/tmp.gene_count_start
   done
 
@@ -583,7 +584,7 @@ run_align() {
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
   fi
 
-  echo; echo "== Move small (<4) and highly low-entropy families (sequences are all identical) to the side =="
+  echo; echo "== Move small (<4) and very low-entropy families (sequences are all identical) to the side =="
   mkdir -p 19_pan_aug_small_or_identical
   min_seq_count=4
   for filepath in 19_pan_aug_leftover_merged_prot/*; do
@@ -600,7 +601,7 @@ run_align() {
   for filepath in 19_pan_aug_leftover_merged_prot/*; do 
     file=`basename $filepath`;
     echo "  Computing alignment, using program famsa, for file $file"
-    famsa -t 2 19_pan_aug_leftover_merged_prot/$file 20_aligns/$file
+    famsa -t 2 19_pan_aug_leftover_merged_prot/$file 20_aligns/$file 1>/dev/null &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -664,8 +665,8 @@ run_calc_trees() {
   OMP_NUM_THREADS=1
   export OMP_NUM_THREADS
   for filepath in 23_hmmalign_trim2/*; do
-    echo "  Calculating tree for $file"
     file=`basename $filepath`
+    echo "  Calculating tree for $file"
     fasttree -quiet $filepath > 24_trees/$file &
   done
   wait
@@ -674,6 +675,15 @@ run_calc_trees() {
 ##########
 run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
+
+  WORK_DIR=$work_dir
+  cd "${WORK_DIR}"
+  echo "  work_dir: $PWD"
+
+  echo "  Calculate matrix of gene counts per orthogroup and annotation set"
+  calc_pan_stats.pl -annot_regex $ANN_REX -pan 18_syn_pan_aug_extra.clust.tsv -out 18_syn_pan_aug_extra.counts.tsv
+  max_annot_ct=$(cat 18_syn_pan_aug_extra.counts.tsv | 
+                       awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
  
   #param_string="${ST}.id${clust_iden}.cov${clust_cov}.cns${consen_iden}.ext${extra_iden}.I${mcl_inflation}"
   conf_base=`basename $CONF .conf`
@@ -690,13 +700,20 @@ run_summarize() {
 
   for file in 06_syn_pan.clust.tsv 06_syn_pan_ge3.hsh.tsv \
               12_syn_pan_aug.clust.tsv 12_syn_pan_aug.hsh.tsv \
-              18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv 18_syn_pan_aug_extra.counts.tsv \
-              18_syn_pan_aug_extra_complement.faa \
-              21_pan_fasta_clust_rep_prot.faa ; do
+              18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv 18_syn_pan_aug_extra.counts.tsv; do
     if [ -f ${WORK_DIR}/$file ]; then
       cp ${WORK_DIR}/$file ${full_out_dir}/
     else 
       echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
+    fi
+  done
+
+  for dir in 19_pan_aug_leftover_merged_prot 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
+    if [ -d ${WORK_DIR}/$dir ]; then
+      echo "Copying directory $dir to output directory"
+      cp -r ${WORK_DIR}/$dir ${full_out_dir}/
+    else 
+      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
     fi
   done
 
@@ -716,60 +733,6 @@ run_summarize() {
 
   echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
 
-  printf '\n  %-20s\t%s\n' "Statistic" "value" >> ${stats_file}
-  printf "The global mode may be for a smaller OG size. Modes below are greater than the specified core threshold.\n" \
-
-#  clustcount=1
-#  # When the number of main annotation sets is small (<4), the core-threshold-ceiling may be lower than 
-#  # the largest number of clusters. In that case, set $CTceil=2 to the smallest cluster size ($CTceil=2)
-#  for clustering in 06_syn_pan 12_syn_pan_aug 18_syn_pan_aug_extra; do
-#    clustfile=${full_out_dir}/$clustering.clust.tsv
-#    if [[ -f $clustfile ]]; then
-#      if [[ $clustcount == 1 ]]; then
-#        printf "\n== Initial clusters (containing only genes within synteny blocks)\n" >> ${stats_file}
-#        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
-#        (( mode=$(awk "{print NF-1}" $clustfile |
-#          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
-#      elif [[ $clustcount == 2 ]]; then
-#        printf "\n== Augmented clusters (unanchored sequences added to the initial clusters)\n" >> ${stats_file}
-#        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
-#        (( mode=$(awk "{print NF-1}" $clustfile |
-#          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
-#      elif [[ $clustcount == 3 ]]; then
-#        printf "\n== Augmented-extra clusters (with sequences from extra annotation sets)\n" >> ${stats_file}
-#        (( largest=$(awk '{print NF-1}' $clustfile | sort -n | tail -1) ))
-#        CTceil=$(echo $pctl_low_threshold | awk '{print int($1+1)}')
-#        if (( $CTceil>$largest )); then let "CTceil=2"; fi; export CTceil
-#        (( mode=$(awk -v CT=$CTceil "(NF-1)>=CT {print NF-1}" $clustfile |
-#          sort -n | uniq -c | awk '{print $1 "\t" $2}' | sort -n | tail -1 | awk '{print $2}') ))
-#        printf "    The pctl${pctl_low} set consists of orthogroups with at least %.0f genes per OG (>= %d * %d/100 sets).\n" \
-#           $CTceil $max_annot_ct $pctl_low >> ${stats_file} >> ${stats_file}
-#      fi
-#
-#      export mode
-#      (( clusters=$(wc -l < $clustfile) ))
-#      (( num_at_mode=$(awk -v MODE=$mode '(NF-1)==MODE {ct++} END{print ct}' $clustfile) ))
-#      (( seqs_clustered=$(awk '{sum+=NF-1} END{print sum}' $clustfile) ))
-#
-#      printf "  %-20s\t%s\n" "Cluster file" "$clustering.clust.tsv" >> ${stats_file}
-#      printf "  %-20s\t%s\n" "num_of_clusters" $clusters >> ${stats_file}
-#      printf "  %-20s\t%s\n" "largest_cluster" $largest >> ${stats_file}
-#      if (( $clustcount<3 )); then
-#        printf "  %-20s\t%d\n" "modal_clst_size" $mode >> ${stats_file}
-#        printf "  %-20s\t%d\n" "num_at_mode" $num_at_mode >> ${stats_file}
-#      else
-#        printf "  %-20s\t%d\n" "modal_clst_size>=$CTceil" $mode >> ${stats_file}
-#        printf "  %-20s\t%d\n" "num_at_mode>=$CTceil" $num_at_mode >> ${stats_file}
-#      fi
-#      printf "  %-20s\t%d\n" "seqs_clustered" $seqs_clustered >> ${stats_file}
-#  
-#      (( clustcount=$((clustcount+1)) ))
-#    else
-#      printf "File $clustfile is not available; skipping\n"
-#      printf "File $clustfile is not available; skipping\n" >> ${stats_file}
-#    fi
-#  done
-
   echo "  Print sequence composition statistics for each annotation set"
   printf "\n== Sequence stats for protein files\n" >> ${stats_file}
   printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
@@ -785,12 +748,6 @@ run_summarize() {
                  END{print "   all_annot_sets\n"}
                  }' >> ${stats_file}
   fi
-
-#  printf "\n== Sequence stats for final protein files -- pctl${pctl_low} and trimmed\n" >> ${stats_file}
-#  printf "  Class:   seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
-#  annot_name=23_syn_pan_pctl${pctl_low}_posn_prot.faa
-#    printf "  pctl${pctl_low}: " >> ${stats_file}
-#    cat_or_zcat "${WORK_DIR}/23_syn_pan_pctl${pctl_low}_posn_prot.faa" | calc_seq_stats >> ${stats_file}
 
   echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
   #   tmp.gene_count_start was generated during run_ingest
