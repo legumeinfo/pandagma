@@ -16,8 +16,6 @@ url_base="https://data.legumeinfo.org"
 base_dir=$PWD
 cd $base_dir/data/
 
-curl -O $url_base/Cercis/canadensis/annotations/ISC453364.gnm3.ann1.3N1M/cerca.ISC453364.gnm3.ann1.3N1M.cds.bed.gz
-
 curl -O $url_base/Arachis/GENUS/pangenes/Arachis.pan1.4LN9/Arachis.pan1.4LN9.pctl25_named_protein.faa.gz
 curl -O $url_base/Cicer/GENUS/pangenes/Cicer.pan1.SV8C/Cicer.pan1.SV8C.pctl25_named_protein.faa.gz
 curl -O $url_base/Glycine/GENUS/pangenes/Glycine.pan3.YWTW/Glycine.pan3.YWTW.pctl25_named_protein.faa.gz
@@ -25,7 +23,17 @@ curl -O $url_base/Medicago/GENUS/pangenes/Medicago.pan1.XXQ6/Medicago.pan1.XXQ6.
 curl -O $url_base/Phaseolus/GENUS/pangenes/Phaseolus.pan1.X2PC/Phaseolus.pan1.X2PC.pctl25_named_protein.faa.gz
 curl -O $url_base/Vigna/GENUS/pangenes/Vigna.pan1.X2PC/Vigna.pan1.X2PC.pctl25_named_protein.faa.gz
 
+curl -O $url_base/Arabidopsis/thaliana/annotations/Col0.gnm9.ann11.KH24/arath.Col0.gnm9.ann11.KH24.protein_primary.faa.gz
+curl -O $url_base/Arabidopsis/thaliana/annotations/Col0.gnm9.ann11.KH24/arath.Col0.gnm9.ann11.KH24.cds.bed.gz
+
+curl -O $url_base/Prunus/persica/annotations/Lovell.gnm2.ann1.S2ZZ/prupe.Lovell.gnm2.ann1.S2ZZ.protein_primary.faa.gz
+curl -O $url_base/Prunus/persica/annotations/Lovell.gnm2.ann1.S2ZZ/prupe.Lovell.gnm2.ann1.S2ZZ.cds.bed.gz
+
+curl -O $url_base/Vitis/vinifera/annotations/PN40024.gnm2.ann1.V31M/vitvi.PN40024.gnm2.ann1.V31M.protein_primary.faa.gz
+curl -O $url_base/Vitis/vinifera/annotations/PN40024.gnm2.ann1.V31M/vitvi.PN40024.gnm2.ann1.V31M.cds.bed.gz
+
 curl -O $url_base/Cercis/canadensis/annotations/ISC453364.gnm3.ann1.3N1M/cerca.ISC453364.gnm3.ann1.3N1M.protein_primary.faa.gz
+curl -O $url_base/Cercis/canadensis/annotations/ISC453364.gnm3.ann1.3N1M/cerca.ISC453364.gnm3.ann1.3N1M.cds.bed.gz
 
 # Rename CDS-based bed files to protein
 for file in *.cds.bed.gz; do
