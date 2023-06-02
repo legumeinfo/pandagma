@@ -1,12 +1,12 @@
 # pandagma
-Pandagma is a collection of workflows for calculating pangene sets and gene families. 
-There are two main workflows: pandagma_pan.sh for pangene sets, and pandagma_fam for gene families.
+Pandagma is a collection of tools for calculating pangene sets and gene families. 
+There are two main workflows: pandagma-pan.sh for pangene sets, and pandagma-fam.sh for gene families.
 The pangene workflow is designed to operate primarily on CDS sequences, at the level of a species or genus.
 The family workflow is designed to operate on protein sequences, at the level of an organismal family or order.
 
 Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023.
 
-The pangene workflow (pandagma_pan.sh) is essentially as follows:
+The pangene workflow (pandagma-pan.sh) is essentially as follows:
 * Add positional information to the gene IDs
 * Find gene homologies among pairs of annotation sets, using mmseqs2
 * Filter by synteny (DAGChainer) -- and, optionally, by a list of allowed chromosome pairings.
@@ -17,7 +17,7 @@ The pangene workflow (pandagma_pan.sh) is essentially as follows:
 * Calculate consensus order of the pangenes, based on whole-chromosome multiple alignments of ordered panIDs
 * Calculate and report statistics
 
-The gene family workflow (pandagma_fam.sh) is similar to the pangene workflow, but operates on proteins rather than CDS,
+The gene family workflow (pandagma-fam.sh) is similar to the pangene workflow, but operates on proteins rather than CDS,
 and uses an option "quotas" file to determine the initial expected gene duplication relationships between species,
 considering known or suspected whole-genome duplication histories at the evolutionary depth of interest.
 * Add positional information to the gene IDs
@@ -59,23 +59,18 @@ Installing the dependencies is up to you. They can be installed via a suitable p
 For example, using conda: 
 ~~~
   conda create -n pandagma
-  conda install -n pandagma -c conda-forge -c bioconda perl-bioperl-core
-  conda install -n pandagma -c conda-forge -c bioconda 	perl-parallel-forkmanager
-  conda install -n pandagma -c conda-forge -c bioconda dagchainer
-  conda install -n pandagma -c conda-forge -c bioconda mcl
-  conda install -n pandagma -c conda-forge -c bioconda mmseqs2
-  conda install -n pandagma -c conda-forge -c bioconda emboss
-  conda install -n pandagma -c conda-forge -c bioconda famsa
+  conda install -n pandagma -c conda-forge -c bioconda perl-bioperl-core perl-parallel-forkmanager \
+    perl-list-moreutils dagchainer mcl mmseqs2 emboss famsa fasttree
   conda activate pandagama
 ~~~
 
-## Usage for the main pandagma.sh <a name="usage"></a>
+## Usage for the main pandagma-pan.sh <a name="usage"></a>
 
 ~~~
 Usage: 
-       nohup ./pandagma.sh -c CONFIG_FILE [options] &
+       nohup ./pandagma-pan.sh -c CONFIG_FILE [options] &
    or
-       nohup ./pandagma.sh -c CONFIG_FILE -s SUBCOMMAND [options] &
+       nohup ./pandagma-pan.sh -c CONFIG_FILE -s SUBCOMMAND [options] &
 
   Required:
            -c (path to the config file)
@@ -198,7 +193,7 @@ Variables in pandagma config file:
     These can be loaded using a module-loading system, or with a package manager such as conda, or
     via a Singularity image. 
       
-          pandagma_sing_img=$YOURPATH/pandagma-v2023-01-23.sif
+          pandagma_sing_img=$YOURPATH/pandagma.sif
     
     OR:
     
@@ -232,13 +227,13 @@ Variables in pandagma config file:
 
       conda activate pandagma
 
-      nohup ./pandagma.sh -c config/Zea_7_2.conf &
+      nohup ./pandagma-pan.sh -c config/Zea_7_2.conf &
 
 
     Using a Singularity image:
 
          pandagma_sing_img=$YOURPATH/pandagma-v_YOUR_VERSION
-         nohup singularity exec --cleanenv $pandagma_sing_img ./pandagma.sh -c config/Zea_7_2.conf &
+         nohup singularity exec --cleanenv $pandagma_sing_img ./pandagma-pan.sh -c config/Zea_7_2.conf &
 
 7. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
     Output will go into a directory composed from a provided prefix name (default "out") and
