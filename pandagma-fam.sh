@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-05-28"
+version="2023-06-01"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -31,7 +31,7 @@ Usage:
 Environment requirements: The following packages need to be available in your PATH:
     mmseqs dagchainer mcl
 
-Also, please add the pandagma utility programs in the bin directory adjacent to pandagma_fam.sh, e.g.
+Also, please add the pandagma utility programs in the bin directory adjacent to pandagma-fam.sh, e.g.
     PATH=$PWD/bin:\$PATH
 
 Primary protein sequences and annotation (GFF3 or BED) files must be listed in the
@@ -66,18 +66,13 @@ Subcommands (in order they are usually run):
 
 MORE_INFO="""
 Optionally, a file specified in the expected_quotas variable can be specified in pandagma.conf,
-which provides the number of expected gene matches in a gene family at the desired evolutionary depth,
+which provides the number of expected paralogs for a species in a gene family at the desired evolutionary depth,
 considering a known history of whole-genome duplications that affect the included species. For example,
 for the legume family, originating ~70 mya:
-Arachis    Arachis     4
-Arachis    Cercis      1
-Arachis    Glycine     4
-Arachis    Phaseolus   2
-Cercis     Arachis     4
-Cercis     Cercis      1
-Cercis     Glycine     4
-Cercis     Phaseolus   2
-...
+  Arachis     4
+  Cercis      1
+  Glycine     4
+  Phaseolus   2
 
 These quotas are used in a regular expression to identify the initial portion of the prefixed seqIDs,
 for example, \"Cicer\" and \"cerca\" matching the genus and \"gensp\" matching prefixes for these seqIDs:
@@ -98,8 +93,8 @@ Variables in pandagma config file (Set the config with the CONF environment vari
       consen_prefix - Prefix to use in orthogroup names
        out_dir_base - Base name for the output directory [default: './out']
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
-                        \"([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+\" 
-                          for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1
+                        \"([^.]+\.[^.]+)\..+\"
+                          for two dot-separated fields, e.g. vigan.Shumari
                         or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
     preferred_annot - String to match and select an annotation set, from a gene ID.
                         This is used for picking representative IDs+sequence from an orthogroup, when
@@ -286,10 +281,7 @@ run_filter() {
     echo "Filtering on quotas from file ${expected_quotas}"
     for mmseqs_path in 03_mmseqs/*.m8; do
       outfilebase=`basename $mmseqs_path .m8`
-      qry=`echo $outfilebase | perl -pe 's/(^[^.]+)\..+/$1/'`;
-      sbj=`echo $outfilebase | perl -pe 's/.+\.x\.([^\.]+)\..+/$1/'`;
-      echo "  $outfilebase $qry $sbj"
-      cat ${mmseqs_path} | filter_mmseqs_by_quotas.pl -quotas ${expected_quotas} -qry_pre $qry -sbj_pre $sbj |
+      cat ${mmseqs_path} | filter_mmseqs_by_quotas.pl -quotas ${expected_quotas} |
         perl -pe 's/\t[\+-]//g' |  # strip orientation, which isn't used by DAGChainer 
         cat | # Next: for self-comparisons, suppress same chromosome && different gene ID (local dups)
         perl -lane 'print $_ unless($F[0] eq $F[4] && $F[1] ne $F[5])' |
@@ -966,7 +958,7 @@ fi
 if [[ $step =~ "all" ]] && [[ $retain == "yes" ]]; then
   echo "Flag -r (retain) was set, so skipping clean-up of the work directory."
   echo "If you wish to do a cleanupt separately, you can call "
-  echo "  .pandagma_fam.sh -c $CONF -s clean";
+  echo "  .pandagma-fam.sh -c $CONF -s clean";
 elif [[ $step =~ "all" ]] && [[ $retain == "no" ]]; then
   echo "Calling the medium cleanup function \"run_clean\" ..."
   run_clean  

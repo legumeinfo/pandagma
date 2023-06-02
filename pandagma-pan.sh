@@ -34,7 +34,7 @@ Usage:
 Environment requirements: The following packages need to be available in your PATH:
     mmseqs dagchainer mcl
 
-Also, please add the pandagma utility programs in the bin directory adjacent to pandagma_pan.sh, e.g.
+Also, please add the pandagma utility programs in the bin directory adjacent to pandagma-pan.sh, e.g.
     PATH=$PWD/bin:\$PATH
 
 Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
@@ -1185,7 +1185,7 @@ fi
 if [[ $step =~ "all" ]] && [[ $retain == "yes" ]]; then
   echo "Flag -r (retain) was set, so skipping clean-up of the work directory."
   echo "If you wish to do a cleanupt separately, you can call "
-  echo "  .pandagma_pan.sh -c $CONF -s clean";
+  echo "  .pandagma-pan.sh -c $CONF -s clean";
 elif [[ $step =~ "all" ]] && [[ $retain == "no" ]]; then
   echo "Calling the medium cleanup function \"run_clean\" ..."
   run_clean  
