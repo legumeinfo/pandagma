@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-06-01"
+version="2023-08-01"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -116,11 +116,20 @@ canonicalize_paths() {
 
   annotation_files=($(realpath --canonicalize-existing "${annotation_files[@]}"))
   protein_files=($(realpath --canonicalize-existing "${protein_files[@]}"))
+  cds_files=($(realpath --canonicalize-existing "${cds_files[@]}"))
+
   if (( ${#protein_files_extra[@]} > 0 ))
   then
     protein_files_extra=($(realpath --canonicalize-existing "${protein_files_extra[@]}"))
     annotation_files_extra=($(realpath --canonicalize-existing "${annotation_files_extra[@]}"))
   fi
+
+  if (( ${#cds_files_extra[@]} > 0 ))
+  then
+    cds_files_extra=($(realpath --canonicalize-existing "${cds_files_extra[@]}"))
+    #annotation_files_extra=($(realpath --canonicalize-existing "${annotation_files_extra[@]}"))
+  fi
+
   readonly expected_quotas=${expected_quotas:+$(realpath "${expected_quotas}")}
   readonly submit_dir=${PWD}
 
@@ -179,7 +188,7 @@ run_ingest() {
   cd "${WORK_DIR}"
   echo; echo "Run ingest: from fasta and gff or bed data, create fasta with IDs containing positional info."
   
-  mkdir -p 02_fasta_prot 01_posn_hsh stats
+  mkdir -p 02_fasta_nuc 02_fasta_prot 01_posn_hsh stats
 
     # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_pctl??_end.
     # This is captured from the gene IDs using the annot_str_regex set in the config file.
@@ -190,8 +199,8 @@ run_ingest() {
 
   export ANN_REX=${annot_str_regex}
 
-  echo "  Get position information from the main annotation sets."
-  cat /dev/null > 02_all_main_prot.faa # Collect all starting sequences, for later comparisons
+  echo "  Get position information from the main annotation sets (protein)."
+  cat /dev/null > 02_all_main_prot.faa # Collect all starting protein sequences, for later comparisons
   for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
     file_base=$(basename ${protein_files[file_num]%.*})
     cat_or_zcat "${protein_files[file_num]}" >> 02_all_main_prot.faa # Collect original seqs for later comparisons
@@ -207,7 +216,20 @@ run_ingest() {
     cat_or_zcat "${protein_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
   done
 
-  echo "  Get position information from the extra annotation sets, if any."
+  echo "  Get position information from the main annotation sets (cds)."
+  cat /dev/null > 02_all_main_cds.fna # Collect all starting cds sequences, for later comparisons
+  for (( file_num = 0; file_num < ${#cds_files[@]} ; file_num++ )); do
+    file_base=$(basename ${cds_files[file_num]%.*})
+    cat_or_zcat "${cds_files[file_num]}" >> 02_all_main_cds.fna # Collect original seqs for later comparisons
+    echo "  Adding positional information to fasta file $file_base"
+    cat_or_zcat "${annotation_files[file_num]}" | 
+      gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
+      hash_into_fasta_id.pl -nodef -fasta "${cds_files[file_num]}" \
+                          -hash 01_posn_hsh/$file_base.hsh \
+                          -out 02_fasta_nuc/$file_base
+  done
+
+  echo "  Get position information from the extra annotation sets (protein), if any."
   if (( ${#protein_files_extra[@]} > 0 ))
   then
     cat /dev/null > 02_all_extra_protein.faa # Collect all starting sequences, for later comparisons
@@ -224,6 +246,22 @@ run_ingest() {
       annot_name=$(basename 02_fasta_prot/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
       printf "  Extra: " >> stats/tmp.fasta_seqstats
       cat_or_zcat "${protein_files_extra[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
+    done
+  fi
+
+  echo "  Get position information from the extra annotation sets (cds), if any."
+  if (( ${#cds_files_extra[@]} > 0 ))
+  then
+    cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
+    for (( file_num = 0; file_num < ${#cds_files_extra[@]} ; file_num++ )); do
+      file_base=$(basename ${cds_files_extra[file_num]%.*})
+      cat_or_zcat "${cds_files_extra[file_num]}" >> 02_all_extra_cds.fna  # Collect original seqs for later comparisons
+      echo "  Adding positional information to extra fasta file $file_base"
+      cat_or_zcat "${annotation_files_extra[file_num]}" | 
+        gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
+      hash_into_fasta_id.pl -nodef -fasta "${cds_files_extra[file_num]}" \
+                            -hash 01_posn_hsh/$file_base.hsh \
+                            -out 02_fasta_nuc/$file_base
     done
   fi
 
@@ -354,7 +392,8 @@ run_mcl() {
     1>/dev/null
  
   echo "  Add cluster IDs"
-  awk '{padnum=sprintf("%05d", NR); print "pan" padnum "\t" $0}' tmp.syn_pan.clust.tsv > 06_syn_pan.clust.tsv
+  awk -v PRE=$consen_prefix '
+    {padnum=sprintf("%05d", NR); print PRE padnum "\t" $0}' tmp.syn_pan.clust.tsv > 06_syn_pan.clust.tsv
   rm tmp.syn_pan.clust.tsv
 
   echo "  Move singleton and doubleton clusters into a list of leftovers"
@@ -457,7 +496,8 @@ run_cluster_rest() {
  
   echo "  Add cluster IDs"
   cat tmp.syn_pan_aug_complement.clust.tsv | 
-    awk -v START=$clust_count_06 'NF>1 {padnum=sprintf("%05d", NR+START); print "pan" padnum "\t" $0}' |
+    awk -v START=$clust_count_06 -v PRE=$consen_prefix '
+      NF>1 {padnum=sprintf("%05d", NR+START); print PRE padnum "\t" $0}' |
     cat > 12_syn_pan_aug_complement.clust.tsv
   rm tmp.syn_pan_aug_complement.clust.tsv
 
