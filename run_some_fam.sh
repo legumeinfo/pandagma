@@ -10,18 +10,18 @@
 set -o errexit -o nounset 
 
 CONFIG=$1
-#./pandagma-fam.sh -c $CONFIG -s run_ingest
-#./pandagma-fam.sh -c $CONFIG -s run_mmseqs
-#./pandagma-fam.sh -c $CONFIG -s run_filter
-#./pandagma-fam.sh -c $CONFIG -s run_dagchainer
-./pandagma-fam.sh -c $CONFIG -s run_mcl
-./pandagma-fam.sh -c $CONFIG -s run_consense
-./pandagma-fam.sh -c $CONFIG -s run_cluster_rest
-./pandagma-fam.sh -c $CONFIG -s run_add_extra
-./pandagma-fam.sh -c $CONFIG -s run_align
-./pandagma-fam.sh -c $CONFIG -s run_model_and_trim
-./pandagma-fam.sh -c $CONFIG -s run_calc_trees
-./pandagma-fam.sh -c $CONFIG -s run_summarize
-#./pandagma-fam.sh -c $CONFIG -s run_clean
-#./pandagma-fam.sh -c $CONFIG -s run_ReallyClean
+#./pandagma-fam.sh -c $CONFIG -s ingest
+#./pandagma-fam.sh -c $CONFIG -s mmseqs
+#./pandagma-fam.sh -c $CONFIG -s filter
+#./pandagma-fam.sh -c $CONFIG -s dagchainer
+./pandagma-fam.sh -c $CONFIG -s mcl
+./pandagma-fam.sh -c $CONFIG -s consense
+./pandagma-fam.sh -c $CONFIG -s cluster_rest
+./pandagma-fam.sh -c $CONFIG -s add_extra
+./pandagma-fam.sh -c $CONFIG -s align
+./pandagma-fam.sh -c $CONFIG -s model_and_trim
+./pandagma-fam.sh -c $CONFIG -s calc_trees
+./pandagma-fam.sh -c $CONFIG -s summarize
+#./pandagma-fam.sh -c $CONFIG -s clean
+#./pandagma-fam.sh -c $CONFIG -s ReallyClean
 
