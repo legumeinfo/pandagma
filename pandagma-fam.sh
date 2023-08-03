@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-08-01"
+version="2023-08-03"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -319,6 +319,7 @@ run_filter() {
     echo "Filtering on quotas from file ${expected_quotas}"
     for mmseqs_path in 03_mmseqs/*.m8; do
       outfilebase=`basename $mmseqs_path .m8`
+      echo "  Filtering $outfilebase based on expected quotas"
       cat ${mmseqs_path} | filter_mmseqs_by_quotas.pl -quotas ${expected_quotas} |
         perl -pe 's/\t[\+-]//g' |  # strip orientation, which isn't used by DAGChainer 
         cat | # Next: for self-comparisons, suppress same chromosome && different gene ID (local dups)
@@ -333,7 +334,7 @@ run_filter() {
   else   # don't filter, since quotas file isn't provided; just remove orientation, which isn't used by DAGChainer
     echo "No expected_quotas.tsv file was provided, so proceeding without quota (expected gene-count) filtering."
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
-      outfilebase=`basename $mmseqs_path _cluster.tsv`
+      outfilebase=`basename $mmseqs_path .m8`
       cat ${mmseqs_path} | cut -f1,2 | 
         perl -pe 's/__/\t/g; s/\t[\+-]//g' | 
         cat | # Next: or self-comparisons, suppress same chromosome && different gene ID (local dups)
@@ -453,8 +454,10 @@ run_consense() {
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
   echo "  Use the \"main set\" $clust_iden threshold."
+  export FAM_PRE=${consen_prefix}
   top_line.awk 10_unclust.x.07_pan_fasta.m8 | 
-    awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' | perl -pe 's/^(pan\d+)__\S+/$1/' |
+    awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' | 
+    perl -pe '$prefix=$ENV{FAM_PRE}; s/^($prefix\d+)__\S+/$1/' |  # trims gene ID from preceding family ID
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  11_syn_pan_leftovers.clust.tsv
 
   echo "  Retrieve sequences for the leftover genes"
@@ -549,9 +552,10 @@ run_add_extra() {
   
     echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
     echo "  Use identity threshold extr_iden: $extra_iden."
+    export FAM_PRE=${consen_prefix}
     top_line.awk 13_extra_out_dir/*.x.all_cons.m8 |
-      awk -v IDEN=${extra_iden} '$3>=IDEN {print $2 "\t" $1}' | perl -pe 's/^(pan\d+)__\S+/$1/' |
-      perl -pe 's/^(\w+)\.\d+/$1/' |
+      awk -v IDEN=${extra_iden} '$3>=IDEN {print $2 "\t" $1}' | 
+      perl -pe '$prefix=$ENV{FAM_PRE}; s/^($prefix\d+)__\S+/$1/' |  # trims gene ID from preceding family ID
       sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 14_syn_pan_extra.clust.tsv
   
     echo "  Retrieve sequences for the extra genes"
@@ -607,12 +611,12 @@ run_add_extra() {
 run_align() {
   echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
   cd "${WORK_DIR}"
-  if [[ -d 19_pan_aug_leftover_merged_prot ]] && [[ -f 19_pan_aug_leftover_merged_prot/pan00001 ]]; then
+  if [[ -d 19_pan_aug_leftover_merged_prot ]] && [[ -f 19_pan_aug_leftover_merged_prot/${consen_prefix}00001 ]]; then
     : # do nothing; the directory and file(s) exist
   else 
     mkdir -p 19_pan_aug_leftover_merged_prot
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    get_fasta_from_family_file.pl "${protein_files[@]}" \
+    get_fasta_from_family_file.pl "${protein_files[@]}" "${protein_files_extra[@]}" \
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
   fi
 
@@ -792,8 +796,8 @@ run_summarize() {
 
   paste ${WORK_DIR}/stats/tmp.gene_count_start \
         ${WORK_DIR}/stats/tmp.gene_count_all_end |
-    awk 'BEGIN{print "  Start\tEnd_all\tEnd_core\tPct_kept_all\tPct_kept_core\tAnnotation_name"} 
-        { printf "  %i\t%i\t%i\t%2.1f\t%2.1f\t%s\n", $2, $4, $6, 100*($4/$2), 100*($6/$2), $1 }'  >> ${stats_file}
+    awk 'BEGIN{print "  Start\tEnd\tPct_kept\tAnnotation_name"} 
+        { printf "  %i\t%i\t%2.1f\t%s\n", $2, $4, 100*($4/$2), $1 }'  >> ${stats_file}
 
   echo "  Print counts per accession"
   if [ -f ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv ]; then
