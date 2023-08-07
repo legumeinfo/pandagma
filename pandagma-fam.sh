@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-08-03"
+version="2023-08-07"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -369,16 +369,6 @@ run_dagchainer() {
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait # wait for last jobs to finish
-
-  if [ "$strict_synt" -eq 1 ]; then
-    # Combine the synteny pairs
-    cat 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | 
-      awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
-  else 
-    # Combine the homology pairs (filtered by quota if provided) and the synteny pairs
-    cat 04_dag/*_matches.tsv 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | 
-      awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
-  fi
 }
 
 ##########
@@ -386,6 +376,31 @@ run_mcl() {
   # Calculate clusters using Markov clustering
   cd "${WORK_DIR}"
   mkdir -p lists
+
+  printf "\nPreparatory to clustering, combine the homology data into a file with gene pairs to be clustered.\n"
+
+  if [ "$strict_synt" -eq 1 ]; then
+    # https://stackoverflow.com/questions/3601515/how-to-check-if-a-variable-is-set-in-bash
+    # https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_06_02
+    if [ -z ${ks_block_wgd_cutoff+x} ] || [ -z ${ks_pair_cutoff+x} ] || 
+        [ ! -d "${WORK_DIR}/05_kaksoutBAK" ] && [ ! "$(ls -A 05_kaksoutBAK/*.rptout)" ]; then
+      echo "## One or both of ks_block_wgd_cutoff ks_pair_cutoff are unset or 05_kaksout doesn't exist; no Ks filtering will be done.";
+      echo "## Combine the DAGChainer synteny pairs into a file to be clustered."
+      cat 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
+    else 
+      echo "## The ks_block_wgd_cutoff is set to '$ks_block_wgd_cutoff' and ks_pair_cutoff is set to '$ks_pair_cutoff'";
+      echo "## Combine the DAGChainer synteny pairs, with additional filtering by pairwise and block Ks thresholds, into a file to be clustered."
+      # Combine the synteny pairs into a file to be clustered
+      cat 05_kaksoutBAK/*.rptout | 
+        awk -v PAIR_CUTOFF=$ks_pair_cutoff -v BLOCK_CUTOFF=$ks_block_wgd_cutoff '
+            NF>0 && $1!~/^#/ && ($5<=PAIR_CUTOFF || $7<=BLOCK_CUTOFF) {print $1 "\t" $2}' |
+          sort -u > 05_filtered_pairs.tsv
+    fi
+  else 
+    echo "## Combine the homology pairs (filtered by quota if provided) into a file to be clustered."
+    cat 04_dag/*_matches.tsv 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | 
+      awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
+  fi
 
   printf "\nDo Markov clustering with inflation parameter $mcl_inflation and ${NPROC} threads\n"
   echo "MCL COMMAND: mcl 05_filtered_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv"
