@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-#!/bin/sh
 # NAME:   run_some_fam.sh - Call pandagma-fam.sh with some sub-commands.
 #
 # SYNOPSIS:   ./run_some_fam.sh config/YOUR_CONFIG.conf
