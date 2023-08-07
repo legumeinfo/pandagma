@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-#!/bin/sh
 # NAME:   run_some_pan.sh - Call pandagma-pan.sh with some sub-commands.
 #
 # SYNOPSIS:   ./run_some_pan.sh config/YOUR_CONFIG.conf
