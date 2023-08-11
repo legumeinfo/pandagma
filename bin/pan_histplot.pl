@@ -3,13 +3,15 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use feature "say";
 
-my $help;
+my ($help, $total);
 my $divisor = 1;
 my $min_bin_ct = 1;
 GetOptions ("divisor:i"    => \$divisor, 
             "min_bin_ct:i" => \$min_bin_ct,
-            "help"         => \$help
+            "total"        => \$total,
+            "help"         => \$help,
             );
 
 my $usage = <<EOS;
@@ -19,7 +21,8 @@ Usage: cat stats* | pan_histplot.pl -divisor 150
 
     -divisor     Optional divisor to apply to histogram values, to lower the plot amplitude [1]
     -min_bin_ct  Minimum count for printing a bin [1]
-    -help        This message
+    -total       (boolean; false) Flag indicates to display the bin * bin_count -- i.e. the gene count at that bin
+    -help        (boolean) This message
 EOS
 
 die "$usage\n" if $help; 
@@ -35,7 +38,12 @@ while (my $line = <>) {
     my ($bin, $value) = ($1, $2);
     my $printbin = sprintf("%i", $bin);
     if ($value >= $min_bin_ct){
-      print "$printbin\t", "." x ($value/$divisor), "\n";
+      if ($total){
+        say "$printbin\t", "." x ($value*$bin/$divisor);
+      }
+      else {
+        say "$printbin\t", "." x ($value/$divisor);
+      }
     }
   }
   else {}
@@ -43,6 +51,7 @@ while (my $line = <>) {
 
 __END__
 VERSIONS
-2023-02-03 initial version for pandagma based on histplot and the one-liner perl -ane 'print "$F[0]\t", "." x $F[1], "\n"'
+2023-02-03 Initial version for pandagma based on histplot and the one-liner perl -ane 'print "$F[0]\t", "." x $F[1], "\n"'
+2023-08-08 Add option to print total per bin -- i.e. the gene count at that bin
 
 
