@@ -10,6 +10,7 @@ use warnings;
 use feature "say";
 use Getopt::Long;
 use File::Basename;
+use Scalar::Util qw(looks_like_number);
 
 my ($ks_cutoff, $report_file, $verbose, $help);
 my $annot_regex = '([^.]+\.[^.]+)\.\S+';
@@ -18,6 +19,7 @@ my $max_pair_ks = 4;
 GetOptions (
   "ks_cutoff=s" =>   \$ks_cutoff,   # required
   "annot_regex:s" => \$annot_regex,
+  "max_pair_ks:f" => \$max_pair_ks,
   "verbose"  =>      \$verbose,
   "help" =>          \$help
 );
@@ -103,12 +105,13 @@ while (my $line = <>) {
   elsif ($parts[0] =~ /^#.SUM/ || $parts[0] =~ /^#.DATA/){
     next;
   }
-  elsif (scalar(@parts) != 7 && $parts[0] !~/^#/ ){
+  elsif (scalar(@parts) != 7 && $parts[0] !~/^#/){
     warn "Unexpected line, not like a header (matching ^#) or data (with 7 fields):" . "\n" . join ("][", @parts), "\n"; 
   }
-  else {
+  elsif (scalar(@parts) == 7 && $parts[0] !~/^#/){
     my ($A_id, $B_id, $aln_len, $Ka, $Ks, $KaKs, $block_ks) = @parts;
-    if ($block_ks < $cutoffs{"$QRY.x.$SBJ"} && $ks < $max_pair_ks ) {
+    next unless (looks_like_number($Ks));
+    if ($block_ks < $cutoffs{"$QRY.x.$SBJ"} && $Ks < $max_pair_ks ) {
       if ($verbose) { say join ("\t", "OK:", $QRY, $SBJ, $block_ks, "<", $cutoffs{"$QRY.x.$SBJ"}) }
       say join ("\t", @parts);
     }
@@ -121,3 +124,4 @@ while (my $line = <>) {
 __END__
 VERSIONS
 2023-08-18 S. Cannon. Initial functional version.
+2023-08-21 Add another check for conditions of data line to be processed
