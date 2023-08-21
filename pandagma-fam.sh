@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-08-08"
+version="2023-08-21"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -38,12 +38,13 @@ Primary protein sequences and annotation (GFF3 or BED) files must be listed in t
 config file, in the arrays annotation_files and protein_files. See example files.
 
 Subcommands (in order they are usually run):
-                all - All of the steps below, except for clean and ReallyClean
+                all - All of the steps below, except for opt_ks_filter, clean and ReallyClean
                         (Or equivalently: omit the -s flag; \"all\" is default)
              ingest - Prepare the assembly and annotation files for analysis
              mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
              filter - Filter the synteny results for chromosome pairings, returning gene pairs.
          dagchainer - Run DAGchainer to filter for syntenic blocks
+      opt_ks_filter - Optional filtering based on provided ks_cutoffs.tsv file
                 mcl - Derive clusters, with Markov clustering
            consense - Calculate a consensus sequences from each pan-gene set, 
                       adding sequences missed in the first clustering round.
@@ -55,7 +56,8 @@ Subcommands (in order they are usually run):
          calc_trees - Calculate gene trees.
           summarize - Move results into output directory, and report summary statistics.
 
-  Run either of the following subcommands separately if you wish:
+  Run the following subcommands separately if you wish:
+      opt_ks_filter - Filtering based on provided ks_cutoffs.tsv file
               clean - Clean (delete) files in the working directory that are not needed 
                         for later addition of data using add_extra and subsequent run commands.
                         By default, \"clean\" is run as part of \"all\" unless the -r flag is set.
@@ -65,8 +67,12 @@ Subcommands (in order they are usually run):
 """
 
 MORE_INFO="""
-Optionally, a file specified in the expected_quotas variable can be specified in pandagma.conf,
-which provides the number of expected paralogs for a species in a gene family at the desired evolutionary depth,
+Two options are provided for filtering gene homologies based on additional provided information.
+
+1. One option for additional filtering is to provide a file of gene matches for each species. 
+In this workflow, this set of values is termed \"expected_quotas\", and can be provided as a file
+indicated in the family conf file, e.g. expected_quotas=data/expected_quotas.tsv
+This indicates the number of expected paralogs for a species in a gene family at the desired evolutionary depth,
 considering a known history of whole-genome duplications that affect the included species. For example,
 for the legume family, originating ~70 mya:
   Arachis     4
@@ -79,7 +85,16 @@ for example, \"Cicer\" and \"cerca\" matching the genus and \"gensp\" matching p
   Cicer.pan1.chr06
   cerca.ISC453364.gnm3.Chr03
 
-If an expected_quotas.tsv file is not provided, then no such filtering will be done.
+2. The second option for additional filtering is to provide a file of cutoffs for synteny-block-median Ks values.
+This requires calculating gene-pair and block-median Ks values from DAGChainer output, using the included
+calc_ks_from_dag.pl script - and then providing cutoff values based on visual assessments of Ks peaks.
+For example, a cutoff could be set at 1.5 times a selected whole-genome duplication peak or 
+speciation peak for each species-pair, taking advantage of the fact that the median absolute deviation 
+value for a standard normal distribution is 1.48. 
+
+To do Ks-based filtering, generate a directory of filtered \.rptout\" files is subdirectory 05_kaksout_ks_filtered
+using script filter_mmseqs_by_ks.pl and a three-column ks_cutoffs.tsv file, 
+then run pandagma-fam.sh steps from opt_ks_filter through summarize.
 
 Variables in pandagma config file (Set the config with the CONF environment variable)
     dagchainer_args - Argument for DAGchainer command
@@ -101,6 +116,13 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
            work_dir - Working directory, for temporary and intermediate files. 
+   annotation_files
+      protein_files
+          cds_files
+annotation_files_extra
+   protein_files_extra
+    expected_quotas
+         ks_cutoffs
 """
 
 ########################################
@@ -131,6 +153,7 @@ canonicalize_paths() {
   fi
 
   readonly expected_quotas=${expected_quotas:+$(realpath "${expected_quotas}")}
+  readonly ks_cutoffs=${ks_cutoffs:+$(realpath "${ks_cutoffs}")}
   readonly submit_dir=${PWD}
 
   fasta_file=$(basename "${protein_files[0]}" .gz)
@@ -333,11 +356,11 @@ run_filter() {
     wait # wait for last jobs to finish
   else   # don't filter, since quotas file isn't provided; just remove orientation, which isn't used by DAGChainer
     echo "No expected_quotas.tsv file was provided, so proceeding without quota (expected gene-count) filtering."
-    for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
+    for mmseqs_path in 03_mmseqs/*.m8; do
       outfilebase=`basename $mmseqs_path .m8`
       cat ${mmseqs_path} | cut -f1,2 | 
         perl -pe 's/__/\t/g; s/\t[\+-]//g' | 
-        cat | # Next: or self-comparisons, suppress same chromosome && different gene ID (local dups)
+        cat | # Next: for self-comparisons, suppress same chromosome && different gene ID (local dups)
         perl -lane 'print $_ unless($F[0] eq $F[4] && $F[1] ne $F[5])' |
         awk 'NF==8' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
         cat > 04_dag/${outfilebase}_matches.tsv 
@@ -372,6 +395,30 @@ run_dagchainer() {
 }
 
 ##########
+run_opt_ks_filter() {
+  echo; echo "From optional provided ks_cutoffs.tsv file and from processed DAGChainer output, (with gene-pair and "
+  echo       "block-median Ks values added by calc_ks_from_dag.pl), filter on block-median Ks values."
+
+  cd "${WORK_DIR}"
+  if [ -d 05_kaksout_ks_filtered ]; then rm -rf 05_kaksout_ks_filtered ; fi
+  mkdir -p 05_kaksout_ks_filtered
+  if [[ -f ${ks_cutoffs} ]]; then  # filter based on list of Ks values
+    echo "Filtering on quotas from file ${expected_quotas} and ks_pair_cutoff value provided in config file"
+    for ks_path in 05_kaksout/*.rptout; do
+      outfilebase=`basename $ks_path .rptout`
+      echo "  Filtering $ks_path based on expected block-median Ks values"
+      cat ${ks_path} | 
+        filter_mmseqs_by_ks.pl -ks_cutoff $ks_cutoffs -annot_regex $annot_str_regex -max_pair_ks $max_pair_ks |
+        awk 'NF==7' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
+        cat > 05_kaksout_ks_filtered/${outfilebase}.rptout 
+    done
+  else   # don't filter, since ks_cutoffs.tsv file isn't provided
+    echo "No ks_cutoffs.tsv file was provided. Please provide ks_cutoffs.tsv in the data directory."
+    echo "$*" 1>&2 ; exit 1;
+  fi
+}
+
+##########
 run_mcl() {
   # Calculate clusters using Markov clustering
   cd "${WORK_DIR}"
@@ -379,27 +426,31 @@ run_mcl() {
 
   printf "\nPreparatory to clustering, combine the homology data into a file with gene pairs to be clustered.\n"
 
-  if [ "$strict_synt" -eq 1 ]; then
-    # https://stackoverflow.com/questions/3601515/how-to-check-if-a-variable-is-set-in-bash
-    # https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_06_02
-    if [ -z ${ks_block_wgd_cutoff+x} ] || [ -z ${ks_pair_cutoff+x} ] || 
-        [ ! -d "${WORK_DIR}/05_kaksout" ] && [ ! "$(ls -A 05_kaksout/*.rptout)" ]; then
-      echo "## One or both of ks_block_wgd_cutoff ks_pair_cutoff are unset or 05_kaksout doesn't exist; no Ks filtering will be done.";
-      echo "## Combine the DAGChainer synteny pairs into a file to be clustered."
-      cat 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
+  if [ -d 05_kaksout_ks_filtered ]; then # From step opt_ks_filter; supersedes all other conditions
+    cat 05_kaksout_ks_filtered/*.rptout | awk 'NF==7 {print $1 "\t" $2}' | sort -u > 05_filtered_pairs.tsv
+  else
+    if [ "$strict_synt" -eq 1 ]; then
+      # https://stackoverflow.com/questions/3601515/how-to-check-if-a-variable-is-set-in-bash
+      # https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_06_02
+      if [ -z ${ks_block_wgd_cutoff+x} ] || [ -z ${ks_pair_cutoff+x} ] || 
+          [ ! -d "${WORK_DIR}/05_kaksout" ] && [ ! "$(ls -A 05_kaksout/*.rptout)" ]; then
+        echo "## One or both of ks_block_wgd_cutoff ks_pair_cutoff are unset or 05_kaksout doesn't exist; no Ks filtering will be done.";
+        echo "## Combine the DAGChainer synteny pairs into a file to be clustered."
+        cat 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
+      else 
+        echo "## The ks_block_wgd_cutoff is set to '$ks_block_wgd_cutoff' and ks_pair_cutoff is set to '$ks_pair_cutoff'";
+        echo "## Combine the DAGChainer synteny pairs, with additional filtering by pairwise and block Ks thresholds, into a file to be clustered."
+        # Combine the synteny pairs into a file to be clustered
+        cat 05_kaksout/*.rptout | 
+          awk -v PAIR_CUTOFF=$ks_pair_cutoff -v BLOCK_CUTOFF=$ks_block_wgd_cutoff '
+              NF>0 && $1!~/^#/ && ($5<=PAIR_CUTOFF || $7<=BLOCK_CUTOFF) {print $1 "\t" $2}' |
+            sort -u > 05_filtered_pairs.tsv
+      fi
     else 
-      echo "## The ks_block_wgd_cutoff is set to '$ks_block_wgd_cutoff' and ks_pair_cutoff is set to '$ks_pair_cutoff'";
-      echo "## Combine the DAGChainer synteny pairs, with additional filtering by pairwise and block Ks thresholds, into a file to be clustered."
-      # Combine the synteny pairs into a file to be clustered
-      cat 05_kaksout/*.rptout | 
-        awk -v PAIR_CUTOFF=$ks_pair_cutoff -v BLOCK_CUTOFF=$ks_block_wgd_cutoff '
-            NF>0 && $1!~/^#/ && ($5<=PAIR_CUTOFF || $7<=BLOCK_CUTOFF) {print $1 "\t" $2}' |
-          sort -u > 05_filtered_pairs.tsv
+      echo "## Combine the homology pairs (filtered by quota if provided) into a file to be clustered."
+      cat 04_dag/*_matches.tsv 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | 
+        awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
     fi
-  else 
-    echo "## Combine the homology pairs (filtered by quota if provided) into a file to be clustered."
-    cat 04_dag/*_matches.tsv 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | 
-      awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
   fi
 
   printf "\nDo Markov clustering with inflation parameter $mcl_inflation and ${NPROC} threads\n"
