@@ -9,6 +9,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 use File::Basename;
+use feature "say";
 
 my ($chr_pat, $verbose, $help);
 my $keepself = "";
@@ -29,6 +30,8 @@ my $usage = <<EOS;
       chromosome__gene__start__end   chromosome__gene__start__end
     or
       chromosome__gene__start__end__+   chromosome__gene__start__end__-
+    optionally with a preceding cluster-id column:
+      pan00010  chromosome__gene__start__end   chromosome__gene__start__end
 
   ... filter on patterns in the two chromosomes, provided in an input file
   via the flag -chr_pat .
@@ -78,21 +81,37 @@ while (<$PAT_IN>){ # two fields, e.g. "01 01"
   my $chr_rex;
   # Store the pattern for later regex use
   $chr_rex = qr(\S+\D0*$left \S+\D0*$right$);
-  if ($verbose) {print "$left $right; $chr_rex\n"}
+  if ($verbose) {say "$left $right; $chr_rex"}
   $rexen{$chr_rex}++;
 
   # Store the reverse pattern, if the left and right chroms are not the same
   if ($left ne $right) {
     $chr_rex = qr(\S+\D0*$right \S+\D0*$left$);
-    if ($verbose) {print "$right $left; $chr_rex\n"}
+    if ($verbose) {say "$right $left; $chr_rex"}
     $rexen{$chr_rex}++;
   }
 }
 
 # Process homology data, comparing to the stored chr patterns
 while (my $line = <>) {
+  chomp $line;
   $line =~ s/>//g; # data shouldn't have ">", but do this to make sure.
-  my ($gene1, $gene2) = split(/\t/, $line);
+  my @fields = split(/\t/, $line);
+  my ($panID, $gene1, $gene2);
+  my $format; # to note either two- or three-column form; values 2 or 3
+
+  if (scalar(@fields) == 2 && $fields[0] =~ /__/ && $fields[1] =~ /__/){
+    ($gene1, $gene2) = @fields;
+    $format = 2;
+  }
+  elsif (scalar(@fields) == 3 && $fields[1] =~ /__/ && $fields[2] =~ /__/){
+    ($panID, $gene1, $gene2) = @fields;
+    $format = 3;
+  }
+  else {
+    warn "WARN| Unexpected format: $line\n";
+    next;
+  }
 
   $gene1 =~ s/__[+-]$//; # strip orientation, since that is not used by subsequent DAGChainer
   $gene2 =~ s/__[+-]$//; # strip orientation, since that is not used by subsequent DAGChainer
@@ -106,17 +125,22 @@ while (my $line = <>) {
   unless ($keepself){ next if ($chr1 eq $chr2 && $geneID1 eq $geneID2) };
   my $matches = 0;
   foreach my $chr_rex (keys %rexen){
-    if ($verbose){print "TEST: $chr1 $chr2 =~ /$chr_rex/\n"}
+    if ($verbose){say "TEST: $chr1 $chr2 =~ /$chr_rex/"}
     if ("$chr1 $chr2" =~ /$chr_rex/){
-      print join("\t", @parts1), "\t", join("\t", @parts2);
+      if ($format == 2){
+        say join("\t", @parts1), "\t", join("\t", @parts2);
+      }
+      else {
+        say $panID, "\t", join("\t", @parts1), "\t", join("\t", @parts2);
+      }
       $matches++;
     }
   }
   if ($matches == 0) {
     next;
-    #print "NO MATCH:"$parts1[1]\t$parts2[1]\n";
+    #say "NO MATCH:"$parts1[1]\t$parts2[1]";
   }
-  if ($verbose){print "\n"}
+  if ($verbose){ say "" }
 }
 
 __END__
@@ -128,3 +152,4 @@ VERSIONS
 2021-10-19 Add "keepself" flag
 2022-12-31 In regex, ignore leading zeroes in e.g. chr01
 2023-03-10 Change -noself to -keepself, and allow orientation code in chromosome__gene fields.
+2023-08-27 Handle a three-column form, to allow match data with leading pangene ID field
