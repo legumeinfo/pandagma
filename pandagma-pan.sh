@@ -376,12 +376,8 @@ run_consense() {
   echo "    Fasta file:" "${cds_files[@]}"
   get_fasta_from_family_file.pl "${cds_files[@]}" -fam 06_syn_pan.clust.tsv -out 07_pan_fasta
 
-  cat /dev/null > 07_pan_fasta_cds.fna
-  for path in 07_pan_fasta/*; do
-    pan_file=`basename $path`
-    cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-                      $1!~/^>/ {print $1} ' >> 07_pan_fasta_cds.fna 
-  done
+  echo "  Merge fasta files in 07_pan_fasta, prefixing IDs with panID"
+  merge_files_to_pan_fasta.awk 07_pan_fasta/* > 07_pan_fasta_cds.fna
 
   echo "  Pick a representative seq. for each orthogroup - as a sequence with the median length for that OG."
   echo "  cat 07_pan_fasta_cds.fna | 
@@ -409,36 +405,38 @@ run_consense() {
   SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
   echo "SEQTYPE is: $SEQTYPE"
 
+  if [ -d 10_place_leftovers ]; then rm -rf 10_place_leftovers; fi
+  mkdir -p 10_place_leftovers
   mmseqs easy-search 09_genes_not_in_clusters.fna \
                      07_pan_fasta_cds.fna \
-                     10_unclust.x.07_pan_fasta.m8 \
+                     10_place_leftovers/unclust.x.07_pan_fasta.m8 \
                      03_mmseqs_tmp \
                      --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
 
-  echo "  Filter 10_unclust.x.07_pan_fasta.m8 by clust_iden and report: panID, qry_gene, sbj_gene"
-  cat 10_unclust.x.07_pan_fasta.m8 | top_line.awk |
+  echo "  Filter unclust.x.07_pan_fasta.m8 by clust_iden and report: panID, qry_gene, sbj_gene"
+  cat 10_place_leftovers/unclust.x.07_pan_fasta.m8 | top_line.awk |
     awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' | 
-    perl -pe 's/^(pan\d+)__(\S+)\t(\S)/$1\t$2\t$3/' > 10_unclust.x.07_pan_fasta.pan_qry_sbj.tsv
+    perl -pe 's/^(pan\d+)__(\S+)\t(\S)/$1\t$2\t$3/' > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj.tsv
 
   echo "  Add gene-pair information"
-  hash_into_table_id.pl 01_posn_hsh/*hsh -table 10_unclust.x.07_pan_fasta.pan_qry_sbj.tsv |
-    cat > 10_unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv
+  hash_into_table_id.pl 01_posn_hsh/*hsh -table 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj.tsv |
+    cat > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv
 
   echo; echo "  Filter based on list of expected chromosome pairings if provided"
   if [[ -f ${chr_match_list} ]]; then  
     echo "Filtering on chromosome patterns from file ${chr_match_list}"
-    cat 10_unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv | filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} |
+    cat 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv | filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} |
       awk 'NF==9' |  # matches for genes with coordinates. The case of <9 can happen for seqs with UNDEF position.
-      cat > 10_unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv 
+      cat > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv 
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
     echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
-    cat 10_unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv | perl -pe 's/__/\t/g; s/\t[\+-]//g' |
+    cat 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv | perl -pe 's/__/\t/g; s/\t[\+-]//g' |
       awk 'NF==9' |  # matches for genes with coordinates. The case of <9 can happen for seqs with UNDEF position.
-      cat > 10_unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv
+      cat > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv
   fi
 
   echo "  Place unclustered genes into their respective pan-gene sets"
-  cat 10_unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv | cut -f1,3 | 
+  cat 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv | cut -f1,3 | 
   sort -u -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 11_syn_pan_leftovers.clust.tsv
 
   echo "  Retrieve sequences for the leftover genes"
@@ -520,12 +518,8 @@ run_add_extra() {
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
   get_fasta_from_family_file.pl "${cds_files[@]}" -fam 12_syn_pan_aug.clust.tsv -out 13_pan_aug_fasta
   
-  cat /dev/null > 13_pan_aug_fasta.fna
-  for path in 13_pan_aug_fasta/*; do
-    pan_file=`basename $path`
-    cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-                      $1!~/^>/ {print $1} ' >> 13_pan_aug_fasta.fna 
-  done
+  echo "  Merge fasta files in 13_pan_aug_fasta, prefixing IDs with panID__"
+  merge_files_to_pan_fasta.awk 13_pan_aug_fasta/* > 13_pan_aug_fasta.fna
 
   if (( ${#cds_files_extra[@]} > 0 ))
   then # handle the "extra" annotation files
@@ -586,13 +580,8 @@ run_add_extra() {
     done
     wait 
   
-    echo "  Get all CDS sequences from files in 19_pan_aug_leftover_merged_cds"
-    cat /dev/null > 19_pan_aug_leftover_merged_cds.fna
-    for path in 19_pan_aug_leftover_merged_cds/*; do
-      pan_file=`basename $path`
-      cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-                        $1!~/^>/ {print $1} ' >> 19_pan_aug_leftover_merged_cds.fna 
-    done
+    echo "  Merge files in 19_pan_aug_leftover_merged_cds, prefixing IDs with panID__"
+    merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_cds/* > 19_pan_aug_leftover_merged_cds.fna
 
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
@@ -626,12 +615,7 @@ run_pick_exemplars() {
               -fam 19_pan_aug_leftover_merged.clust.tsv -out 19_pan_aug_leftover_merged_prot
 
   echo "  Get all protein sequences from files in 19_pan_aug_leftover_merged_prot"
-  cat /dev/null > 19_pan_aug_leftover_merged_prot.faa
-  for path in 19_pan_aug_leftover_merged_prot/*; do
-    pan_file=`basename $path`
-    cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-                      $1!~/^>/ {print $1} ' >> 19_pan_aug_leftover_merged_prot.faa 
-  done
+  merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_prot/* > 19_pan_aug_leftover_merged_prot.faa
 
   echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
   echo "    == first proteins:"

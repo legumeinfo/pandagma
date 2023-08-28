@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-08-21"
+version="2023-08-28"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -484,12 +484,8 @@ run_consense() {
   echo "    Fasta file:" "${protein_files[@]}"
   get_fasta_from_family_file.pl "${protein_files[@]}" -fam 06_syn_pan_ge3.clust.tsv -out 07_pan_fasta
 
-  cat /dev/null > 07_pan_fasta_prot.faa
-  for path in 07_pan_fasta/*; do
-    pan_file=`basename $path`
-    cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-                      $1!~/^>/ {print $1} ' >> 07_pan_fasta_prot.faa 
-  done
+  echo "  Merge fasta files in 07_pan_fasta, prefixing them with panID__"
+  merge_files_to_pan_fasta.awk 07_pan_fasta/* > 07_pan_fasta_prot.faa
 
   echo "  Get sorted list of all genes, from the original fasta files"
   cat_or_zcat "${protein_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
@@ -590,12 +586,8 @@ run_add_extra() {
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
   get_fasta_from_family_file.pl "${protein_files[@]}" -fam 12_syn_pan_aug.clust.tsv -out 13_pan_aug_fasta
   
-  cat /dev/null > 13_pan_aug_fasta.faa
-  for path in 13_pan_aug_fasta/*; do
-    pan_file=`basename $path`
-    cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-                      $1!~/^>/ {print $1} ' >> 13_pan_aug_fasta.faa 
-  done
+  echo "Merge fasta files in 13_pan_aug_fasta, prefixing IDs with panID__"
+  merge_files_to_pan_fasta.awk 13_pan_aug_fasta/* > 13_pan_aug_fasta.faa
 
   if (( ${#protein_files_extra[@]} > 0 ))
   then # handle the "extra" annotation files
@@ -657,13 +649,8 @@ run_add_extra() {
     done
     wait 
   
-    echo "  Get all protein sequences from files in 19_pan_aug_leftover_merged_prot"
-    cat /dev/null > 19_pan_aug_leftover_merged_prot.faa
-    for path in 19_pan_aug_leftover_merged_prot/*; do
-      pan_file=`basename $path`
-      cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-                        $1!~/^>/ {print $1} ' >> 19_pan_aug_leftover_merged_prot.faa 
-    done
+    echo "  Merge fasta files from 19_pan_aug_leftover_merged_prot, prefixing IDs with panID__"
+    merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_prot/* > 19_pan_aug_leftover_merged_prot.faa
 
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
