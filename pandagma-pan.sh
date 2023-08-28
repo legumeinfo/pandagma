@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-05-29"
+version="2023-08-28"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -89,8 +89,8 @@ Variables in pandagma config file (Set the config with the CONF environment vari
           clust_cov - Minimum coverage for mmseqs clustering [0.60]
         consen_iden - Minimum identity threshold for consensus generation [0.80]
          extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [90]
-      mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
-        strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs (1)
+      mcl_inflation - Inflation parameter, for Markov clustering [1.6]
+        strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs [1]
                         The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches.tsv
       consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
        out_dir_base - Base name for the output directory [default: './out']
@@ -235,7 +235,7 @@ run_ingest() {
   fi
 
   echo "  Count starting sequences, for later comparisons"
-  for file in 02_fasta_prot/*.$fna; do
+  for file in 02_fasta_nuc/*.$fna; do
     awk '$0~/UNDEFINED/ {ct++} 
       END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' $file
     cat $file | grep '>' | perl -pe 's/__/\t/g' | cut -f2 | # extracts the GeneName from combined genspchr__GeneName__start__end__orient
@@ -366,7 +366,8 @@ run_mcl() {
 ##########
 run_consense() {
   echo; 
-  echo "Add previously unclustered sequences into an \"augmented\" pan-gene set, by homology."
+  printf "\nStep \"consense\" will add previously unclustered"
+  printf "\nsequences into an \"augmented\" pan-gene set, by homology.\n"
   cd "${WORK_DIR}"
   if [ -d 07_pan_fasta ]; then rm -rf 07_pan_fasta; fi
   mkdir -p 07_pan_fasta lists
@@ -414,11 +415,31 @@ run_consense() {
                      03_mmseqs_tmp \
                      --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
 
-  echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
-  echo "  Use the \"main set\" $clust_iden threshold."
-  top_line.awk 10_unclust.x.07_pan_fasta.m8 | 
-    awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' | perl -pe 's/^(pan\d+)__\S+/$1/' |
-    sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  11_syn_pan_leftovers.clust.tsv
+  echo "  Filter 10_unclust.x.07_pan_fasta.m8 by clust_iden and report: panID, qry_gene, sbj_gene"
+  cat 10_unclust.x.07_pan_fasta.m8 | top_line.awk |
+    awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' | 
+    perl -pe 's/^(pan\d+)__(\S+)\t(\S)/$1\t$2\t$3/' > 10_unclust.x.07_pan_fasta.pan_qry_sbj.tsv
+
+  echo "  Add gene-pair information"
+  hash_into_table_id.pl 01_posn_hsh/*hsh -table 10_unclust.x.07_pan_fasta.pan_qry_sbj.tsv |
+    cat > 10_unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv
+
+  echo; echo "  Filter based on list of expected chromosome pairings if provided"
+  if [[ -f ${chr_match_list} ]]; then  
+    echo "Filtering on chromosome patterns from file ${chr_match_list}"
+    cat 10_unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv | filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} |
+      awk 'NF==9' |  # matches for genes with coordinates. The case of <9 can happen for seqs with UNDEF position.
+      cat > 10_unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv 
+  else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
+    echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
+    cat 10_unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv | perl -pe 's/__/\t/g; s/\t[\+-]//g' |
+      awk 'NF==9' |  # matches for genes with coordinates. The case of <9 can happen for seqs with UNDEF position.
+      cat > 10_unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv
+  fi
+
+  echo "  Place unclustered genes into their respective pan-gene sets"
+  cat 10_unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv | cut -f1,3 | 
+  sort -u -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 11_syn_pan_leftovers.clust.tsv
 
   echo "  Retrieve sequences for the leftover genes"
   mkdir -p 11_pan_leftovers
@@ -450,9 +471,13 @@ run_cluster_rest() {
     mmseqs easy-cluster stdin 03_mmseqs/$complmt_self_compare $MMTEMP \
     --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
+  echo "  Add gene-pair information"
+  hash_into_table_id.pl 01_posn_hsh/*hsh -idx1 0 -idx2 1 -table 03_mmseqs/${complmt_self_compare}_cluster.tsv |
+    cat > 03_mmseqs/${complmt_self_compare}_cluster_posn.tsv
+
   if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
     echo "Filtering on chromosome patterns from file ${chr_match_list}"
-    cat 03_mmseqs/${complmt_self_compare}_cluster.tsv |
+    cat 03_mmseqs/${complmt_self_compare}_cluster_posn.tsv |
       filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} > 04_dag/${complmt_self_compare}_matches.tsv
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
     echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
@@ -460,9 +485,11 @@ run_cluster_rest() {
       perl -pe 's/__/\t/g; s/\t[\+-]$//' > 04_dag/${complmt_self_compare}_matches.tsv 
   fi
 
-  echo "  Cluster the remaining sequences that have matches"
-  mcl  04_dag/${complmt_self_compare}_matches.tsv -I 2 -te 10 --abc -o tmp.syn_pan_aug_complement.clust.tsv
+  echo "  Extract query and subject matches to be clustered"
+  cat 04_dag/${complmt_self_compare}_matches.tsv | cut -f2,6 > 04_dag/${complmt_self_compare}_pairs.tsv
 
+  echo "  Cluster the remaining sequences that have matches"
+  mcl  04_dag/${complmt_self_compare}_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan_aug_complement.clust.tsv
 
   echo "  Find number of clusters in initial (06) results"
   clust_count_06=`wc -l 06_syn_pan.clust.tsv | awk '{print $1}'`
@@ -1070,8 +1097,9 @@ export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 # mmseqs uses significant number of threads on its own. Set a maximum, which may be below NPROC.
 MMSEQSTHREADS=$(( 4 < ${NPROC} ? 4 : ${NPROC} ))
 
-pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation strict_synt dagchainer_args 
-  out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex order_method preferred_annot work_dir'
+pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation 
+  strict_synt dagchainer_args out_dir_base pctl_low pctl_med pctl_hi 
+  consen_prefix annot_str_regex order_method preferred_annot work_dir'
 
 ##########
 # Command-line interpreter
