@@ -31,7 +31,7 @@ my $usage = <<EOS;
   Calculates Ks for genes in DAGchainer synteny gene pairs.
   
   Required:
-    [on stdin]  -- One or more fasta files with CDS sequence containing genes from FILE.aligncoords
+    [on ARGV]   -- One or more fasta files with CDS sequence containing genes from FILE.aligncoords
     -dagin      -- An .aligncoords file, from DAGchainer
                     IDchrA idA start stop IDchrB idB start stop Eval
     -report_out -- filename for output report
@@ -382,4 +382,4 @@ __END__
 
 Versions
 2023-08-07 Initial, based on older dag_ks.pl script.
-
+2023-08-26 Tweak help text: STDIN --> ARGV
