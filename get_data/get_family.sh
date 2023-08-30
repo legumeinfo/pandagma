@@ -16,6 +16,10 @@ url_base="https://data.legumeinfo.org"
 base_dir=$PWD
 cd $base_dir/data/
 
+curl -O $url_base/Aeschynomene/evenia/annotations/CIAT22838.gnm1.ann1.ZM3R/aesev.CIAT22838.gnm1.ann1.ZM3R.cds_primary.fna.gz
+curl -O $url_base/Aeschynomene/evenia/annotations/CIAT22838.gnm1.ann1.ZM3R/aesev.CIAT22838.gnm1.ann1.ZM3R.cds.bed.gz
+curl -O $url_base/Aeschynomene/evenia/annotations/CIAT22838.gnm1.ann1.ZM3R/aesev.CIAT22838.gnm1.ann1.ZM3R.protein_primary.faa.gz
+
 curl -O $url_base/Arachis/GENUS/pangenes/Arachis.pan1.4LN9/Arachis.pan1.4LN9.pctl25_named_protein.faa.gz
 curl -O $url_base/Arachis/GENUS/pangenes/Arachis.pan1.4LN9/Arachis.pan1.4LN9.pctl25_named_cds.fna.gz
 
@@ -26,14 +30,38 @@ curl -O $url_base/Cercis/canadensis/annotations/ISC453364.gnm3.ann1.3N1M/cerca.I
 curl -O $url_base/Cercis/canadensis/annotations/ISC453364.gnm3.ann1.3N1M/cerca.ISC453364.gnm3.ann1.3N1M.cds_primary.fna.gz
 curl -O $url_base/Cercis/canadensis/annotations/ISC453364.gnm3.ann1.3N1M/cerca.ISC453364.gnm3.ann1.3N1M.cds.bed.gz
 
+curl -O $url_base/annex/Dalbergia/odorifera/annotations/SKLTGB.gnm1.ann1.R67B/dalod.SKLTGB.gnm1.ann1.R67B.cds.fna.gz
+curl -O $url_base/annex/Dalbergia/odorifera/annotations/SKLTGB.gnm1.ann1.R67B/dalod.SKLTGB.gnm1.ann1.R67B.protein.faa.gz
+curl -O $url_base/annex/Dalbergia/odorifera/annotations/SKLTGB.gnm1.ann1.R67B/dalod.SKLTGB.gnm1.ann1.R67B.cds.bed.gz
+
 curl -O $url_base/Glycine/GENUS/pangenes/Glycine.pan3.YWTW/Glycine.pan3.YWTW.pctl25_named_protein.faa.gz
 curl -O $url_base/Glycine/GENUS/pangenes/Glycine.pan3.YWTW/Glycine.pan3.YWTW.pctl25_named_cds.fna.gz
+
+curl -O $url_base/Lens/culinaris/annotations/CDC_Redberry.gnm2.ann1.5FB4/lencu.CDC_Redberry.gnm2.ann1.5FB4.cds.bed.gz
+curl -O $url_base/Lens/culinaris/annotations/CDC_Redberry.gnm2.ann1.5FB4/lencu.CDC_Redberry.gnm2.ann1.5FB4.cds.fna.gz
+curl -O $url_base/Lens/culinaris/annotations/CDC_Redberry.gnm2.ann1.5FB4/lencu.CDC_Redberry.gnm2.ann1.5FB4.protein.faa.gz
+
+curl -O $url_base/Lotus/japonicus/annotations/MG20.gnm3.ann1.WF9B/lotja.MG20.gnm3.ann1.WF9B.cds.bed.gz
+curl -O $url_base/Lotus/japonicus/annotations/MG20.gnm3.ann1.WF9B/lotja.MG20.gnm3.ann1.WF9B.cds_primary.fna.gz
+curl -O $url_base/Lotus/japonicus/annotations/MG20.gnm3.ann1.WF9B/lotja.MG20.gnm3.ann1.WF9B.protein_primary.faa.gz
+
+curl -O $url_base/Lupinus/albus/annotations/Amiga.gnm1.ann1.3GKS/lupal.Amiga.gnm1.ann1.3GKS.cds.bed.gz
+curl -O $url_base/Lupinus/albus/annotations/Amiga.gnm1.ann1.3GKS/lupal.Amiga.gnm1.ann1.3GKS.cds.fna.gz
+curl -O $url_base/Lupinus/albus/annotations/Amiga.gnm1.ann1.3GKS/lupal.Amiga.gnm1.ann1.3GKS.protein.faa.gz
 
 curl -O $url_base/Medicago/GENUS/pangenes/Medicago.pan1.XXQ6/Medicago.pan1.XXQ6.pctl25_named_protein.faa.gz
 curl -O $url_base/Medicago/GENUS/pangenes/Medicago.pan1.XXQ6/Medicago.pan1.XXQ6.pctl25_named_cds.fna.gz
 
 curl -O $url_base/Phaseolus/GENUS/pangenes/Phaseolus.pan1.X2PC/Phaseolus.pan1.X2PC.pctl25_named_protein.faa.gz
 curl -O $url_base/Phaseolus/GENUS/pangenes/Phaseolus.pan1.X2PC/Phaseolus.pan1.X2PC.pctl25_named_cds.fna.gz
+
+curl -O $url_base/Pisum/sativum/annotations/Cameor.gnm1.ann1.7SZR/pissa.Cameor.gnm1.ann1.7SZR.cds.bed.gz
+curl -O $url_base/Pisum/sativum/annotations/Cameor.gnm1.ann1.7SZR/pissa.Cameor.gnm1.ann1.7SZR.cds_primary.fna.gz
+curl -O $url_base/Pisum/sativum/annotations/Cameor.gnm1.ann1.7SZR/pissa.Cameor.gnm1.ann1.7SZR.protein_primary.faa.gz
+
+curl -O $url_base/Vicia/faba/annotations/Hedin2.gnm1.ann1.PTNK/vicfa.Hedin2.gnm1.ann1.PTNK.cds.bed.gz
+curl -O $url_base/Vicia/faba/annotations/Hedin2.gnm1.ann1.PTNK/vicfa.Hedin2.gnm1.ann1.PTNK.cds_primary.fna.gz
+curl -O $url_base/Vicia/faba/annotations/Hedin2.gnm1.ann1.PTNK/vicfa.Hedin2.gnm1.ann1.PTNK.protein_primary.faa.gz
 
 curl -O $url_base/Vigna/GENUS/pangenes/Vigna.pan1.X2PC/Vigna.pan1.X2PC.pctl25_named_protein.faa.gz
 curl -O $url_base/Vigna/GENUS/pangenes/Vigna.pan1.X2PC/Vigna.pan1.X2PC.pctl25_named_cds.fna.gz
