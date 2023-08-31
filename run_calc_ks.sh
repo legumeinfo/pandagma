@@ -20,21 +20,17 @@ if [ ! -f $WORKDIR/02_all_main_cds.fna ]; then
   exit
 fi
 
-#if [ ! -d $WORKDIR/05_kaksout ]; then
-#  echo "creating output directory $WORKDIR/05_kaksout"
-#  mkdir -p $WORKDIR/05_kaksout
-#fi
-
-if [ ! -d $WORKDIR/05_kaksout_full ]; then
-  echo "creating output directory $WORKDIR/05_kaksout_full"
-  mkdir -p $WORKDIR/05_kaksout_full
+if [ ! -d $WORKDIR/05_kaksout ]; then
+  echo "creating output directory $WORKDIR/05_kaksout"
+  mkdir -p $WORKDIR/05_kaksout
 fi
 
 for DAGFILE in $WORKDIR/04_dag/*aligncoords; do
   base=`basename $DAGFILE _matches.tsv.aligncoords`
   echo "WORKING ON $base"
-  echo "calc_ks_from_dag.pl $WORKDIR/*_cds.fna -dagin $DAGFILE -report_out $WORKDIR/05_kaksout_full/$base.rptout 1> /dev/null 2> /dev/null &"
-  calc_ks_from_dag.pl $WORKDIR/*_cds.fna -dagin $DAGFILE -report_out $WORKDIR/05_kaksout_full/$base.rptout 1> /dev/null 2> /dev/null &
+  echo "calc_ks_from_dag.pl $WORKDIR/*_cds.fna -dagin $DAGFILE -report_out $WORKDIR/05_kaksout/$base.rptout"
+  calc_ks_from_dag.pl $WORKDIR/*_cds.fna -dagin $DAGFILE -report_out $WORKDIR/05_kaksout/$base.rptout 1> /dev/null 2> /dev/null &
+  #calc_ks_from_dag.pl $WORKDIR/*_cds.fna -dagin $DAGFILE -report_out $WORKDIR/05_kaksout/$base.rptout & 
   echo
   if [[ $(jobs -r -p | wc -l) -ge ${THREADS} ]]; then wait -n; fi
 done
