@@ -24,6 +24,7 @@ curl -O $url_base/max/annotations/FengDiHuang.gnm1.ann1.P6HL/glyma.FengDiHuang.g
 curl -O $url_base/max/annotations/FiskebyIII.gnm1.ann1.SS25/glyma.FiskebyIII.gnm1.ann1.SS25.cds_primary.fna.gz
 curl -O $url_base/max/annotations/HanDouNo_5.gnm1.ann1.ZS7M/glyma.HanDouNo_5.gnm1.ann1.ZS7M.cds_primary.fna.gz
 curl -O $url_base/max/annotations/HeiHeNo_43.gnm1.ann1.PDXG/glyma.HeiHeNo_43.gnm1.ann1.PDXG.cds_primary.fna.gz
+curl -O $url_base/annex/Glycine/max/annotations/JD17.gnm1.ann1.CLFP/glyma.JD17.gnm1.ann1.CLFP.cds_primary.fna.gz
 curl -O $url_base/max/annotations/JiDouNo_17.gnm1.ann1.X5PX/glyma.JiDouNo_17.gnm1.ann1.X5PX.cds_primary.fna.gz
 curl -O $url_base/max/annotations/JinDouNo_23.gnm1.ann1.SGJW/glyma.JinDouNo_23.gnm1.ann1.SGJW.cds_primary.fna.gz
 curl -O $url_base/max/annotations/JuXuanNo_23.gnm1.ann1.H8PW/glyma.JuXuanNo_23.gnm1.ann1.H8PW.cds_primary.fna.gz
@@ -79,6 +80,7 @@ curl -O $url_base/max/annotations/FengDiHuang.gnm1.ann1.P6HL/glyma.FengDiHuang.g
 curl -O $url_base/max/annotations/FiskebyIII.gnm1.ann1.SS25/glyma.FiskebyIII.gnm1.ann1.SS25.gene_models_main.bed.gz
 curl -O $url_base/max/annotations/HanDouNo_5.gnm1.ann1.ZS7M/glyma.HanDouNo_5.gnm1.ann1.ZS7M.gene_models_main.bed.gz
 curl -O $url_base/max/annotations/HeiHeNo_43.gnm1.ann1.PDXG/glyma.HeiHeNo_43.gnm1.ann1.PDXG.gene_models_main.bed.gz
+curl -O $url_base/annex/Glycine/max/annotations/JD17.gnm1.ann1.CLFP/glyma.JD17.gnm1.ann1.CLFP.cds.bed.gz
 curl -O $url_base/max/annotations/JiDouNo_17.gnm1.ann1.X5PX/glyma.JiDouNo_17.gnm1.ann1.X5PX.gene_models_main.bed.gz
 curl -O $url_base/max/annotations/JinDouNo_23.gnm1.ann1.SGJW/glyma.JinDouNo_23.gnm1.ann1.SGJW.gene_models_main.bed.gz
 curl -O $url_base/max/annotations/JuXuanNo_23.gnm1.ann1.H8PW/glyma.JuXuanNo_23.gnm1.ann1.H8PW.gene_models_main.bed.gz
@@ -134,6 +136,7 @@ curl -O $url_base/max/annotations/FengDiHuang.gnm1.ann1.P6HL/glyma.FengDiHuang.g
 curl -O $url_base/max/annotations/FiskebyIII.gnm1.ann1.SS25/glyma.FiskebyIII.gnm1.ann1.SS25.protein_primary.faa.gz
 curl -O $url_base/max/annotations/HanDouNo_5.gnm1.ann1.ZS7M/glyma.HanDouNo_5.gnm1.ann1.ZS7M.protein_primary.faa.gz
 curl -O $url_base/max/annotations/HeiHeNo_43.gnm1.ann1.PDXG/glyma.HeiHeNo_43.gnm1.ann1.PDXG.protein_primary.faa.gz
+curl -O $url_base/annex/Glycine/max/annotations/JD17.gnm1.ann1.CLFP/glyma.JD17.gnm1.ann1.CLFP.protein_primary.faa.gz
 curl -O $url_base/max/annotations/JiDouNo_17.gnm1.ann1.X5PX/glyma.JiDouNo_17.gnm1.ann1.X5PX.protein_primary.faa.gz
 curl -O $url_base/max/annotations/JinDouNo_23.gnm1.ann1.SGJW/glyma.JinDouNo_23.gnm1.ann1.SGJW.protein_primary.faa.gz
 curl -O $url_base/max/annotations/JuXuanNo_23.gnm1.ann1.H8PW/glyma.JuXuanNo_23.gnm1.ann1.H8PW.protein_primary.faa.gz
