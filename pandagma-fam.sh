@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-08-28"
+version="2023-09-03"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -38,14 +38,15 @@ Primary protein sequences and annotation (GFF3 or BED) files must be listed in t
 config file, in the arrays annotation_files and protein_files. See example files.
 
 Subcommands (in order they are usually run):
-                all - All of the steps below, except for opt_ks_filter, clean and ReallyClean
-                        (Or equivalently: omit the -s flag; \"all\" is default)
-             ingest - Prepare the assembly and annotation files for analysis
-             mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
+                all - All of the steps below, except for ks_filter, clean and ReallyClean
+                        (Or equivalently: omit the -s flag; \"all\" is default).
+             ingest - Prepare the assembly and annotation files for analysis.
+             mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies.
              filter - Filter the synteny results for chromosome pairings, returning gene pairs.
-         dagchainer - Run DAGchainer to filter for syntenic blocks
-      opt_ks_filter - Optional filtering based on provided ks_cutoffs.tsv file
-                mcl - Derive clusters, with Markov clustering
+         dagchainer - Run DAGchainer to filter for syntenic blocks.
+            ks_calc - Optional calculation of Ks values on gene pairs from DAGchainer output.
+          ks_filter - Optional filtering based on provided ks_cutoffs.tsv file (assumes prior ks_calc step)
+                mcl - Derive clusters, with Markov clustering.
            consense - Calculate a consensus sequences from each pan-gene set, 
                       adding sequences missed in the first clustering round.
        cluster_rest - Retrieve unclustered sequences and cluster those that can be.
@@ -57,7 +58,6 @@ Subcommands (in order they are usually run):
           summarize - Move results into output directory, and report summary statistics.
 
   Run the following subcommands separately if you wish:
-      opt_ks_filter - Filtering based on provided ks_cutoffs.tsv file
               clean - Clean (delete) files in the working directory that are not needed 
                         for later addition of data using add_extra and subsequent run commands.
                         By default, \"clean\" is run as part of \"all\" unless the -r flag is set.
@@ -94,7 +94,7 @@ value for a standard normal distribution is 1.48.
 
 To do Ks-based filtering, generate a directory of filtered \.rptout\" files is subdirectory 05_kaksout_ks_filtered
 using script filter_mmseqs_by_ks.pl and a three-column ks_cutoffs.tsv file, 
-then run pandagma-fam.sh steps from opt_ks_filter through summarize.
+then run pandagma-fam.sh steps from ks_filter through summarize.
 
 Variables in pandagma config file (Set the config with the CONF environment variable)
     dagchainer_args - Argument for DAGchainer command
@@ -395,7 +395,30 @@ run_dagchainer() {
 }
 
 ##########
-run_opt_ks_filter() {
+run_ks_calc() {
+  echo; echo "From optional provided ks_cutoffs.tsv file and from processed DAGChainer output, (with gene-pair and "
+  echo       "block-median Ks values added by calc_ks_from_dag.pl), filter on block-median Ks values."
+
+  cd "${WORK_DIR}"
+
+  if [ ! -d $WORK_DIR/05_kaksout ]; then
+    echo "creating output directory $WORK_DIR/05_kaksout"
+    mkdir -p $WORK_DIR/05_kaksout
+  fi
+  
+  for DAGFILE in $WORK_DIR/04_dag/*aligncoords; do
+    base=`basename $DAGFILE _matches.tsv.aligncoords`
+    echo "WORKING ON $base"
+    echo "calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout"
+    calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout 1> /dev/null 2> /dev/null &
+    echo
+    if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
+  done
+  wait
+}
+
+##########
+run_ks_filter() {
   echo; echo "From optional provided ks_cutoffs.tsv file and from processed DAGChainer output, (with gene-pair and "
   echo       "block-median Ks values added by calc_ks_from_dag.pl), filter on block-median Ks values."
 
@@ -426,7 +449,7 @@ run_mcl() {
 
   printf "\nPreparatory to clustering, combine the homology data into a file with gene pairs to be clustered.\n"
 
-  if [ -d 05_kaksout_ks_filtered ]; then # From step opt_ks_filter; supersedes all other conditions
+  if [ -d 05_kaksout_ks_filtered ]; then # From step ks_filter; supersedes all other conditions
     cat 05_kaksout_ks_filtered/*.rptout | awk 'NF==7 {print $1 "\t" $2}' | sort -u > 05_filtered_pairs.tsv
   else
     if [ "$strict_synt" -eq 1 ]; then
@@ -1040,7 +1063,9 @@ if ! type hash_into_fasta_id.pl &> /dev/null; then
 fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
-commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra align model_and_trim calc_trees summarize"
+commandlist="ingest mmseqs filter dagchainer \
+             run_ks ks_filter \
+             mcl consense cluster_rest add_extra align model_and_trim calc_trees summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do

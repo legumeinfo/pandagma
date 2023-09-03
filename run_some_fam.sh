@@ -9,10 +9,16 @@
 set -o errexit -o nounset 
 
 CONFIG=$1
-#./pandagma-fam.sh -c $CONFIG -s ingest
-#./pandagma-fam.sh -c $CONFIG -s mmseqs
-#./pandagma-fam.sh -c $CONFIG -s filter
-#./pandagma-fam.sh -c $CONFIG -s dagchainer
+
+# Stage 1: ingest through ks_calc
+./pandagma-fam.sh -c $CONFIG -s ingest
+./pandagma-fam.sh -c $CONFIG -s mmseqs
+./pandagma-fam.sh -c $CONFIG -s filter
+./pandagma-fam.sh -c $CONFIG -s dagchainer
+./pandagma-fam.sh -c $CONFIG -s ks_calc  # Optional but recommended. Time-consuming.
+
+# Stage 2: ks_filter through summarize
+./pandagma-fam.sh -c $CONFIG -s ks_filter  # Optional but recommended. Provide the file ks_cutoffs.tsv .
 ./pandagma-fam.sh -c $CONFIG -s mcl
 ./pandagma-fam.sh -c $CONFIG -s consense
 ./pandagma-fam.sh -c $CONFIG -s cluster_rest
@@ -21,6 +27,8 @@ CONFIG=$1
 ./pandagma-fam.sh -c $CONFIG -s model_and_trim
 ./pandagma-fam.sh -c $CONFIG -s calc_trees
 ./pandagma-fam.sh -c $CONFIG -s summarize
+
+# Optional steps to cleanup the work directory
 #./pandagma-fam.sh -c $CONFIG -s clean
 #./pandagma-fam.sh -c $CONFIG -s ReallyClean
 
