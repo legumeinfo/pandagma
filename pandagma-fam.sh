@@ -380,11 +380,11 @@ run_dagchainer() {
     echo "Find average distance between genes for the query and subject files: "
     echo "  $qryfile and $sbjfile"
     ave_gene_gap=$(cat 02_fasta_prot/$qryfile.$faa 02_fasta_prot/$sbjfile.$faa | 
-                     awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/__/\t/g' |
+                     awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/__/\t/g' | sort -k1,1 -k3n,3n |
                      awk '$1 == prev1 && $3 > prev4 {sum+=$3-prev4; ct++; prev1=$1; prev3=$3; prev4=$4};
                           $1 != prev1 || $3 <= prev4 {prev1=$1; prev3=$3; prev4=$4}; 
-                          END{print int(sum/ct)}')
-    let "max_gene_gap = ave_gene_gap * 10"
+                          END{print 100*int(sum/ct/100)}')
+    let "max_gene_gap = ave_gene_gap * 20"
 
     echo "Running DAGchainer on comparison: $align_file"
     echo "  Calculated DAGchainer parameters: -g (ave_gene_gap): $ave_gene_gap -D (max_gene_gap): $max_gene_gap"; echo
