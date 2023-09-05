@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-09-03"
+version="2023-09-05"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -44,8 +44,8 @@ Subcommands (in order they are usually run):
              mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies.
              filter - Filter the synteny results for chromosome pairings, returning gene pairs.
          dagchainer - Run DAGchainer to filter for syntenic blocks.
-            ks_calc - Optional calculation of Ks values on gene pairs from DAGchainer output.
-          ks_filter - Optional filtering based on provided ks_cutoffs.tsv file (assumes prior ks_calc step)
+            ks_calc - Calculation of Ks values on gene pairs from DAGchainer output.
+          ks_filter - Filtering based on provided ks_peaks.tsv file (assumes prior ks_calc step)
                 mcl - Derive clusters, with Markov clustering.
            consense - Calculate a consensus sequences from each pan-gene set, 
                       adding sequences missed in the first clustering round.
@@ -85,19 +85,12 @@ for example, \"Cicer\" and \"cerca\" matching the genus and \"gensp\" matching p
   Cicer.pan1.chr06
   cerca.ISC453364.gnm3.Chr03
 
-2. The second option for additional filtering is to provide a file of cutoffs for synteny-block-median Ks values.
+2. The second option for additional filtering is to provide a file of Ks peak values for synteny-block-median Ks values.
 This requires calculating gene-pair and block-median Ks values from DAGChainer output, using the included
-calc_ks_from_dag.pl script - and then providing cutoff values based on visual assessments of Ks peaks.
-For example, a cutoff could be set at 1.5 times a selected whole-genome duplication peak or 
-speciation peak for each species-pair, taking advantage of the fact that the median absolute deviation 
-value for a standard normal distribution is 1.48. 
-
-To do Ks-based filtering, generate a directory of filtered \.rptout\" files is subdirectory 05_kaksout_ks_filtered
-using script filter_mmseqs_by_ks.pl and a three-column ks_cutoffs.tsv file, 
-then run pandagma-fam.sh steps from ks_filter through summarize.
+calc_ks_from_dag.pl script. A cutoff multiplier also needs to be provided. A value of 1.5 is recommended,
+taking advantage of the fact that the median absolute deviation value for a standard normal distribution is 1.48. 
 
 Variables in pandagma config file (Set the config with the CONF environment variable)
-    dagchainer_args - Argument for DAGchainer command
          clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
           clust_cov - Minimum coverage for mmseqs clustering [0.60]
         consen_iden - Minimum identity threshold for consensus generation [0.80]
@@ -105,6 +98,13 @@ Variables in pandagma config file (Set the config with the CONF environment vari
       mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
         strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs (1)
                         The alternative (0) is to use all homologous pairs that satisfy expected_quotas.tsv
+      ks_low_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values less than this. [0.5]
+       ks_hi_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values greater than this. [2.0]
+         ks_binsize - For calculating and displaying histograms. [0.05]
+ mult_for_ks_cutoff - Multiply by Ks_peak to give the per-species cutoff for Ks block-medians. [1.5]
+ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
+        max_pair_ks - Fallback value for excluding gene pairs, if a ks_cutoffs file is not provided. [4.0]
+
       consen_prefix - Prefix to use in orthogroup names
        out_dir_base - Base name for the output directory [default: './out']
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
@@ -120,10 +120,6 @@ Variables in pandagma config file (Set the config with the CONF environment vari
       protein_files
           cds_files
 annotation_files_extra
-   protein_files_extra
-    expected_quotas
-         ks_cutoffs
-"""
 
 ########################################
 # Helper functions begin here
@@ -153,7 +149,7 @@ canonicalize_paths() {
   fi
 
   readonly expected_quotas=${expected_quotas:+$(realpath "${expected_quotas}")}
-  readonly ks_cutoffs=${ks_cutoffs:+$(realpath "${ks_cutoffs}")}
+  readonly ks_peaks=${ks_peaks:+$(realpath "${ks_peaks}")}
   readonly submit_dir=${PWD}
 
   fasta_file=$(basename "${protein_files[0]}" .gz)
@@ -372,20 +368,33 @@ run_filter() {
 run_dagchainer() {
   # Identify syntenic blocks, using DAGchainer
   cd "${WORK_DIR}"
-  echo; echo "Run DAGchainer, using args \"${dagchainer_args}\""
+  dagchainer_args='-M 50 -E 1e-5 -A 6 -s'  # -g and -D are calculated from the data
+  echo; echo "Run DAGchainer using arguments \"${dagchainer_args}\" (-g and -D are calculated from the data)"
   # Check and preemptively remove malformed \*_matches.file, which can result from an aborted run
   if [ -f 04_dag/\*_matches.tsv ]; then rm 04_dag/\*_matches.tsv; fi
   for match_path in 04_dag/*_matches.tsv; do
-    #echo "basename $match_path _matches.tsv"
     align_file=`basename $match_path _matches.tsv`
+    qryfile=$(echo $align_file | perl -pe 's/(\S+)\.x\..+/$1/')
+    sbjfile=$(echo $align_file | perl -pe 's/\S+\.x\.(\S+)/$1/')
+
+    echo "Find average distance between genes for the query and subject files: "
+    echo "  $qryfile and $sbjfile"
+    ave_gene_gap=$(cat 02_fasta_prot/$qryfile.$faa 02_fasta_prot/$sbjfile.$faa | 
+                     awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/__/\t/g' |
+                     awk '$1 == prev1 && $3 > prev4 {sum+=$3-prev4; ct++; prev1=$1; prev3=$3; prev4=$4};
+                          $1 != prev1 || $3 <= prev4 {prev1=$1; prev3=$3; prev4=$4}; 
+                          END{print int(sum/ct)}')
+    let "max_gene_gap = ave_gene_gap * 10"
+
     echo "Running DAGchainer on comparison: $align_file"
-    echo "  run_DAG_chainer.pl $dagchainer_args -i $match_path"; echo
+    echo "  Calculated DAGchainer parameters: -g (ave_gene_gap): $ave_gene_gap -D (max_gene_gap): $max_gene_gap"; echo
+    echo " run_DAG_chainer.pl $dagchainer_args  -g $ave_gene_gap -D $max_gene_gap -i \"${OLDPWD}/${match_path}\""
     # run_DAG_chainer.pl writes temp files to cwd;
     # use per-process temp directory to avoid any data race
     (
       tmpdir=$(mktemp -d)
       cd "${tmpdir}"
-      run_DAG_chainer.pl $dagchainer_args -i "${OLDPWD}/${match_path}" 1>/dev/null
+      run_DAG_chainer.pl $dagchainer_args  -g $ave_gene_gap -D $max_gene_gap -i "${OLDPWD}/${match_path}" 1>/dev/null
       rmdir ${tmpdir}
     ) &
     # allow to execute up to $NPROC in parallel
@@ -396,8 +405,8 @@ run_dagchainer() {
 
 ##########
 run_ks_calc() {
-  echo; echo "From optional provided ks_cutoffs.tsv file and from processed DAGChainer output, (with gene-pair and "
-  echo       "block-median Ks values added by calc_ks_from_dag.pl), filter on block-median Ks values."
+  echo; echo "Calculate Ks values from processed DAGChainer output, generating gene-pair and "
+  echo       "block-median Ks values for subsequent filtering."
 
   cd "${WORK_DIR}"
 
@@ -415,28 +424,70 @@ run_ks_calc() {
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
+
+  echo "Determine provisional Ks peaks (Ks values and amplitudes) and generate Ks plots."
+  annot_str_regex='([^.]+\.[^.]+)\..+'
+  export ANN_REX=${annot_str_regex}
+  cat /dev/null > stats/ks_peaks_auto.tsv
+  cat /dev/null > stats/ks_histograms.tsv
+  cat /dev/null > stats/ks_histplots.tsv
+  for ks_path in 05_kaksout/*.rptout; do
+    filebase=`basename $ks_path .rptout`
+    qry_ann=$(echo $filebase | perl -pe 'BEGIN{$REX=$ENV{"ANN_REX"}}; s/^$REX/$1/')
+    sbj_ann=$(echo $filebase | perl -pe 'BEGIN{$REX=qr($ENV{"ANN_REX"})}; s/.+\.x\.$REX/$1/')
+
+    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | histogram -z -n -s $KS_BINSIZE |
+      awk -v KSLC=$KS_LOW_CUTOFF -v KSHC=$KS_HI_CUTOFF -v QA=$qry_ann -v SA=$sbj_ann -v OFS="\t" '
+        $1>KSLC && $1<KSHC && $2>=max { max=$2; maxbin=$1 } END{ print QA, SA, maxbin, max}' >> stats/ks_peaks_auto.tsv
+
+    ks_bin=$(cat stats/ks_peaks_auto.tsv | 
+                    awk -v QA=$qry_ann -v SA=$sbj_ann -v OFS="\t" '$1 == QA && $2 == SA {print $3}')
+    ks_amplitude=$(cat stats/ks_peaks_auto.tsv | 
+                    awk -v QA=$qry_ann -v SA=$sbj_ann -v OFS="\t" '$1 == QA && $2 == SA {print $4}')
+    let "ks_amplitude_pct = ks_amplitude/100"
+      
+    echo "$qry_ann, $sbj_ann, $ks_amplitude, $ks_amplitude_pct"
+
+    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | histogram -z -n -s $KS_BINSIZE >> stats/ks_histograms.tsv
+
+    echo "# $filebase" >> stats/ks_histplots.tsv
+    echo "# Normalized relative to Ks peak inferred at bin $ks_bin, with amplitude $ks_amplitude_pct" >> stats/ks_histplots.tsv
+    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | histogram -z -n -s $KS_BINSIZE | histplot.pl -d $ks_amplitude_pct >> stats/ks_histplots.tsv
+    echo "" >> stats/ks_histplots.tsv
+  done
 }
 
 ##########
 run_ks_filter() {
-  echo; echo "From optional provided ks_cutoffs.tsv file and from processed DAGChainer output, (with gene-pair and "
+  echo; echo "From optional provided ks_peaks.tsv file and from processed DAGChainer output, (with gene-pair and "
   echo       "block-median Ks values added by calc_ks_from_dag.pl), filter on block-median Ks values."
 
   cd "${WORK_DIR}"
   if [ -d 05_kaksout_ks_filtered ]; then rm -rf 05_kaksout_ks_filtered ; fi
   mkdir -p 05_kaksout_ks_filtered
-  if [[ -f ${ks_cutoffs} ]]; then  # filter based on list of Ks values
+  if [[ -f ${ks_peaks} ]]; then  # filter based on list of Ks values
     echo "Filtering on quotas from file ${expected_quotas} and ks_pair_cutoff value provided in config file"
     for ks_path in 05_kaksout/*.rptout; do
       outfilebase=`basename $ks_path .rptout`
       echo "  Filtering $ks_path based on expected block-median Ks values"
       cat ${ks_path} | 
-        filter_mmseqs_by_ks.pl -ks_cutoff $ks_cutoffs -annot_regex $annot_str_regex -max_pair_ks $max_pair_ks |
+        filter_mmseqs_by_ks.pl -ks_peak $ks_peaks -annot_regex $annot_str_regex -max_pair_ks $max_pair_ks |
         awk 'NF==7' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
         cat > 05_kaksout_ks_filtered/${outfilebase}.rptout 
     done
-  else   # don't filter, since ks_cutoffs.tsv file isn't provided
-    echo "No ks_cutoffs.tsv file was provided. Please provide ks_cutoffs.tsv in the data directory."
+  elif [[ -f stats/ks_peaks_auto.tsv ]]; then  # filter based on list of Ks values determined automatically in step ks_calc above
+    echo "Filtering on quotas from file ${expected_quotas} and ks_pair_cutoff value calculated and stored at ks_peaks_auto.tsv"
+    for ks_path in 05_kaksout/*.rptout; do
+      outfilebase=`basename $ks_path .rptout`
+      echo "  Filtering $ks_path based on expected block-median Ks values"
+      cat ${ks_path} | 
+        filter_mmseqs_by_ks.pl -ks_peak stats/ks_peaks_auto.tsv -annot_regex $annot_str_regex -max_pair_ks $max_pair_ks |
+        awk 'NF==7' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
+        cat > 05_kaksout_ks_filtered/${outfilebase}.rptout 
+    done
+  else   # don't filter, since ks_peaks.tsv file isn't provided
+    echo "No ks_peaks.tsv file was provided. It is recommended to review the provisional stats/ks_peaks_auto.tsv file and"
+    echo "ks_histplots.tsv file and edit ks_peaks_auto.tsv to generate ks_peaks.tsv to be placed in the data/ directory."
     echo "$*" 1>&2 ; exit 1;
   fi
 }
@@ -972,6 +1023,7 @@ export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 MMSEQSTHREADS=$(( 4 < ${NPROC} ? 4 : ${NPROC} ))
 
 pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation strict_synt dagchainer_args 
+  ks_low_cutoff ks_hi_cutoff ks_binsize mult_for_ks_cutoff ks_block_wgd_cutoff max_pair_ks 
   out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex work_dir'
 
 ##########
