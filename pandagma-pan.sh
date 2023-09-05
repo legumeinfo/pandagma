@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-08-28"
+version="2023-09-05"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -84,7 +84,6 @@ These pairings are used in a regular expression to identify terminal portions of
 If an expected_chr_matches file is not provided, then no such filtering will be done.
 
 Variables in pandagma config file (Set the config with the CONF environment variable)
-    dagchainer_args - Argument for DAGchainer command
          clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
           clust_cov - Minimum coverage for mmseqs clustering [0.60]
         consen_iden - Minimum identity threshold for consensus generation [0.80]
@@ -314,20 +313,34 @@ run_filter() {
 run_dagchainer() {
   # Identify syntenic blocks, using DAGchainer
   cd "${WORK_DIR}"
-  echo; echo "Run DAGchainer, using args \"${dagchainer_args}\""
+  dagchainer_args='-M 50 -E 1e-5 -A 6 -s'  # -g and -D are calculated from the data
+  echo; echo "Run DAGchainer using arguments \"${dagchainer_args}\" (-g and -D are calculated from the data)"
   # Check and preemptively remove malformed \*_matches.file, which can result from an aborted run
   if [ -f 04_dag/\*_matches.tsv ]; then rm 04_dag/\*_matches.tsv; fi
   for match_path in 04_dag/*_matches.tsv; do
-    #echo "basename $match_path _matches.tsv"
     align_file=`basename $match_path _matches.tsv`
+    qryfile=$(echo $align_file | perl -pe 's/(\S+)\.x\..+/$1/')
+    sbjfile=$(echo $align_file | perl -pe 's/\S+\.x\.(\S+)/$1/')
+
+    echo "Find average distance between genes for the query and subject files: "
+    echo "  $qryfile and $sbjfile"
+    ave_gene_gap=$(cat 02_fasta_prot/$qryfile.$faa 02_fasta_prot/$sbjfile.$faa | 
+                     awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/__/\t/g' |
+                     awk '$1 == prev1 && $3 > prev4 {sum+=$3-prev4; ct++; prev1=$1; prev3=$3; prev4=$4};
+                          $1 != prev1 || $3 <= prev4 {prev1=$1; prev3=$3; prev4=$4}; 
+                          END{print int(sum/ct)}')
+    let "max_gene_gap = ave_gene_gap * 10"
+
     echo "Running DAGchainer on comparison: $align_file"
-    echo "  run_DAG_chainer.pl $dagchainer_args -i $match_path"; echo
+    echo "  Calculated DAGchainer parameters: -g (ave_gene_gap): $ave_gene_gap -D (max_gene_gap): $max_gene_gap"; echo
+    echo " run_DAG_chainer.pl $dagchainer_args  -g $ave_gene_gap -D $max_gene_gap -i \"${OLDPWD}/${match_path}\""
+
     # run_DAG_chainer.pl writes temp files to cwd;
     # use per-process temp directory to avoid any data race
     (
       tmpdir=$(mktemp -d)
       cd "${tmpdir}"
-      run_DAG_chainer.pl $dagchainer_args -i "${OLDPWD}/${match_path}" 1>/dev/null
+      run_DAG_chainer.pl $dagchainer_args  -g $ave_gene_gap -D $max_gene_gap -i "${OLDPWD}/${match_path}" 1>/dev/null
       rmdir ${tmpdir}
     ) &
     # allow to execute up to $NPROC in parallel
@@ -1082,7 +1095,7 @@ export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 MMSEQSTHREADS=$(( 4 < ${NPROC} ? 4 : ${NPROC} ))
 
 pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation 
-  strict_synt dagchainer_args out_dir_base pctl_low pctl_med pctl_hi 
+  strict_synt out_dir_base pctl_low pctl_med pctl_hi 
   consen_prefix annot_str_regex order_method preferred_annot work_dir'
 
 ##########
