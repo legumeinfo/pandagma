@@ -45,11 +45,11 @@ my $usage = <<EOS;
   ... filter gene pairs on block-median values against values provided in the file specified by -ks_peaks and
   cutoff values determined by those peak values and the supplied mult_for_ks_cutoff (default 1.5).
   
-  Example1 from ks_peaks file ...
-    Cicer.pan1  Cicer.pan1     1.43
-    Cicer.pan1  Glycine.pan3   1.28
-    ...
-    Glycine.pan3	Phaseolus.pan1	1.13
+  Example1 from ks_peaks file. Column 3 is the Ks bin. Column 4 is optional. Here it contains the peak amplitude.
+    sento.Myeongyun    sento.Myeongyun   0.7    1278
+    sento.Myeongyun    singl.CAF01       0.75   4511
+    sento.Myeongyun    vicfa.Hedin2      0.85    417
+    sento.Myeongyun    Vigna.pan1        0.9    6659
     ...
 
   Flags and parameters:
@@ -73,25 +73,25 @@ my $ANN_REX = qr/$annot_regex/;
 # read in values from Ks peaks file
 open( my $KS_IN, '<', $ks_peaks ) or die "can't open ks_peaks $ks_peaks: $!";
 my %peaks;
-while (<$KS_IN>){ # three fields, e.g. "Arachis.pan1  Cicer.pan1  1.8"
+while (<$KS_IN>){ # three required fields, e.g. "Arachis.pan1  Cicer.pan1  1.8"
   chomp;
   next if (/^#/ || /^$/);
   my $line = $_;
-  my ($left, $right, $threshold) = split(/\s+/);
+  my ($left, $right, $ks_peak_bin, $rest) = split(/\s+/);
   
   my $chr_rex;
   # Store the pattern for later regex use
-  $peaks{"$left.x.$right"} = $threshold;
-  if ($verbose) {say "$left.x.$right\t$threshold"}
+  $peaks{"$left.x.$right"} = $ks_peak_bin;
+  if ($verbose) {say "$left.x.$right\t$ks_peak_bin"}
 
   # Store the reverse pattern, if the left and right chroms are not the same
   if ($left ne $right) {
-    $peaks{"$right.x.$left"} = $threshold;
-    if ($verbose) {say "$right.x.$left\t$threshold"}
+    $peaks{"$right.x.$left"} = $ks_peak_bin;
+    if ($verbose) {say "$right.x.$left\t$ks_peak_bin"}
   }
 }
 
-# Process homology data, comparing to the stored thresholds
+# Process homology data, comparing to the stored ks_peak_bins
 my ($QRY, $SBJ);
 while (my $line = <>) {
   chomp $line;
