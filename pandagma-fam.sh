@@ -116,10 +116,16 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
            work_dir - Working directory, for temporary and intermediate files. 
+
+File sets (arrays):
    annotation_files
       protein_files
           cds_files
 annotation_files_extra
+   protein_files_extra
+     expected_quotas
+          ks_cutoffs
+ """
 
 ########################################
 # Helper functions begin here
