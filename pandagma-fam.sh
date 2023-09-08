@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-09-05"
+version="2023-09-08"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -322,11 +322,13 @@ run_mmseqs() {
       if [[ ${qry_base} == ${sbj_base} ]]; then # self-comparison, so use flag --add-self-matches
         mmseqs easy-search \
           02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa 03_mmseqs/${qry_base}.x.${sbj_base}.m8 $MMTEMP \
-          --add-self-matches --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} --min-seq-id ${clust_iden} 1>/dev/null 
+          --add-self-matches --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} --min-seq-id ${clust_iden} \
+          --format-output "query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,qaln,taln" 1>/dev/null 
       else # not a self-comparison, do omit flag --add-self-matches
         mmseqs easy-search \
           02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa 03_mmseqs/${qry_base}.x.${sbj_base}.m8 $MMTEMP \
-          --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} --min-seq-id ${clust_iden} 1>/dev/null 
+          --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} --min-seq-id ${clust_iden} \
+          --format-output "query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,qaln,taln" 1>/dev/null 
       fi
     done
     echo
@@ -425,14 +427,14 @@ run_ks_calc() {
     base=`basename $DAGFILE _matches.tsv.aligncoords`
     echo "WORKING ON $base"
     echo "calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout"
-    calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout 1> /dev/null 2> /dev/null &
+    calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -align_method precalc -match_table 03_mmseqs/$base.m8 \
+      -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout 1> /dev/null 2> /dev/null &
     echo
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
 
   echo "Determine provisional Ks peaks (Ks values and amplitudes) and generate Ks plots."
-  annot_str_regex='([^.]+\.[^.]+)\..+'
   export ANN_REX=${annot_str_regex}
   cat /dev/null > stats/ks_peaks_auto.tsv
   cat /dev/null > stats/ks_histograms.tsv
@@ -442,9 +444,10 @@ run_ks_calc() {
     qry_ann=$(echo $filebase | perl -pe 'BEGIN{$REX=$ENV{"ANN_REX"}}; s/^$REX/$1/')
     sbj_ann=$(echo $filebase | perl -pe 'BEGIN{$REX=qr($ENV{"ANN_REX"})}; s/.+\.x\.$REX/$1/')
 
-    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | histogram -z -n -s $KS_BINSIZE |
-      awk -v KSLC=$KS_LOW_CUTOFF -v KSHC=$KS_HI_CUTOFF -v QA=$qry_ann -v SA=$sbj_ann -v OFS="\t" '
-        $1>KSLC && $1<KSHC && $2>=max { max=$2; maxbin=$1 } END{ print QA, SA, maxbin, max}' >> stats/ks_peaks_auto.tsv
+    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | histogram.pl -z -n -s $ks_binsize |
+      awk -v KSLC=$ks_low_cutoff -v KSHC=$ks_hi_cutoff -v QA=$qry_ann -v SA=$sbj_ann '
+        $1>KSLC && $1<KSHC && $2>=max { max=$2; maxbin=$1 } 
+        END{ printf("%s\t%s\t%d\t%d\n", QA, SA, maxbin, max)}' >> stats/ks_peaks_auto.tsv
 
     ks_bin=$(cat stats/ks_peaks_auto.tsv | 
                     awk -v QA=$qry_ann -v SA=$sbj_ann -v OFS="\t" '$1 == QA && $2 == SA {print $3}')
@@ -452,13 +455,17 @@ run_ks_calc() {
                     awk -v QA=$qry_ann -v SA=$sbj_ann -v OFS="\t" '$1 == QA && $2 == SA {print $4}')
     let "ks_amplitude_pct = ks_amplitude/100"
       
-    echo "$qry_ann, $sbj_ann, $ks_amplitude, $ks_amplitude_pct"
+    printf "  Amplitude, ks_peak_bin, qry, sbj:\t$ks_amplitude\t$ks_amplitude_pct\t$qry_ann\t$sbj_ann\n"
 
-    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | histogram -z -n -s $KS_BINSIZE >> stats/ks_histograms.tsv
+    echo "# $filebase" >> stats/ks_histograms.tsv
+    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | 
+      histogram.pl -z -n -s $ks_binsize >> stats/ks_histograms.tsv
+    echo "" >> stats/ks_histograms.tsv
 
     echo "# $filebase" >> stats/ks_histplots.tsv
     echo "# Normalized relative to Ks peak inferred at bin $ks_bin, with amplitude $ks_amplitude_pct" >> stats/ks_histplots.tsv
-    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | histogram -z -n -s $KS_BINSIZE | histplot.pl -d $ks_amplitude_pct >> stats/ks_histplots.tsv
+    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | histogram.pl -z -n -s $ks_binsize | 
+      histplot.pl -d $ks_amplitude_pct >> stats/ks_histplots.tsv
     echo "" >> stats/ks_histplots.tsv
   done
 }
