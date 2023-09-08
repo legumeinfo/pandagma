@@ -1,5 +1,4 @@
-#!/usr/bin/perl
-## #!/usr/bin/env perl
+#!/usr/bin/env perl
 
 use strict;
 use warnings;
@@ -23,6 +22,11 @@ EOS
 
 die "$usage\n" if $help; 
 
+if ($divisor == 0){ 
+  warn "Divisor used in histplot.pl can't be 0; changing to 1\n";
+  $divisor = 1;  # divisor=0 causes division by zero error. Warn and change to zero
+}
+
 BEGIN{print "bin\tabcdefghijKLMNOPQRSTabcdefghijKLMNOPQRSTabcdefghijKLMNOPQRSTabcdefghijKLMNOPQRSTabcdefghijKLMNOPQRST\n"}
 
 while (<>) {
@@ -34,6 +38,7 @@ while (<>) {
 __END__
 VERSIONS
 sc = Steven Cannon
-v01 2017-08-15 initial, based on the one-liner perl -ane 'print "$F[0]\t", "." x $F[1], "\n"'
-v02 2017-01-29 use printf to format the bin output
+2017-08-15 initial, based on the one-liner perl -ane 'print "$F[0]\t", "." x $F[1], "\n"'
+2017-01-29 use printf to format the bin output
+2023-09-08 Preemptively reset $divisor if -divisor is set to 0
 
