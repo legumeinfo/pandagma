@@ -27,7 +27,7 @@ EOS
 
 die "$usage\n" if $help; 
 
-my $header = "bin\tabcdefghijKLMNOPQRSTabcdefghijKLMNOPQRSTabcdefghijKLMNOPQRSTabcdefghijKLMNOPQRST";
+my $header = "bin\tabcdefghijKLMNOPQRSTabcdefghijKLMNOPQRSTabcdefghijKLMNOPQRSTabcdefghijKLMNOPQRSTabcdefghijKLMNOPQRST";
 
 print "\nHistograms of cluster sizes, with amplitude divisor = $divisor and minimum bin count = $min_bin_ct\n";
 
@@ -53,5 +53,5 @@ __END__
 VERSIONS
 2023-02-03 Initial version for pandagma based on histplot and the one-liner perl -ane 'print "$F[0]\t", "." x $F[1], "\n"'
 2023-08-08 Add option to print total per bin -- i.e. the gene count at that bin
-
+2023-09-09 Extend header row to 100 characters
 
