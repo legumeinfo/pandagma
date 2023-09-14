@@ -39,13 +39,16 @@ curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.
 curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann2.PVFB/arahy.Tifrunner.gnm2.ann2.PVFB.protein.faa.gz
 curl -O $url_base/ipaensis/annotations/K30076.gnm1.ann1.J37m/araip.K30076.gnm1.ann1.J37m.protein.faa.gz
 
+
 # Merge duranensis and ipaensis to give a pseudo-allotetraploid that can be compared with A. hypogaea
 zcat aradu.V14167.gnm1.ann1.cxSM.cds.bed.gz araip.K30076.gnm1.ann1.J37m.cds.bed.gz |
   perl -pe 's/aradu.V14167.gnm1.Adur/araduip.V14167K30076.gnm1.scaffA_/; 
             s/araip.K30076.gnm1.Aipa/araduip.V14167K30076.gnm1.scaffB_/; 
             s/aradu.V14167.gnm1.Aradu.A/araduip.V14167K30076.gnm1.chrA/;
             s/^araip.K30076.gnm1.Araip.B0(\d)/araduip.V14167K30076.gnm1.chrB1$1/; 
-            s/^araip.K30076.gnm1.Araip.B1(\d)/araduip.V14167K30076.gnm1.chrB2$1/' |
+            s/^araip.K30076.gnm1.Araip.B1(\d)/araduip.V14167K30076.gnm1.chrB2$1/;
+            s/aradu.V14167.gnm1/araduip.V14167K30076.gnm1/;
+            s/araip.K30076.gnm1/araduip.V14167K30076.gnm1/' |
   cat > ../data/araduip.V14167K30076.gnm1.ann1.cxSMJ37m.cds.bed
 
 # Copy the arahy bed files
@@ -64,9 +67,11 @@ zcat aradu.V14167.gnm1.ann1.cxSM.cds.bed.gz araip.K30076.gnm1.ann1.J37m.cds.bed.
 
 # The cds and protein sequence IDs should be OK without modification, but the dur and ipa need to be merged.
   zcat aradu.V14167.gnm1.ann1.cxSM.cds.fna.gz araip.K30076.gnm1.ann1.J37m.cds.fna.gz |
+    perl -pe 's/aradu.V14167.gnm1/araduip.V14167K30076.gnm1/; s/araip.K30076.gnm1/araduip.V14167K30076.gnm1/' |
     cat > ../data/araduip.V14167K30076.gnm1.ann1.cxSMJ37m.cds.fna
 
   zcat aradu.V14167.gnm1.ann1.cxSM.protein.faa.gz araip.K30076.gnm1.ann1.J37m.protein.faa.gz |
+    perl -pe 's/aradu.V14167.gnm1/araduip.V14167K30076.gnm1/; s/araip.K30076.gnm1/araduip.V14167K30076.gnm1/' |
     cat > ../data/araduip.V14167K30076.gnm1.ann1.cxSMJ37m.protein.faa
 
   zcat arahy.Tifrunner.gnm1.ann1.CCJH.cds_primary.fna.gz > ../data/arahy.Tifrunner.gnm1.ann1.CCJH.cds_primary.fna
@@ -84,14 +89,22 @@ zcat aradu.V14167.gnm1.ann1.cxSM.cds.bed.gz araip.K30076.gnm1.ann1.J37m.cds.bed.
   zcat arahy.Tifrunner.gnm1.ann2.TN8K.cds_primary.fna.gz > ../data/arahy.Tifrunner.gnm1.ann2.TN8K.cds_primary.fna
   zcat arahy.Tifrunner.gnm1.ann2.TN8K.protein_primary.faa.gz > ../data/arahy.Tifrunner.gnm1.ann2.TN8K.protein_primary.faa
 
-# 145 models in arahy.Tifrunner.gnm2.ann1.4K0L lack positional information. Exclude them:
-  cat arahy.Tifrunner.gnm2.ann1.4K0L.cds_primary.fna.gz | fasta_to_table.awk | 
-    grep -v -f lis.exclude_from_arahy.Tifrunner.gnm2.ann1 | 
-    awk '{print ">" $1; print $2}' > ../data/arahy.Tifrunner.gnm2.ann1.4K0L.cds_primary.fna
 
-  zcat arahy.Tifrunner.gnm2.ann1.4K0L.protein_primary.faa.gz | fasta_to_table.awk | 
-    grep -v -f lis.exclude_from_arahy.Tifrunner.gnm2.ann1 | 
-    awk '{print ">" $1; print $2}' > ../data/arahy.Tifrunner.gnm2.ann1.4K0L.protein_primary.faa
+# Exclude 145 models that weren't mapped from Tifrunner.gnm1.ann1 to Tifrunner.gnm2.ann1:
+url_base="https://data.legumeinfo.org/Arachis"
+curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.gnm2.ann1.4K0L.info_unmapped_models.txt.gz
+
+  zcat arahy.Tifrunner.gnm2.ann1.4K0L.info_unmapped_models.txt.gz | awk '$1!~/^#/ {print $1}' |
+    perl -pe 's/arahy.Tifrunner.gnm1.ann1/arahy.Tifrunner.gnm2.ann1/' > lis.exclude_from_arahy.Tifrunner.gnm2.ann1
+
+  zcat arahy.Tifrunner.gnm2.ann1.4K0L.cds_primary.fna.gz | fasta_to_table.awk |
+  grep -v -f lis.exclude_from_arahy.Tifrunner.gnm2.ann1 |
+  awk '{print ">" $1; print $2}' > ../data/arahy.Tifrunner.gnm2.ann1.4K0L.cds_primary.fna
+
+  zcat arahy.Tifrunner.gnm2.ann1.4K0L.protein_primary.faa.gz | fasta_to_table.awk |
+  grep -v -f lis.exclude_from_arahy.Tifrunner.gnm2.ann1 |
+  awk '{print ">" $1; print $2}' > ../data/arahy.Tifrunner.gnm2.ann1.4K0L.protein_primary.faa
+
 
 cd $base_dir/data/
 
