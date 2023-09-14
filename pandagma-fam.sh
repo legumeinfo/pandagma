@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-09-08"
+version="2023-09-14"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -451,9 +451,9 @@ run_ks_calc() {
 
     ks_bin=$(cat stats/ks_peaks_auto.tsv | 
                     awk -v QA=$qry_ann -v SA=$sbj_ann -v OFS="\t" '$1 == QA && $2 == SA {print $3}')
-    ks_amplitude=$(cat stats/ks_peaks_auto.tsv | 
+    export ks_amplitude=$(cat stats/ks_peaks_auto.tsv | 
                     awk -v QA=$qry_ann -v SA=$sbj_ann -v OFS="\t" '$1 == QA && $2 == SA {print $4}')
-    let "ks_amplitude_pct = ks_amplitude/100"
+    ks_amplitude_pct=$(perl -e '$KSA=$ENV{ks_amplitude}; {printf("%.2f", $KSA/100)}')
       
     printf "  Amplitude, ks_peak_bin, qry, sbj:\t$ks_amplitude\t$ks_amplitude_pct\t$qry_ann\t$sbj_ann\n"
 
