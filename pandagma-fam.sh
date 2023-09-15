@@ -446,8 +446,8 @@ run_ks_calc() {
 
     cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | histogram.pl -z -n -s $ks_binsize |
       awk -v KSLC=$ks_low_cutoff -v KSHC=$ks_hi_cutoff -v QA=$qry_ann -v SA=$sbj_ann '
-        $1>KSLC && $1<KSHC && $2>=max { max=$2; maxbin=$1 } 
-        END{ printf("%s\t%s\t%d\t%d\n", QA, SA, maxbin, max)}' >> stats/ks_peaks_auto.tsv
+        $1>=KSLC && $1<=KSHC && $2>=maxampl { maxampl=$2; maxbin=$1 } 
+        END{ printf("%s\t%s\t%.2f\t%d\n", QA, SA, maxbin, maxampl)}' >> stats/ks_peaks_auto.tsv
 
     ks_bin=$(cat stats/ks_peaks_auto.tsv | 
                     awk -v QA=$qry_ann -v SA=$sbj_ann -v OFS="\t" '$1 == QA && $2 == SA {print $3}')
