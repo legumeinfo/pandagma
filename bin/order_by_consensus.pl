@@ -1,6 +1,6 @@
-d_//binenv perl
-d/bin/bind_/bin strict;
-dd_/bin warning/bin/bins;
+#!/usr/bin/env perl
+use strict;
+use warnings;
 use Getopt::Long;
 use List::Util qw(sum);
 use File::Basename;
@@ -248,4 +248,4 @@ __END__
        on the same five-column input data with genomic position, but calculates modal 
        chromosome and gene orders per annotation set; then calculates modal order for the pangene.
 02-27 Fix REGEX for chromosome prefix, removing patterns that can match Mtrun
-
+09-16 Fix interpreter line and warnings and strict pragmas

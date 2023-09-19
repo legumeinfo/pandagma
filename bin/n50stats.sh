@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # NAME
 #     n50stats.sh - print some basic stats about sequences in a multifasta file
 #
