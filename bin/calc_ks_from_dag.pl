@@ -124,7 +124,12 @@ while (<$MATCH_FH>){
   $qry =~ s/^\S+__(\S+)__\d+__\d+__[+-]$/$1/;
   $sbj =~ s/^\S+__(\S+)__\d+__\d+__[+-]$/$1/;
   #say "AA: $qry\t$sbj";
-  $match_table_hsh{"$qry.x.$sbj"} = [ $qry, $sbj, @fields[2..13] ];
+  if ($align_method =~ /precalc/){
+    $match_table_hsh{"$qry.x.$sbj"} = [ $qry, $sbj, @fields[2..13] ];
+  }
+  else {
+    $match_table_hsh{"$qry.x.$sbj"} = [ $qry, $sbj, @fields[2..11] ];
+  }
 }
 
 ##################################################
@@ -235,6 +240,15 @@ while (<$DAG>) {
     $prot_objB = $nuc_objB->translate(-frame => 0, -codontable_id => $codontable);
     
     if ($align_method =~ /precalc/i){ # Seqs in prot aligns may be truncated/partial. Adjust prot and nucl seqs.
+      #say "WW: idA.x.idB: [$idA.x.$idB]";
+      unless (defined $idA){
+        say "WARNING: undefined idA; skipping";
+        next;
+      }
+      unless (defined $idB){
+        say "WARNING: undefined idB; skipping";
+        next;
+      }
       my @fields = @{$match_table_hsh{"$idA.x.$idB"}};
       #say "CC: ", join "\t", @fields, "\n";
       my ($protA_start, $protA_end, $protA_aln) = ($fields[6], $fields[7], $fields[12]);
@@ -474,4 +488,4 @@ Versions
 2023-08-07 Initial, based on older dag_ks.pl script.
 2023-08-26 Tweak help text: STDIN --> ARGV
 2023-09-08 Add "precalc" to take in precomputed alignment from mmseqs, rather than using clustalw or mafft
-
+2023-09-18 Add warning for undefined keys in match_table_hsh
