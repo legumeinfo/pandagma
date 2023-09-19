@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-09-14"
+version="2023-09-19"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -415,6 +415,7 @@ run_dagchainer() {
 run_ks_calc() {
   echo; echo "Calculate Ks values from processed DAGChainer output, generating gene-pair and "
   echo       "block-median Ks values for subsequent filtering."
+  echo "NPROC: ${NPROC}"
 
   cd "${WORK_DIR}"
 
@@ -426,9 +427,10 @@ run_ks_calc() {
   for DAGFILE in $WORK_DIR/04_dag/*aligncoords; do
     base=`basename $DAGFILE _matches.tsv.aligncoords`
     echo "WORKING ON $base"
-    echo "calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout"
-    calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -align_method precalc -match_table 03_mmseqs/$base.m8 \
+    echo "calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout --align_method clustalw" 
+    calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -match_table 03_mmseqs/$base.m8  --align_method clustalw \
       -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout 1> /dev/null 2> /dev/null &
+      #-dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout 
     echo
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
@@ -1129,7 +1131,7 @@ fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
 commandlist="ingest mmseqs filter dagchainer \
-             run_ks ks_filter \
+             run_ks_calc ks_filter \
              mcl consense cluster_rest add_extra align model_and_trim calc_trees summarize"
 
 if [[ $step =~ "all" ]]; then
