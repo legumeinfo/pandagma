@@ -116,6 +116,9 @@ for file in *.pctl40_named_protein.faa.gz; do
     perl -pe 's/^(\w+\.\w+\.[^_]+)_\S+/$1/' > $base.pctl40_named_protein.bed
 done
 
+# Patch the lupal gene names - many of which look like this (with mRNA:) lupal.Amiga.gnm1.ann1.mRNA:Lalb_Chr25g0290201.1
+  perl -pi -e 's/mRNA:/mRNA_/g' lupal*
+
 # Check chromosome names
   for file in *bed.gz; do zcat $file | awk '$1~/chr|Chr|Ca/ {print $1}' | sort | uniq -c ; echo; done
 
