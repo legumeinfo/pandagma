@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-09-05"
+version="2023-10-06"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -59,9 +59,14 @@ Subcommands (in order they are usually run):
    filter_to_pctile - Calculate orthogroup composition and filter fasta files by selected percentiles.
      order_and_name - Assign pan-gene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
-          summarize - Move results into output directory, and report summary statistics.
+          summarize - Copy results into output directory, and report summary statistics.
 
-  Run either of the following subcommands separately if you wish:
+  Run the following subcommands separately if you wish:
+              align - Align families.
+     model_and_trim - Build HMMs and trim the alignments, preparatory to calculating trees.
+         calc_trees - Calculate gene trees.
+   xfr_aligns_trees - Transfer alignments, HMMs, and trees to output directory
+
               clean - Clean (delete) files in the working directory that are not needed 
                         for later addition of data using add_extra and subsequent run commands.
                         By default, \"clean\" is run as part of \"all\" unless the -r flag is set.
@@ -802,6 +807,132 @@ run_order_and_name() {
 }
 
 ##########
+run_align() {
+  echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
+  cd "${WORK_DIR}"
+  if [[ -d 19_pan_aug_leftover_merged_cds ]] && [[ -f 19_pan_aug_leftover_merged_cds/${consen_prefix}00001 ]]; then
+    : # do nothing; the directory and file(s) exist
+  else
+    mkdir -p 19_pan_aug_leftover_merged_cds
+    echo "  For each pan-gene set, retrieve sequences into a multifasta file."
+    get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra[@]}" \
+      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_cds
+  fi
+
+  echo; echo "== Align the gene families =="
+  mkdir -p 20_aligns
+  for filepath in 19_pan_aug_leftover_merged_cds/*; do
+    file=`basename $filepath`;
+    echo "  Computing alignment, using program famsa, for file $file"
+    famsa -t 2 19_pan_aug_leftover_merged_cds/$file 20_aligns/$file 1>/dev/null &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+}
+
+##########
+run_model_and_trim() {
+  echo; echo "== Build HMMs =="
+  cd "${WORK_DIR}"
+  mkdir -p 21_hmm
+  for filepath in 20_aligns/*; do
+    file=`basename $filepath`;
+    hmmbuild -n $file 21_hmm/$file $filepath 1>/dev/null &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+
+  echo; echo "== Realign to HMMs =="
+  mkdir -p 22_hmmalign
+  for filepath in 21_hmm/*; do
+    file=`basename $filepath`;
+    hmmalign --trim --outformat A2M -o 22_hmmalign/$file 21_hmm/$file 19_pan_aug_leftover_merged_cds/$file &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+
+  echo; echo "== Trim HMM alignments to match-states =="
+  mkdir -p 23_hmmalign_trim1
+  for filepath in 22_hmmalign/*; do
+    file=`basename $filepath`;
+    cat $filepath |
+      perl -ne 'if ($_ =~ />/) {print $_} else {$line = $_; $line =~ s/[a-z]//g; print $line}' |
+      sed '/^$/d' > 23_hmmalign_trim1/$file &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+
+  echo; echo "== Filter alignments prior to tree calculation =="
+  mkdir -p 23_hmmalign_trim2 23_hmmalign_trim2_log
+  min_depth=3
+  min_pct_depth=20
+  min_pct_aligned=20
+  for filepath in 23_hmmalign_trim1/*; do
+    file=`basename $filepath`
+    filter_align.pl -in $filepath -out 23_hmmalign_trim2/$file -log 23_hmmalign_trim2_log/$file \
+                    -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+}
+
+##########
+run_calc_trees() {
+  echo; echo "== Calculate trees =="
+  cd "${WORK_DIR}"
+
+  mkdir -p 24_trees
+
+  echo; echo "== Move small (<4) and very low-entropy families (sequences are all identical) to the side =="
+  mkdir -p 23_pan_aug_small_or_identical
+  min_seq_count=4
+  # Below, "count" is the number of unique sequences in the alignment.
+  for filepath in 23_hmmalign_trim2/*; do
+    file=`basename $filepath`
+    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' $filepath | sort -u | wc -l);
+    if [[ $count -lt $min_seq_count ]]; then
+      echo "Set aside small or low-entropy family $file";
+      mv $filepath 23_pan_aug_small_or_identical/
+    fi;
+  done
+
+  # By default, FastTreeMP uses all available threads.
+  # It is more efficient to run more jobs on one core each by setting an environment variable.
+  OMP_NUM_THREADS=1
+  export OMP_NUM_THREADS
+  for filepath in 23_hmmalign_trim2/*; do
+    file=`basename $filepath`
+    echo "  Calculating tree for $file"
+    fasttree -nt -quiet $filepath > 24_trees/$file &
+  done
+  wait
+}
+
+##########
+run_xfr_aligns_trees() {
+  echo; echo "Copy alignment and tree results into output directory"
+
+  conf_base=`basename $CONF .conf`
+  full_out_dir="${out_dir_base}_$conf_base"
+
+  cd "${submit_dir}"
+
+  if [ ! -d "$full_out_dir" ]; then
+      echo "creating output directory \"${full_out_dir}/\""
+      mkdir -p $full_out_dir
+  fi
+
+  for dir in 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
+    if [ -d ${WORK_DIR}/$dir ]; then
+      echo "Copying directory $dir to output directory"
+      cp -r ${WORK_DIR}/$dir ${full_out_dir}/
+    else
+      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
+    fi
+  done
+}
+
+##########
 run_calc_chr_pairs() {
   cd "${WORK_DIR}"
   echo "Generate a report of observed chromosome pairs"
@@ -832,7 +963,7 @@ run_calc_chr_pairs() {
 
 ##########
 run_summarize() {
-  echo; echo "Summarize: Move results into output directory, and report some summary statistics"
+  echo; echo "Summarize: Copy results into output directory, and report some summary statistics"
  
   # Determine if the sequence looks like nucleotide or like protein.
   someseq=$(head ${WORK_DIR}/07_pan_fasta_cds.fna | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
@@ -842,7 +973,6 @@ run_summarize() {
     1) ST="PEP" ;;
   esac
 
-  #param_string="${ST}.id${clust_iden}.cov${clust_cov}.cns${consen_iden}.ext${extra_iden}.I${mcl_inflation}"
   conf_base=`basename $CONF .conf`
   full_out_dir="${out_dir_base}_$conf_base"
   stats_file=${full_out_dir}/stats.$conf_base.txt
@@ -1194,6 +1324,7 @@ if ! type hash_into_fasta_id.pl &> /dev/null; then
 fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
+# Also, the steps align model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
 commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra pick_exemplars \
              filter_to_pctile order_and_name calc_chr_pairs summarize"
 
