@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-09-19"
+version="2023-10-06"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -762,18 +762,6 @@ run_align() {
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
   fi
 
-  echo; echo "== Move small (<4) and very low-entropy families (sequences are all identical) to the side =="
-  mkdir -p 19_pan_aug_small_or_identical
-  min_seq_count=4
-  for filepath in 19_pan_aug_leftover_merged_prot/*; do
-    file=`basename $filepath`
-    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' $filepath | sort -u | wc -l);  
-    if [[ $count -lt $min_seq_count ]]; then 
-      echo "Set aside small or low-entropy family $file";
-      mv $filepath 19_pan_aug_small_or_identical/
-    fi; 
-  done
-
   echo; echo "== Align the gene families =="
   mkdir -p 20_aligns
   for filepath in 19_pan_aug_leftover_merged_prot/*; do 
@@ -837,8 +825,21 @@ run_calc_trees() {
   cd "${WORK_DIR}"
   
   mkdir -p 24_trees
-  
-  # By default, FastTreeMP uses all machine cores, e.g. 64 on lathyrus. 
+
+  echo; echo "== Move small (<4) and very low-entropy families (sequences are all identical) to the side =="
+  mkdir -p 23_pan_aug_small_or_identical
+  min_seq_count=4
+  # Below, "count" is the number of unique sequences in the alignment.
+  for filepath in 23_hmmalign_trim2/*; do
+    file=`basename $filepath`
+    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' $filepath | sort -u | wc -l);
+    if [[ $count -lt $min_seq_count ]]; then
+      echo "Set aside small or low-entropy family $file";
+      mv $filepath 23_pan_aug_small_or_identical/
+    fi;
+  done
+
+  # By default, FastTreeMP uses all available threads.
   # It is more efficient to run more jobs on one core each by setting an environment variable.
   OMP_NUM_THREADS=1
   export OMP_NUM_THREADS
@@ -863,7 +864,6 @@ run_summarize() {
   max_annot_ct=$(cat 18_syn_pan_aug_extra.counts.tsv | 
                        awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
  
-  #param_string="${ST}.id${clust_iden}.cov${clust_cov}.cns${consen_iden}.ext${extra_iden}.I${mcl_inflation}"
   conf_base=`basename $CONF .conf`
   full_out_dir="${out_dir_base}_$conf_base"
   stats_file=${full_out_dir}/stats.$conf_base.txt
