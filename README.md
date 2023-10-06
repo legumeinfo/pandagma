@@ -17,8 +17,15 @@ The pangene workflow (pandagma-pan.sh) is essentially as follows:
 * Calculate consensus order of the pangenes, based on whole-chromosome multiple alignments of ordered panIDs
 * Calculate and report statistics
 
+Alignments and trees can also be calculated with these optional steps:
+* align
+* model_and_trim
+* calc_trees
+* xfr_aligns_trees
+
+
 The gene family workflow (pandagma-fam.sh) is similar to the pangene workflow, but operates on proteins rather than CDS,
-and uses an option "quotas" file to determine the initial expected gene duplication relationships between species,
+and uses an optional "quotas" file to determine the initial expected gene duplication relationships between species,
 considering known or suspected whole-genome duplication histories at the evolutionary depth of interest.
 * Add positional information to the gene IDs
 * Find gene homologies among pairs of annotation sets, using mmseqs2
@@ -60,7 +67,7 @@ For example, using conda:
 ~~~
   conda create -n pandagma
   conda install -n pandagma -c conda-forge -c bioconda perl-bioperl-core perl-parallel-forkmanager \
-    perl-list-moreutils dagchainer mcl mmseqs2 emboss famsa fasttree
+    perl-list-moreutils dagchainer mcl mmseqs2 emboss famsa fasttree hmmer
   conda activate pandagama
 ~~~
 
@@ -71,6 +78,8 @@ Usage:
        nohup ./pandagma-pan.sh -c CONFIG_FILE [options] &
    or
        nohup ./pandagma-pan.sh -c CONFIG_FILE -s SUBCOMMAND [options] &
+
+   ... or using a suitable job submission script if using a workload manager such as slurm.
 
   Required:
            -c (path to the config file)
