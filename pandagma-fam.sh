@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-10-06"
+version="2023-10-11"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -424,12 +424,28 @@ run_ks_calc() {
     mkdir -p $WORK_DIR/05_kaksout
   fi
   
+  for MATCHFILE in $WORK_DIR/03_mmseqs/*.m8; do
+    base=`basename $MATCHFILE .db`
+    echo "  Create berkeleydb file for $base"
+    cat $MATCHFILE | 
+      perl -lane '($qry, $sbj, @rest) = $F[0], $F[1], @F[2..14]);
+                   $qry =~ s/^\S+__(\S+)__\d+__\d+__[+-]$/$1/;
+                   $sbj =~ s/^\S+__(\S+)__\d+__\d+__[+-]$/$1/;
+                   print "$qry $sbj";
+                   print join(" ", @rest);
+                  ' | db_load -T -t hash $base.db &
+    if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
+  done
+  wait
+
   for DAGFILE in $WORK_DIR/04_dag/*aligncoords; do
     base=`basename $DAGFILE _matches.tsv.aligncoords`
-    echo "WORKING ON $base"
-    echo "calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout --align_method clustalw" 
-    calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -match_table 03_mmseqs/$base.m8  --align_method clustalw \
-      -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout 1> /dev/null 2> /dev/null &
+    echo "  Calculate Ks values for $base"
+
+    echo "calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -match_table 03_mmseqs/$base.db ";
+    echo "  -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout --align_method precalc";
+    calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -match_table 03_mmseqs/$base.db  --align_method precalc -dagin $DAGFILE \
+      -report_out $WORK_DIR/05_kaksout/$base.rptout 1> /dev/null 2> /dev/null &
       #-dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout 
     echo
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
