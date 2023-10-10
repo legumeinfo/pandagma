@@ -130,29 +130,35 @@ foreach my $seqobj ( $aln->each_seq ) {
   my $display_id = $seqobj->display_id();
   my $sequence = $seqobj->seq();
   my $desc = $seqobj->desc();
-  my $ct_dashes += () = $sequence =~ /-/g;
   my $seq_len = length($sequence);
-  my $ct_residues = $seq_len - $ct_dashes;
-  my $pct_aligned_residues = int(10000*$ct_residues/$seq_len)/100;
-  if ($verbose) { print "$min_pct_aligned\t$ct_residues\t$ct_dashes\t$pct_aligned_residues\n"; }
-  if ($pct_aligned_residues < $min_pct_aligned) {
-    if (defined $log) {
-      print $LOG_FH "For alignment $in_align, cutting $display_id: only " .
-        "$ct_residues/$seq_len = $pct_aligned_residues% of $min_pct_aligned% " .
-        "required after trimming to align depth $depth and percent depth $pct_depth\n";
-    }
-    else {
-      print "For alignment $in_align, cutting $display_id: only " .
-        "$ct_residues/$seq_len = $pct_aligned_residues% of $min_pct_aligned% " .  
-        "required after trimming to align depth $depth and percent depth $pct_depth\n";
-    }
+  if (!defined $seq_len || $seq_len == 0){
+    warn "Got a sequence with no length for alignment $in_alig, ID $display_id\n";
+    next;
   }
   else {
-    if (defined $desc) {
-      print $OUT_FH ">$display_id $desc\n$sequence\n";
+    my $ct_dashes += () = $sequence =~ /-/g;
+    my $ct_residues = $seq_len - $ct_dashes;
+    my $pct_aligned_residues = int(10000*$ct_residues/$seq_len)/100;
+    if ($verbose) { print "$min_pct_aligned\t$ct_residues\t$ct_dashes\t$pct_aligned_residues\n"; }
+    if ($pct_aligned_residues < $min_pct_aligned) {
+      if (defined $log) {
+        print $LOG_FH "For alignment $in_align, cutting $display_id: only " .
+          "$ct_residues/$seq_len = $pct_aligned_residues% of $min_pct_aligned% " .
+          "required after trimming to align depth $depth and percent depth $pct_depth\n";
+      }
+      else {
+        print "For alignment $in_align, cutting $display_id: only " .
+          "$ct_residues/$seq_len = $pct_aligned_residues% of $min_pct_aligned% " .  
+          "required after trimming to align depth $depth and percent depth $pct_depth\n";
+      }
     }
     else {
-      print $OUT_FH ">$display_id\n$sequence\n";
+      if (defined $desc) {
+        print $OUT_FH ">$display_id $desc\n$sequence\n";
+      }
+      else {
+        print $OUT_FH ">$display_id\n$sequence\n";
+      }
     }
   }
 }
@@ -160,13 +166,14 @@ foreach my $seqobj ( $aln->each_seq ) {
 __END__
 VERSIONS
 sc = Steven Cannon
-v01 picked up this script on-line somewhere, ca. 2010
-v02 17-07-17 sc Report usage message, and print to stdout
-v03 17-08-01 sc Rewrite. Add getopts. Add filtering by alignment depth.
-v04 17-08-20 sc Add warning about gap-only sequences after trimming to given align depth
-                Add min_pct_aligned to cut short sequences
-                Add option to remove short sequences. Write out to specified outfile.
-                Add log file.
-v05 18-02-23 sc Add option to filter by depth by percent of sequences
-v06 19-09-30 sc Also filter against Ns (in addition to dashes)
-v07 23-01-22 sc Remove columns that have no information (are all the same residue or base)
+picked up this script on-line somewhere, ca. 2010
+17-07-17 sc Report usage message, and print to stdout
+17-08-01 sc Rewrite. Add getopts. Add filtering by alignment depth.
+17-08-20 sc Add warning about gap-only sequences after trimming to given align depth
+            Add min_pct_aligned to cut short sequences
+            Add option to remove short sequences. Write out to specified outfile.
+            Add log file.
+18-02-23 sc Add option to filter by depth by percent of sequences
+19-09-30 sc Also filter against Ns (in addition to dashes)
+23-01-22 sc Remove columns that have no information (are all the same residue or base)
+23-10-09 sc Test if seq_len is defined and >0
