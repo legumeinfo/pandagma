@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-10-06"
+version="2023-10-21"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -29,7 +29,7 @@ Usage:
            -m (more information)
 
 Environment requirements: The following packages need to be available in your PATH:
-    mmseqs dagchainer mcl
+    mmseqs dagchainer mcl cons famsa hmmalign hmmbuild fasttree
 
 Also, please add the pandagma utility programs in the bin directory adjacent to pandagma-fam.sh, e.g.
     PATH=$PWD/bin:\$PATH
@@ -686,11 +686,11 @@ run_add_extra() {
     SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
     echo "SEQTYPE is: $SEQTYPE"
 
-    for path in "${protein_files_extra[@]}"; do
-      fasta_file=`basename ${path%.*}`
+    for filepath in "${protein_files_extra[@]}"; do
+      fasta_file=`basename ${filepath%.*}`
       echo "Extra: $fasta_file"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
-      mmseqs easy-search "${path}" 13_pan_aug_fasta.faa 13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
+      mmseqs easy-search "${filepath}" 13_pan_aug_fasta.faa 13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
                    $MMTEMP --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
 
       if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
