@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-10-21"
+version="2023-10-24"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -91,12 +91,12 @@ calc_ks_from_dag.pl script. A cutoff multiplier also needs to be provided. A val
 taking advantage of the fact that the median absolute deviation value for a standard normal distribution is 1.48. 
 
 Variables in pandagma config file (Set the config with the CONF environment variable)
-         clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
-          clust_cov - Minimum coverage for mmseqs clustering [0.60]
-        consen_iden - Minimum identity threshold for consensus generation [0.80]
-         extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [90]
-      mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
-        strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs (1)
+         clust_iden - Minimum identity threshold for mmseqs clustering [0.40]
+          clust_cov - Minimum coverage for mmseqs clustering [0.40]
+        consen_iden - Minimum identity threshold for consensus generation [0.30]
+         extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [0.30]
+      mcl_inflation - Inflation parameter, for Markov clustering [1.6]
+        strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs [1]
                         The alternative (0) is to use all homologous pairs that satisfy expected_quotas.tsv
       ks_low_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values less than this. [0.5]
        ks_hi_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values greater than this. [2.0]
