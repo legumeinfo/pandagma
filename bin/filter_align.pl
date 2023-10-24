@@ -132,7 +132,7 @@ foreach my $seqobj ( $aln->each_seq ) {
   my $desc = $seqobj->desc();
   my $seq_len = length($sequence);
   if (!defined $seq_len || $seq_len == 0){
-    warn "Got a sequence with no length for alignment $in_alig, ID $display_id\n";
+    warn "Got a sequence with no length for alignment $in_align, ID $display_id\n";
     next;
   }
   else {

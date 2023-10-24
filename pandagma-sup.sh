@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 #
 # Configuration and run script which, with other scripts in this package, generates gene-family 
-# orthogroups using the programs mmseqs, dagchainer, and mcl. 
+# orthogroups using the programs mmseqs, the hmmer package and others.
+# This workflow, pandagma-sup.sh, is to be used to add selected annotation sets to
+# a collection of HMMs calculated as part of a prior full run of pandagma-fam.sh.
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-10-18"
+version="2023-10-24"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -38,20 +40,11 @@ Subcommands (in order they are usually run):
                 all - All of the steps below, except for ks_filter, clean and ReallyClean
                         (Or equivalently: omit the -s flag; \"all\" is default).
              ingest - Prepare the assembly and annotation files for analysis.
-             mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies.
-             filter - Filter the synteny results for chromosome pairings, returning gene pairs.
-         dagchainer - Run DAGchainer to filter for syntenic blocks.
-            ks_calc - Calculation of Ks values on gene pairs from DAGchainer output.
-          ks_filter - Filtering based on provided ks_peaks.tsv file (assumes prior ks_calc step)
-                mcl - Derive clusters, with Markov clustering.
-           consense - Calculate a consensus sequences from each pan-gene set, 
-                      adding sequences missed in the first clustering round.
-       cluster_rest - Retrieve unclustered sequences and cluster those that can be.
-          add_extra - Add other gene model sets to the primary clusters. Useful for adding
-                      annotation sets that may be of lower or uncertain quality.
-              align - Align families.
-     model_and_trim - Build HMMs and trim the alignments, preparatory to calculating trees.
-         calc_trees - Calculate gene trees.
+         fam_consen - 
+      search_consen - 
+      place_matches -
+   realign_and_trim - 
+         calc_trees - 
           summarize - Move results into output directory, and report summary statistics.
 
   Run the following subcommands separately if you wish:
@@ -65,22 +58,14 @@ Subcommands (in order they are usually run):
 
 MORE_INFO="""
 Variables in pandagma config file (Set the config with the CONF environment variable)
-         clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
-          clust_cov - Minimum coverage for mmseqs clustering [0.60]
-        consen_iden - Minimum identity threshold for consensus generation [0.80]
-         extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [90]
-      mcl_inflation - Inflation parameter, for Markov clustering [default: 1.2]
-
+        consen_iden - Minimum identity threshold for consensus generation [0.30]
+          clust_cov - Minimum alignment coverage [0.40]
       consen_prefix - Prefix to use in orthogroup names
        out_dir_base - Base name for the output directory [default: './out']
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
                         \"([^.]+\.[^.]+)\..+\"
                           for two dot-separated fields, e.g. vigan.Shumari
                         or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
-    preferred_annot - String to match and select an annotation set, from a gene ID.
-                        This is used for picking representative IDs+sequence from an orthogroup, when
-                        this annotation is among those with the median length for the orthogroup.
-                        Otherwise, one is selected at random from those with median length.
            work_dir - Working directory, for temporary and intermediate files. 
 
 File sets (arrays):
@@ -163,47 +148,47 @@ run_ingest() {
   echo "Note that this is a simpler ingest than for the primary gene family or pangene construction,"
   echo "as the identifiers aren't modified with positional information."
   
-  mkdir -p 02_fasta_nuc_add 02_fasta_prot_add 
+  mkdir -p 02_fasta_nuc_sup 02_fasta_prot_sup 
 
     # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_pctl??_end.
     # This is captured from the gene IDs using the annot_str_regex set in the config file.
-    cat /dev/null > stats/tmp.gene_count_start_add
-    cat /dev/null > stats/tmp.fasta_seqstats_add
+    cat /dev/null > stats/tmp.gene_count_start_sup
+    cat /dev/null > stats/tmp.fasta_seqstats_sup
     start_time=`date`
     printf "Run started at: $start_time\n" > stats/tmp.timing
 
   export ANN_REX=${annot_str_regex}
 
   echo "  Pull the protein files locally"
-  cat /dev/null > 02_all_main_prot_add.faa # Collect all starting protein sequences, for later comparisons
+  cat /dev/null > 02_all_main_prot_sup.faa # Collect all starting protein sequences, for later comparisons
   for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
     file_base=$(basename ${protein_files[file_num]%.*})
-    zcat "${protein_files[file_num]}" >> 02_all_main_prot_add.faa # Collect original seqs for later comparisons
-    zcat "${protein_files[file_num]}" > 02_fasta_prot_add/$file_base
+    zcat "${protein_files[file_num]}" >> 02_all_main_prot_sup.faa # Collect original seqs for later comparisons
+    zcat "${protein_files[file_num]}" > 02_fasta_prot_sup/$file_base
     # calc basic sequence stats
     annot_name=$(basename 02_fasta_prot/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
-    printf "  Added with hmmsearch:  " >> stats/tmp.fasta_seqstats_add
-    cat_or_zcat "${protein_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats_add
+    printf "  Added with hmmsearch:  " >> stats/tmp.fasta_seqstats_sup
+    cat_or_zcat "${protein_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats_sup
   done
 
   echo "  Pull the CDS files locally"
-  cat /dev/null > 02_all_main_cds_add.fna # Collect all starting cds sequences, for later comparisons
+  cat /dev/null > 02_all_main_cds_sup.fna # Collect all starting cds sequences, for later comparisons
   for (( file_num = 0; file_num < ${#cds_files[@]} ; file_num++ )); do
     file_base=$(basename ${cds_files[file_num]%.*})
-    zcat "${cds_files[file_num]}" >> 02_all_main_cds_add.fna # Collect original seqs for later comparisons
-    zcat "${cds_files[file_num]}" > 02_fasta_nuc_add/$file_base
+    zcat "${cds_files[file_num]}" >> 02_all_main_cds_sup.fna # Collect original seqs for later comparisons
+    zcat "${cds_files[file_num]}" > 02_fasta_nuc_sup/$file_base
   done
 
   echo "  Count starting sequences, for later comparisons"
-  for file in 02_fasta_prot_add/*.$faa; do
+  for file in 02_fasta_prot_sup/*.$faa; do
     awk '$0~/UNDEFINED/ {ct++} 
       END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' $file
     cat $file | grep '>' | perl -pe 's/__/\t/g' | cut -f2 | # extracts the GeneName from combined genspchr__GeneName__start__end__orient
       perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex.+/$1/' |
-      grep -v UNDEFINED | sort | uniq -c | awk '{print $2 "\t" $1}' >> stats/tmp.gene_count_start_add
+      grep -v UNDEFINED | sort | uniq -c | awk '{print $2 "\t" $1}' >> stats/tmp.gene_count_start_sup
   done
 
-  sort -o stats/tmp.gene_count_start_add stats/tmp.gene_count_start_add
+  sort -o stats/tmp.gene_count_start_sup stats/tmp.gene_count_start_sup
 }
 
 run_fam_consen() {
@@ -256,7 +241,7 @@ run_search_consen() {
 
   SEQTYPE=1 # 3=nuc; 1=pep
 
-  for filepath in 02_fasta_prot_add/*; do 
+  for filepath in 02_fasta_prot_sup/*; do 
     base=`basename $filepath .$faa`
     echo "  Search $base.$faa against family hmmemit consensus sequences"
     mmseqs easy-search $filepath \
@@ -276,23 +261,23 @@ run_place_matches() {
   export FAM_PRE=${consen_prefix}
   cat 33_mmseqs_fam_match/*.m8 | top_line.awk |
     awk -v IDEN=${consen_iden} '$3>=IDEN {print $2 "\t" $1}' |
-    sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 34_add_vs_fam_consen.clust.tsv
+    sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 34_sup_vs_fam_consen.clust.tsv
 }
 
 ##########
 run_realign_and_trim() {
   echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
   cd "${WORK_DIR}"
-  mkdir -p 35_add_in_fams_prot
+  mkdir -p 35_sup_in_fams_prot
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
   get_fasta_from_family_file.pl "${protein_files[@]}" \
-    -fam 34_add_vs_fam_consen.clust.tsv -out 35_add_in_fams_prot
+    -fam 34_sup_vs_fam_consen.clust.tsv -out 35_sup_in_fams_prot
 
   echo; echo "== Realign to HMMs =="
   mkdir -p 42_hmmalign
-  for filepath in 35_add_in_fams_prot/*; do 
+  for filepath in 35_sup_in_fams_prot/*; do 
     file=`basename $filepath`;
-    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/$file 21_hmm/$file 35_add_in_fams_prot/$file &
+    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/$file 21_hmm/$file 35_sup_in_fams_prot/$file &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
