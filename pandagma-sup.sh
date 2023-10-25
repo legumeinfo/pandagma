@@ -7,7 +7,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-10-24"
+version="2023-10-25"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -41,8 +41,7 @@ Subcommands (in order they are usually run):
                         (Or equivalently: omit the -s flag; \"all\" is default).
              ingest - Prepare the assembly and annotation files for analysis.
          fam_consen - 
-      search_consen - 
-      place_matches -
+    search_families - 
    realign_and_trim - 
          calc_trees - 
           summarize - Move results into output directory, and report summary statistics.
@@ -224,42 +223,75 @@ run_fam_consen() {
   
     cat 30_hmmalign_cons/* > 30_consen.faa
 
+  elif [ $consen_method == "align_sample" ]; then
+
+    enough_seqs=10  # Don't search against more than this number of sequences in a family
+    echo "  Prepare to search against a random sampling of $enough_seqs sequences from each family"
+    echo "  (or as many as available if there are fewer than $enough_seqs in the family)."
+
+    cat /dev/null > 23_hmmalign_trim2.fam_ID.faa
+
+    for filepath in 23_hmmalign_trim2/*; do
+      base=`basename $filepath`
+      cat $filepath | fasta_to_table.awk | shuf |
+        awk -v FAM=$base -v MAX=$enough_seqs 'ct<MAX {print ">" FAM "__" $1; print $2; ct++}' >> 23_hmmalign_trim2.fam_ID.faa
+    done
+
   else 
     echo "Unrecognized consen_method: $consen_method."
-    echo "Expected values are \"hmmemit\" or \"cons\"."
+    echo "Expected values are \"hmmemit\", \"cons\", or \"align_sample\"."
     exit
   fi
 }
 
 ##########
-run_search_consen() {
+run_search_families() {
   cd "${WORK_DIR}"
-  echo "Search provided annotation sets (protein) against family consensus sequences (from hmmemit)"
+  echo "Search provided annotation sets (protein) against family consensus sequences, using method $consen_method"
 
   if [ -d 33_mmseqs_fam_match ]; then rm -rf 33_mmseqs_fam_match; fi
   mkdir -p 33_mmseqs_fam_match 33_mmseqs_tmp
 
   SEQTYPE=1 # 3=nuc; 1=pep
 
-  for filepath in 02_fasta_prot_sup/*; do 
-    base=`basename $filepath .$faa`
-    echo "  Search $base.$faa against family hmmemit consensus sequences"
-    mmseqs easy-search $filepath \
-                       30_consen.faa \
-                       33_mmseqs_fam_match/$base.x.consen.m8 \
-                       33_mmseqs_tmp \
-                       --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null
-  done
-}
+  if [ $consen_method == "hmmemit" ] || [ $consen_method == "cons" ]; then
+    for filepath in 02_fasta_prot_sup/*; do 
+      base=`basename $filepath .$faa`
+      echo "  Search $base.$faa against family hmmemit consensus sequences"
+      mmseqs easy-search $filepath \
+                         30_consen.faa \
+                         33_mmseqs_fam_match/$base.x.consen.m8 \
+                         33_mmseqs_tmp \
+                         --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null
+    done
+    for filepath in 33_mmseqs_fam_match/*; do
+      base=`basename $filepath`
+      cat $filepath | top_line.awk > 33_mmseqs_fam_match/$base.top
+    done
+  elif [ $consen_method == "align_sample" ]; then
+    for filepath in 02_fasta_prot_sup/*; do 
+      base=`basename $filepath .$faa`
+      echo "  Search $base.$faa against a sampling of sequences in family alignments in 23_hmmalign_trim2 to determine best family match"
+      mmseqs easy-search $filepath \
+                         23_hmmalign_trim2.fam_ID.faa \
+                         33_mmseqs_fam_match/$base.x.23_hmmalign_trim2.fam_ID.m8 \
+                         33_mmseqs_tmp \
+                         --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null
+    done
+    for filepath in 33_mmseqs_fam_match/*; do
+      base=`basename $filepath`
+      cat $filepath | perl -pe 's/^(\S+)\t([^_]+)__\S+/$1\t$2/' | 
+        sort -k1,1 -k12nr,12nr | top_line.awk > 33_mmseqs_fam_match/$base.top
+    done
+  else
+    echo "Unrecognized consen_method: $consen_method."
+    echo "Expected values are \"hmmemit\" or \"cons\"."
+    exit
+  fi
 
-##########
-run_place_matches() {
-  echo; echo "== Place sequences into families based on top mmsearch hits."
-  echo "  Use the consen_iden threshold of $consen_iden."
+  echo "== Place sequences into families based on top mmsearch hits, using the consen_iden threshold of $consen_iden."
 
-  cd "${WORK_DIR}"
-  export FAM_PRE=${consen_prefix}
-  cat 33_mmseqs_fam_match/*.m8 | top_line.awk |
+  cat 33_mmseqs_fam_match/*.m8.top | top_line.awk |
     awk -v IDEN=${consen_iden} '$3>=IDEN {print $2 "\t" $1}' |
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 34_sup_vs_fam_consen.clust.tsv
 }
@@ -612,7 +644,7 @@ if ! type hash_into_fasta_id.pl &> /dev/null; then
 fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
-commandlist="ingest fam_consen search_consen place_matches realign_and_trim calc_trees summarize"
+commandlist="ingest fam_consen search_families place_matches realign_and_trim calc_trees summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do
