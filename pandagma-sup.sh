@@ -264,10 +264,15 @@ run_search_families() {
                          33_mmseqs_tmp \
                          --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null
     done
+    wait
+
     for filepath in 33_mmseqs_fam_match/*; do
       base=`basename $filepath`
-      cat $filepath | top_line.awk > 33_mmseqs_fam_match/$base.top
+      cat $filepath | top_line.awk > 33_mmseqs_fam_match/$base.top &
+      if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
     done
+    wait
+
   elif [ $consen_method == "align_sample" ]; then
     for filepath in 02_fasta_prot_sup/*; do 
       base=`basename $filepath .$faa`
@@ -278,11 +283,15 @@ run_search_families() {
                          33_mmseqs_tmp \
                          --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null
     done
+
     for filepath in 33_mmseqs_fam_match/*; do
       base=`basename $filepath`
       cat $filepath | perl -pe 's/^(\S+)\t([^_]+)__\S+/$1\t$2/' | 
-        sort -k1,1 -k12nr,12nr | top_line.awk > 33_mmseqs_fam_match/$base.top
+        sort -k1,1 -k12nr,12nr | top_line.awk > 33_mmseqs_fam_match/$base.top &
+      if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
     done
+    wait
+
   else
     echo "Unrecognized consen_method: $consen_method."
     echo "Expected values are \"hmmemit\" or \"cons\"."
