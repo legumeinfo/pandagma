@@ -21,6 +21,7 @@ pan_clust=$2  # Glycine.pan4.RK4P.clust.tsv.gz
 
 # For db_load, print the key-value pairs on alternate lines (key odd, value even)
 gzcat $pan_hash |
+  awk '{print $1 "\t" tolower($2)}' |
   perl -pe 's/(\S+)\t(\S+)\.\D*\d+/$2\n$1/' |
   db_load -T -t hash gn_to_pan.db &
 

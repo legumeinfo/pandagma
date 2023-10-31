@@ -108,6 +108,9 @@ elsif ($hash_method =~ /tsv/){
 }
 else { die "Flag -hash_method must be either BerkeleyDB or tsv.\n" }
 
+# For case-insensitive matching, lowercase to_annot
+my $to_annot_lc = lc($to_annot);
+
 # Read gene list from stdin and look corresponding genes
 my %gene_set_hsh;
 while (<>){
@@ -130,14 +133,20 @@ while (<>){
   # Trim splice variant suffix if present
   $from_gn =~ s/\.\D*\d+$//;
 
-  my $pan = $gn_to_pan_hsh{$from_gn};
-  my @to_gn_ary = split(/,/, $pan_to_gn_hsh{$pan});
+  # For case-insensitive matching, lowercase all the IDs
+  my $from_gn_lc = lc($from_gn);
 
-  if ($to_annot =~ /all/i){
+  my $pan = $gn_to_pan_hsh{$from_gn_lc};
+
+  # Put the pangene vector into an array
+  my @to_gn_ary = split(/,/, $pan_to_gn_hsh{$pan});
+  my @to_gn_ary_lc = map{ lc } @to_gn_ary;
+
+  if ($to_annot_lc =~ /all/i){
     say "$from_gn\t$pan\t", join ("\t", @to_gn_ary);
   }
-  elsif ($to_annot =~ /^[^.]+\.[^.]+\.[^.]+\.[^.]+/){ # TO DO: Genralize. Assumes LIS DataStore prefix form.
-    my @to_matches = grep(/$to_annot/g, @to_gn_ary);
+  elsif ($to_annot_lc =~ /^[^.]+\.[^.]+\.[^.]+\.[^.]+/){ # TO DO: Genralize. Assumes LIS DataStore prefix form.
+    my @to_matches = grep(/$to_annot_lc/g, @to_gn_ary_lc);
     if (scalar(@to_matches) == 0){ @to_matches = "NONE" }
     $gene_set_hsh{$from_gn} = join("\t", $pan, @to_matches);
   }
