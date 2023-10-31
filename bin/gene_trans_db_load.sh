@@ -20,12 +20,12 @@ pan_hash=$1   # Glycine.pan4.RK4P.hsh.tsv.gz
 pan_clust=$2  # Glycine.pan4.RK4P.clust.tsv.gz
 
 # For db_load, print the key-value pairs on alternate lines (key odd, value even)
-gzcat $pan_hash |
+zcat < $pan_hash |
   awk '{print $1 "\t" tolower($2)}' |
   perl -pe 's/(\S+)\t(\S+)\.\D*\d+/$2\n$1/' |
   db_load -T -t hash gn_to_pan.db &
 
-gzcat $pan_clust |
+zcat < $pan_clust |
   perl -lane 'print $F[0];
               @genes = ();
               for $gene (@F[1..scalar(@F)-1]){$gene =~ s/(\S+)\.\D*\d$/$1/; push(@genes, $gene)};
