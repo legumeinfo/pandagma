@@ -28,7 +28,7 @@ zcat < $pan_hash |
 zcat < $pan_clust |
   perl -lane 'print $F[0];
               @genes = ();
-              for $gene (@F[1..scalar(@F)-1]){$gene =~ s/(\S+)\.\D*\d$/$1/; push(@genes, $gene)};
+              for $gene (@F[1..scalar(@F)-1]){$gene =~ s/(\S+)\.\D*\d+$/$1/; push(@genes, $gene)};
               print join (",", @genes)' |
     db_load -T -t hash pan_to_gn.db &
 
