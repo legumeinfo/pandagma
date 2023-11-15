@@ -2,12 +2,12 @@
 #
 # Configuration and run script which, with other scripts in this package, generates gene-family 
 # orthogroups using the programs mmseqs, the hmmer package and others.
-# This workflow, pandagma-sup.sh, is to be used to add selected annotation sets to
+# This workflow, pandagma-fsup.sh, is to be used to add selected annotation sets to
 # a collection of HMMs calculated as part of a prior full run of pandagma-fam.sh.
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-10-25"
+version="2023-11-14"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -25,7 +25,6 @@ Usage:
            -w (working directory, for temporary and intermediate files. 
                 Must be specified in config file if not specified here.)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
-           -r (retain. Don't do subcommand \"clean\" after running \"all\".)
            -v (version)
            -h (help)
            -m (more information)
@@ -37,7 +36,7 @@ Also, please add the pandagma utility programs in the bin directory adjacent to 
     PATH=$PWD/bin:\$PATH
 
 Subcommands (in order they are usually run):
-                all - All of the steps below, except for ks_filter, clean and ReallyClean
+                all - All of the steps below
                         (Or equivalently: omit the -s flag; \"all\" is default).
              ingest - Prepare the assembly and annotation files for analysis.
          fam_consen - 
@@ -46,13 +45,6 @@ Subcommands (in order they are usually run):
          calc_trees - 
           summarize - Move results into output directory, and report summary statistics.
 
-  Run the following subcommands separately if you wish:
-              clean - Clean (delete) files in the working directory that are not needed 
-                        for later addition of data using add_extra and subsequent run commands.
-                        By default, \"clean\" is run as part of \"all\" unless the -r flag is set.
-        ReallyClean - Do complete clean-up of files in the working directory.
-                        Use this if you want to start over, OR if you are satisified with the results and
-                        don't anticipate adding other annotation sets to this pan-gene set.
 """
 
 MORE_INFO="""
@@ -380,133 +372,133 @@ run_calc_trees() {
   wait
 }
 
-##########
-run_summarize() {
-  echo; echo "Summarize: Move results into output directory, and report some summary statistics"
-
-  WORK_DIR=$work_dir
-  cd "${WORK_DIR}"
-  echo "  work_dir: $PWD"
-
-  echo "  Calculate matrix of gene counts per orthogroup and annotation set"
-  calc_pan_stats.pl -annot_regex $ANN_REX -pan 18_syn_pan_aug_extra.clust.tsv -out 18_syn_pan_aug_extra.counts.tsv
-  max_annot_ct=$(cat 18_syn_pan_aug_extra.counts.tsv | 
-                       awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
- 
-  conf_base=`basename $CONF .conf`
-  full_out_dir="${out_dir_base}_$conf_base"
-  stats_file=${full_out_dir}/stats.$conf_base.txt
-  export ANN_REX=${annot_str_regex}
-
-  cd "${submit_dir}"
-
-  if [ ! -d "$full_out_dir" ]; then
-      echo "creating output directory \"${full_out_dir}/\""
-      mkdir -p $full_out_dir
-  fi
-
-  for file in 06_syn_pan.clust.tsv 06_syn_pan_ge3.hsh.tsv \
-              12_syn_pan_aug.clust.tsv 12_syn_pan_aug.hsh.tsv \
-              18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv 18_syn_pan_aug_extra.counts.tsv; do
-    if [ -f ${WORK_DIR}/$file ]; then
-      cp ${WORK_DIR}/$file ${full_out_dir}/
-    else 
-      echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
-    fi
-  done
-
-  for dir in 19_pan_aug_leftover_merged_prot 21_hmm 42_hmmalign 23_hmmalign_trim2 24_trees; do
-    if [ -d ${WORK_DIR}/$dir ]; then
-      echo "Copying directory $dir to output directory"
-      cp -r ${WORK_DIR}/$dir ${full_out_dir}/
-    else 
-      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
-    fi
-  done
-
-  printf "Run of program $scriptname, version $version\n" > ${stats_file}
-
-  end_time=`date`
-  cat ${WORK_DIR}/stats/tmp.timing >> ${stats_file}
-  printf "Run ended at:   $end_time\n\n" >> ${stats_file}
-
-  echo "  Report parameters from config file"
-  printf "Parameter  \tvalue\n" >> ${stats_file}
-  for key in ${pandagma_conf_params}; do
-    printf '%-15s\t%s\n' ${key} "${!key}" >> ${stats_file}
-  done
-
-  printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
-
-  echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
-
-  echo "  Print sequence composition statistics for each annotation set"
-  printf "\n== Sequence stats for protein files\n" >> ${stats_file}
-  printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
-  if [ -f ${WORK_DIR}/stats/tmp.fasta_seqstats ]; then
-    cat ${WORK_DIR}/stats/tmp.fasta_seqstats >> ${stats_file}
-
-  printf "\n  Avg:   " >> ${stats_file} 
-    cat ${WORK_DIR}/stats/tmp.fasta_seqstats | transpose.pl |
-      perl -ane 'BEGIN{use List::Util qw(sum)}; 
-                 if ($F[0]=~/^\d+/){
-                   $sum=sum @F; $ct=scalar(@F); $avg=$sum/$ct;
-                   printf " %4d ", $avg;
-                 END{print "   all_annot_sets\n"}
-                 }' >> ${stats_file}
-  fi
-
-  echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
-  #   tmp.gene_count_start was generated during run_ingest
-  printf "\n== Proportion of initial genes retained in the \"aug_extra\" set:\n" \
-    >> ${stats_file}
-
-  cut -f2 ${WORK_DIR}/18_syn_pan_aug_extra.hsh.tsv | 
-    perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' |
-    sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_all_end
-
-  paste ${WORK_DIR}/stats/tmp.gene_count_start \
-        ${WORK_DIR}/stats/tmp.gene_count_all_end |
-    awk 'BEGIN{print "  Start\tEnd\tPct_kept\tAnnotation_name"} 
-        { printf "  %i\t%i\t%2.1f\t%s\n", $2, $4, 100*($4/$2), $1 }'  >> ${stats_file}
-
-  echo "  Print counts per accession"
-  if [ -f ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv ]; then
-    printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" \
-      >> ${stats_file}
-    printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n" \
-      >> ${stats_file}
-    cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv | transpose.pl | 
-      perl -lane 'next if ($.<=3); 
-        $ct=0; $sum=0; $nulls=0; $OGs=0;
-        for $i (@F[1..(@F-1)]){
-          $OGs++;
-          if ($i>0){$ct++; $sum+=$i}
-          if ($i==0){$nulls++}
-        }; 
-        printf("  %d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
-        >> ${stats_file}
-  fi
-
-  echo "  Print histograms"
-  if [ -f ${full_out_dir}/06_syn_pan.clust.tsv ]; then
-    printf "\nCounts of initial clusters by cluster size, file 06_syn_pan.clust.tsv:\n" >> ${stats_file}
-    awk '{print NF-1}' ${full_out_dir}/06_syn_pan.clust.tsv |
-      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
-  fi
-
-  if [ -f ${full_out_dir}/12_syn_pan_aug.clust.tsv ]; then
-    printf "\nCounts of augmented clusters by cluster size, file 12_syn_pan_aug.clust.tsv:\n" >> ${stats_file}
-    awk '{print NF-1}' ${full_out_dir}/12_syn_pan_aug.clust.tsv |
-      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
-  fi
-
-  if [ -f ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv ]; then
-    printf "\nCounts of augmented-extra clusters by cluster size, file 18_syn_pan_aug_extra.clust.tsv:\n" >> ${stats_file}
-    awk '{print NF-1}' ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv |
-      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
-  fi
-}
+###########
+#run_summarize() {
+#  echo; echo "Summarize: Move results into output directory, and report some summary statistics"
+#
+#  WORK_DIR=$work_dir
+#  cd "${WORK_DIR}"
+#  echo "  work_dir: $PWD"
+#
+#  echo "  Calculate matrix of gene counts per orthogroup and annotation set"
+#  calc_pan_stats.pl -annot_regex $ANN_REX -pan 18_syn_pan_aug_extra.clust.tsv -out 18_syn_pan_aug_extra.counts.tsv
+#  max_annot_ct=$(cat 18_syn_pan_aug_extra.counts.tsv | 
+#                       awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
+# 
+#  conf_base=`basename $CONF .conf`
+#  full_out_dir="${out_dir_base}_$conf_base"
+#  stats_file=${full_out_dir}/stats.$conf_base.txt
+#  export ANN_REX=${annot_str_regex}
+#
+#  cd "${submit_dir}"
+#
+#  if [ ! -d "$full_out_dir" ]; then
+#      echo "creating output directory \"${full_out_dir}/\""
+#      mkdir -p $full_out_dir
+#  fi
+#
+#  for file in 06_syn_pan.clust.tsv 06_syn_pan_ge3.hsh.tsv \
+#              12_syn_pan_aug.clust.tsv 12_syn_pan_aug.hsh.tsv \
+#              18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv 18_syn_pan_aug_extra.counts.tsv; do
+#    if [ -f ${WORK_DIR}/$file ]; then
+#      cp ${WORK_DIR}/$file ${full_out_dir}/
+#    else 
+#      echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
+#    fi
+#  done
+#
+#  for dir in 19_pan_aug_leftover_merged_prot 21_hmm 42_hmmalign 23_hmmalign_trim2 24_trees; do
+#    if [ -d ${WORK_DIR}/$dir ]; then
+#      echo "Copying directory $dir to output directory"
+#      cp -r ${WORK_DIR}/$dir ${full_out_dir}/
+#    else 
+#      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
+#    fi
+#  done
+#
+#  printf "Run of program $scriptname, version $version\n" > ${stats_file}
+#
+#  end_time=`date`
+#  cat ${WORK_DIR}/stats/tmp.timing >> ${stats_file}
+#  printf "Run ended at:   $end_time\n\n" >> ${stats_file}
+#
+#  echo "  Report parameters from config file"
+#  printf "Parameter  \tvalue\n" >> ${stats_file}
+#  for key in ${pandagma_conf_params}; do
+#    printf '%-15s\t%s\n' ${key} "${!key}" >> ${stats_file}
+#  done
+#
+#  printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
+#
+#  echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
+#
+#  echo "  Print sequence composition statistics for each annotation set"
+#  printf "\n== Sequence stats for protein files\n" >> ${stats_file}
+#  printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
+#  if [ -f ${WORK_DIR}/stats/tmp.fasta_seqstats ]; then
+#    cat ${WORK_DIR}/stats/tmp.fasta_seqstats >> ${stats_file}
+#
+#  printf "\n  Avg:   " >> ${stats_file} 
+#    cat ${WORK_DIR}/stats/tmp.fasta_seqstats | transpose.pl |
+#      perl -ane 'BEGIN{use List::Util qw(sum)}; 
+#                 if ($F[0]=~/^\d+/){
+#                   $sum=sum @F; $ct=scalar(@F); $avg=$sum/$ct;
+#                   printf " %4d ", $avg;
+#                 END{print "   all_annot_sets\n"}
+#                 }' >> ${stats_file}
+#  fi
+#
+#  echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
+#  #   tmp.gene_count_start was generated during run_ingest
+#  printf "\n== Proportion of initial genes retained in the \"aug_extra\" set:\n" \
+#    >> ${stats_file}
+#
+#  cut -f2 ${WORK_DIR}/18_syn_pan_aug_extra.hsh.tsv | 
+#    perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' |
+#    sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_all_end
+#
+#  paste ${WORK_DIR}/stats/tmp.gene_count_start \
+#        ${WORK_DIR}/stats/tmp.gene_count_all_end |
+#    awk 'BEGIN{print "  Start\tEnd\tPct_kept\tAnnotation_name"} 
+#        { printf "  %i\t%i\t%2.1f\t%s\n", $2, $4, 100*($4/$2), $1 }'  >> ${stats_file}
+#
+#  echo "  Print counts per accession"
+#  if [ -f ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv ]; then
+#    printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" \
+#      >> ${stats_file}
+#    printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n" \
+#      >> ${stats_file}
+#    cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv | transpose.pl | 
+#      perl -lane 'next if ($.<=3); 
+#        $ct=0; $sum=0; $nulls=0; $OGs=0;
+#        for $i (@F[1..(@F-1)]){
+#          $OGs++;
+#          if ($i>0){$ct++; $sum+=$i}
+#          if ($i==0){$nulls++}
+#        }; 
+#        printf("  %d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
+#        >> ${stats_file}
+#  fi
+#
+#  echo "  Print histograms"
+#  if [ -f ${full_out_dir}/06_syn_pan.clust.tsv ]; then
+#    printf "\nCounts of initial clusters by cluster size, file 06_syn_pan.clust.tsv:\n" >> ${stats_file}
+#    awk '{print NF-1}' ${full_out_dir}/06_syn_pan.clust.tsv |
+#      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
+#  fi
+#
+#  if [ -f ${full_out_dir}/12_syn_pan_aug.clust.tsv ]; then
+#    printf "\nCounts of augmented clusters by cluster size, file 12_syn_pan_aug.clust.tsv:\n" >> ${stats_file}
+#    awk '{print NF-1}' ${full_out_dir}/12_syn_pan_aug.clust.tsv |
+#      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
+#  fi
+#
+#  if [ -f ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv ]; then
+#    printf "\nCounts of augmented-extra clusters by cluster size, file 18_syn_pan_aug_extra.clust.tsv:\n" >> ${stats_file}
+#    awk '{print NF-1}' ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv |
+#      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
+#  fi
+#}
 
 ##########
 run_clean() {
@@ -558,7 +550,6 @@ NPROC=$(command -v nproc > /dev/null && nproc || getconf _NPROCESSORS_ONLN)
 CONFIG="null"
 optarg_work_dir="null"
 step="all"
-retain="no"
 
 export NPROC=${NPROC:-1}
 
@@ -567,14 +558,13 @@ pandagma_conf_params='consen_iden out_dir_base pctl_low pctl_med pctl_hi consen_
 ##########
 # Command-line interpreter
 
-while getopts "c:w:s:n:o:rvhm" opt
+while getopts "c:w:s:n:o:vhm" opt
 do
   case $opt in
     c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
     w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
     s) step=$OPTARG; echo "step(s): $step" ;;
     n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
-    r) retain="yes" ;;
     v) version ;;
     h) printf >&2 "$HELP_DOC\n" && exit 0 ;;
     m) printf >&2 "$HELP_DOC\n$MORE_INFO\n" && exit 0 ;;
@@ -623,12 +613,6 @@ else
   exit 1;
 fi
 
-if [[ $step == "clean" ]] || [[ $step == "ReallyClean" ]] ; then
-  run_$step
-  echo "Command \"$step\" was run for cleanup in the work directory: $WORK_DIR"
-  exit 0;
-fi
-
 # Get paths to the fasta and annotation files
 canonicalize_paths
 
@@ -652,7 +636,7 @@ if ! type hash_into_fasta_id.pl &> /dev/null; then
   exit 1; 
 fi
 
-# Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
+# Run all specified steps 
 commandlist="ingest fam_consen search_families place_matches realign_and_trim calc_trees summarize"
 
 if [[ $step =~ "all" ]]; then
@@ -665,12 +649,4 @@ else
   run_${step};
 fi
 
-if [[ $step =~ "all" ]] && [[ $retain == "yes" ]]; then
-  echo "Flag -r (retain) was set, so skipping clean-up of the work directory."
-  echo "If you wish to do a cleanupt separately, you can call "
-  echo "  .pandagma-fam.sh -c $CONF -s clean";
-elif [[ $step =~ "all" ]] && [[ $retain == "no" ]]; then
-  echo "Calling the medium cleanup function \"run_clean\" ..."
-  run_clean  
-fi
 
