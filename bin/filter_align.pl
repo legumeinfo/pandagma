@@ -129,6 +129,10 @@ foreach my $seqobj ( $aln->each_seq ) {
   $seqobj->seq($seq_strs[$i++]);
   my $display_id = $seqobj->display_id();
   my $sequence = $seqobj->seq();
+  if (!defined($sequence)){
+    warn "WARNING -- In $in_align, No sequence found for $display_id; skipping\n";
+    next;
+  }
   my $desc = $seqobj->desc();
   my $seq_len = length($sequence);
   if (!defined $seq_len || $seq_len == 0){
@@ -177,3 +181,4 @@ picked up this script on-line somewhere, ca. 2010
 19-09-30 sc Also filter against Ns (in addition to dashes)
 23-01-22 sc Remove columns that have no information (are all the same residue or base)
 23-10-09 sc Test if seq_len is defined and >0
+23-11-15 sc Handle case of missing sequence
