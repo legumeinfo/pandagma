@@ -71,6 +71,8 @@ curl -O $url_base/soja/annotations/F_IGA1003.gnm1.ann1.G61B/glyso.F_IGA1003.gnm1
 curl -O $url_base/soja/annotations/PI483463.gnm1.ann1.3Q3Q/glyso.PI483463.gnm1.ann1.3Q3Q.cds_primary.fna.gz
 curl -O $url_base/stenophita/annotations/G1974.gnm1.ann1.F257/glyst.G1974.gnm1.ann1.F257.cds.fna.gz
 curl -O $url_base/syndetika/annotations/G1300.gnm1.ann1.RRK6/glysy.G1300.gnm1.ann1.RRK6.cds.fna.gz
+curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/Lee.gnm3.ann1.ZYY3/glyma.Lee.gnm3.ann1.ZYY3.cds.fna.gz
+curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/Wm82.gnm5.ann1.J7HW/glyma.Wm82.gnm5.ann1.J7HW.cds.fna.gz
 
 # BED
 curl -O $url_base/max/annotations/58-161.gnm1.ann1.HJ1K/glyma.58-161.gnm1.ann1.HJ1K.gene_models_main.bed.gz
@@ -127,6 +129,8 @@ curl -O $url_base/soja/annotations/F_IGA1003.gnm1.ann1.G61B/glyso.F_IGA1003.gnm1
 curl -O $url_base/soja/annotations/PI483463.gnm1.ann1.3Q3Q/glyso.PI483463.gnm1.ann1.3Q3Q.gene_models_main.bed.gz
 curl -O $url_base/stenophita/annotations/G1974.gnm1.ann1.F257/glyst.G1974.gnm1.ann1.F257.gene_models_main.bed.gz
 curl -O $url_base/syndetika/annotations/G1300.gnm1.ann1.RRK6/glysy.G1300.gnm1.ann1.RRK6.gene_models_main.bed.gz
+curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/Lee.gnm3.ann1.ZYY3/glyma.Lee.gnm3.ann1.ZYY3.cds.bed.gz
+curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/Wm82.gnm5.ann1.J7HW/glyma.Wm82.gnm5.ann1.J7HW.cds.bed.gz
 
 # Protein
 curl -O $url_base/max/annotations/58-161.gnm1.ann1.HJ1K/glyma.58-161.gnm1.ann1.HJ1K.protein_primary.faa.gz
@@ -183,6 +187,8 @@ curl -O $url_base/soja/annotations/F_IGA1003.gnm1.ann1.G61B/glyso.F_IGA1003.gnm1
 curl -O $url_base/soja/annotations/PI483463.gnm1.ann1.3Q3Q/glyso.PI483463.gnm1.ann1.3Q3Q.protein_primary.faa.gz
 curl -O $url_base/stenophita/annotations/G1974.gnm1.ann1.F257/glyst.G1974.gnm1.ann1.F257.protein.faa.gz
 curl -O $url_base/syndetika/annotations/G1300.gnm1.ann1.RRK6/glysy.G1300.gnm1.ann1.RRK6.protein.faa.gz
+curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/Lee.gnm3.ann1.ZYY3/glyma.Lee.gnm3.ann1.ZYY3.protein.faa.gz
+curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/Wm82.gnm5.ann1.J7HW/glyma.Wm82.gnm5.ann1.J7HW.protein.faa.gz
 
 ## The glyma.Zh13.gnm2.ann1.FJ3G gene models are too big by half: N50 2376 vs. expected 1572 (Wm82.gnm4.ann1)
 ## Exclude glyma.Wm82.gnm2.ann2.BG1Q because the conversion between GFF and CDS was flawed as of mid-2022. Maybe add later.
