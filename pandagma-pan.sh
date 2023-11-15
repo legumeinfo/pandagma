@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-10-21"
+version="2023-11-13"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -110,6 +110,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
        order_method - Method to determine consensus panID order. reference or alignment [default reference]
+         align_prot - If \"true\", calculate protein alignments [false]
            work_dir - Working directory, for temporary and intermediate files. 
 """
 
@@ -579,24 +580,33 @@ run_add_extra() {
     perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 18_syn_pan_aug_extra.clust.tsv \
       > 18_syn_pan_aug_extra.hsh.tsv
 
-    echo "  Merge fasta sets (in parallel)"
-    if [ -d batches ]; then rm -rf batches; fi
-    mkdir -p batches
-    ls 13_pan_aug_fasta | split - batches/
+    echo "  For each pan-gene set, retrieve sequences into a multifasta file."
+    echo "    Fasta file:" "${protein_files[@]}"
     if [ -d 19_pan_aug_leftover_merged_cds ]; then rm -rf 19_pan_aug_leftover_merged_cds; fi
     mkdir -p 19_pan_aug_leftover_merged_cds
-    for batch in batches/*; do
-      cat $batch | while read -r panID; do
-        #echo "$batch: $panID"
-        if [[ -f "16_pan_leftovers_extra/$panID" ]]; then
-          cat 13_pan_aug_fasta/$panID 16_pan_leftovers_extra/$panID > 19_pan_aug_leftover_merged_cds/$panID
-        else
-          cp 13_pan_aug_fasta/$panID 19_pan_aug_leftover_merged_cds/
-        fi
-      done & # Do the merging in parallel because of the number of flies
-      if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-    done
-    wait 
+    get_fasta_from_family_file.pl "${protein_files[@]}" \
+      -fam -18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_cds
+
+# Remove cumbersome batch-merge process, which is handled better with augment_cluster_sets.awk
+# 19_pan_aug_leftover_merged_cds 
+#    echo "  Merge fasta sets (in parallel)"
+#    if [ -d batches ]; then rm -rf batches; fi
+#    mkdir -p batches
+#    ls 13_pan_aug_fasta | split - batches/
+#    if [ -d 19_pan_aug_leftover_merged_cds ]; then rm -rf 19_pan_aug_leftover_merged_cds; fi
+#    mkdir -p 19_pan_aug_leftover_merged_cds
+#    for batch in batches/*; do
+#      cat $batch | while read -r panID; do
+#        #echo "$batch: $panID"
+#        if [[ -f "16_pan_leftovers_extra/$panID" ]]; then
+#          cat 13_pan_aug_fasta/$panID 16_pan_leftovers_extra/$panID > 19_pan_aug_leftover_merged_cds/$panID
+#        else
+#          cp 13_pan_aug_fasta/$panID 19_pan_aug_leftover_merged_cds/
+#        fi
+#      done & # Do the merging in parallel because of the number of flies
+#      if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+#    done
+#    wait 
   
     echo "  Merge files in 19_pan_aug_leftover_merged_cds, prefixing IDs with panID__"
     merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_cds/* > 19_pan_aug_leftover_merged_cds.fna
@@ -614,13 +624,13 @@ run_pick_exemplars() {
   echo; echo "== Pick representative (exemplar) sequence for each pan-gene set (protein and CDS) =="
   cd "${WORK_DIR}"
 
-  echo "  From 19_pan_aug_leftover_merged_cds.fna, derive cluster-format file; used to extract corresponding protein files"
-  cat 19_pan_aug_leftover_merged_cds.fna | awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/^(\w+\d+)__/$1\t/' | 
-    awk -v ORS="" '$1 == prev {print "\t" $2; count++} 
-                   $1 != prev && NR==1 { print $1 "\t" $2; prev=$1 } 
-                   $1 != prev && NR>1 { print "\n" $1 "\t" $2; prev=$1 }' > 19_pan_aug_leftover_merged.clust.tsv
+  #echo "  From 19_pan_aug_leftover_merged_cds.fna, derive cluster-format file; used to extract corresponding protein files"
+  #cat 19_pan_aug_leftover_merged_cds.fna | awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/^(\w+\d+)__/$1\t/' | 
+  #  awk -v ORS="" '$1 == prev {print "\t" $2; count++} 
+  #                 $1 != prev && NR==1 { print $1 "\t" $2; prev=$1 } 
+  #                 $1 != prev && NR>1 { print "\n" $1 "\t" $2; prev=$1 }' > 19_pan_aug_leftover_merged.clust.tsv
 
-  echo "  Get all protein sequences corresponding with 19_pan_aug_leftover_merged.clust.tsv"
+  echo "  Get all protein sequences corresponding with 18_syn_pan_aug_extra.clust.tsv"
   cat /dev/null > 20_pan_fasta_prot.faa
   for filepath in 02_fasta_prot/*.gz; do 
     zcat $filepath >> 20_pan_fasta_prot.faa
@@ -630,7 +640,7 @@ run_pick_exemplars() {
   if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot; fi
   mkdir -p 19_pan_aug_leftover_merged_prot
   get_fasta_from_family_file.pl 20_pan_fasta_prot.faa \
-              -fam 19_pan_aug_leftover_merged.clust.tsv -out 19_pan_aug_leftover_merged_prot
+              -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
 
   echo "  Get all protein sequences from files in 19_pan_aug_leftover_merged_prot"
   merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_prot/* > 19_pan_aug_leftover_merged_prot.faa
@@ -819,15 +829,27 @@ run_align() {
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_cds
   fi
 
-  echo; echo "== Align the gene families =="
-  mkdir -p 20_aligns
+  echo; echo "== Align nucleotide sequence for each gene family =="
+  mkdir -p 20_aligns_cds
   for filepath in 19_pan_aug_leftover_merged_cds/*; do
     file=`basename $filepath`;
     echo "  Computing alignment, using program famsa, for file $file"
-    famsa -t 2 19_pan_aug_leftover_merged_cds/$file 20_aligns/$file 1>/dev/null &
+    famsa -t 2 19_pan_aug_leftover_merged_cds/$file 20_aligns_cds/$file 1>/dev/null &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
+
+  if [[ $align_prot =~ "true" ]]; then
+    echo; echo "== Align protein sequence for the each gene family =="
+    mkdir -p 20_aligns_prot
+    for filepath in 19_pan_aug_leftover_merged_prot/*; do
+      file=`basename $filepath`;
+      echo "  Computing alignment, using program famsa, for file $file"
+      famsa -t 2 19_pan_aug_leftover_merged_prot/$file 20_aligns_prot/$file 1>/dev/null &
+      if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+    done
+    wait
+  fi
 }
 
 ##########
@@ -835,7 +857,7 @@ run_model_and_trim() {
   echo; echo "== Build HMMs =="
   cd "${WORK_DIR}"
   mkdir -p 21_hmm
-  for filepath in 20_aligns/*; do
+  for filepath in 20_aligns_cds/*; do
     file=`basename $filepath`;
     hmmbuild -n $file 21_hmm/$file $filepath 1>/dev/null &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
@@ -846,21 +868,25 @@ run_model_and_trim() {
   mkdir -p 22_hmmalign
   for filepath in 21_hmm/*; do
     file=`basename $filepath`;
+    printf "$file "
     hmmalign --trim --outformat A2M -o 22_hmmalign/$file 21_hmm/$file 19_pan_aug_leftover_merged_cds/$file &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
+  echo
 
   echo; echo "== Trim HMM alignments to match-states =="
   mkdir -p 23_hmmalign_trim1
   for filepath in 22_hmmalign/*; do
     file=`basename $filepath`;
+    printf "$file "
     cat $filepath |
       perl -ne 'if ($_ =~ />/) {print $_} else {$line = $_; $line =~ s/[a-z]//g; print $line}' |
       sed '/^$/d' > 23_hmmalign_trim1/$file &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
+  echo
 
   echo; echo "== Filter alignments prior to tree calculation =="
   mkdir -p 23_hmmalign_trim2 23_hmmalign_trim2_log
@@ -869,11 +895,13 @@ run_model_and_trim() {
   min_pct_aligned=20
   for filepath in 23_hmmalign_trim1/*; do
     file=`basename $filepath`
+    printf "$file "
     filter_align.pl -in $filepath -out 23_hmmalign_trim2/$file -log 23_hmmalign_trim2_log/$file \
                     -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
+  echo
 }
 
 ##########
@@ -1324,9 +1352,9 @@ if ! type hash_into_fasta_id.pl &> /dev/null; then
 fi
 
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
-# Also, the steps align model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
+# Also, the steps align, model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
 commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra pick_exemplars \
-             filter_to_pctile order_and_name calc_chr_pairs summarize"
+             filter_to_pctile order_and_name  calc_chr_pairs summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do
