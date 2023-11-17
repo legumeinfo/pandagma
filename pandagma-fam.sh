@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-11-15"
+version="2023-11-16"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -740,7 +740,7 @@ run_add_extra() {
     if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot ; fi
     mkdir -p 19_pan_aug_leftover_merged_prot
     get_fasta_from_family_file.pl "${protein_files[@]}" \
-      -fam -18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
+      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
 
 # Remove cumbersome batch-merge process, which is handled better with augment_cluster_sets.awk
     # echo "  Merge fasta sets (in parallel)"
