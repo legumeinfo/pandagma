@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
 #
 # Configuration and run script which, with other scripts in this package, generates gene-family 
-# orthogroups using the programs mmseqs, the hmmer package and others.
+# orthogroups using the program mmseqs2.
 # This workflow, pandagma-psup.sh, is to be used to add selected annotation sets to
 # a previously calculated pangene set
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
-#
+
 scriptname=`basename "$0"`
-version="2023-11-15"
+version="2023-11-16"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
-HELP_DOC="""Place annotation sets (CDS and protein) into pangene or gene family sets, using hmmsearch 
-to compare the indicated annotations against HMMs calculated in a prior run of pandagma-pan.
+HELP_DOC="""Place annotation sets (CDS and protein) into pangene or gene family sets, using mmseqs2
+to compare the indicated supplemental annotations against the output from a previous pangene run.
+
+The following files need to be available in the work directory, from a previous pangene calculation:
+  18_syn_pan_aug_extra.clust.tsv and  21_pan_fasta_clust_rep_cds.fna   
 
 Usage:
   ./$scriptname -c CONFIG_FILE [options]
@@ -57,8 +60,14 @@ Variables in pandagma config file (Set the config with the CONF environment vari
            work_dir - Working directory, for temporary and intermediate files. 
 
 File sets (arrays):
-      protein_files
           cds_files
+   annotation_files
+          cds_files_extra  (optional)
+   annotation_files_extra  (optional)
+      protein_files
+   annotation_files_sup
+      protein_files_sup
+          cds_files_sup
  """
 
 ########################################
@@ -72,8 +81,19 @@ version() {
 canonicalize_paths() {
   echo "Entering canonicalize_paths."
 
-  protein_files=($(realpath --canonicalize-existing "${protein_files[@]}"))
+  annotation_files=($(realpath --canonicalize-existing "${annotation_files[@]}"))
   cds_files=($(realpath --canonicalize-existing "${cds_files[@]}"))
+  protein_files=($(realpath --canonicalize-existing "${protein_files[@]}"))
+
+  annotation_files_sup=($(realpath --canonicalize-existing "${annotation_files_sup[@]}"))
+  cds_files_sup=($(realpath --canonicalize-existing "${cds_files_sup[@]}"))
+  protein_files_sup=($(realpath --canonicalize-existing "${protein_files_sup[@]}"))
+
+  if (( ${#cds_files_extra[@]} > 0 ))
+  then
+    cds_files_extra=($(realpath --canonicalize-existing "${cds_files_extra[@]}"))
+    annotation_files_extra=($(realpath --canonicalize-existing "${annotation_files_extra[@]}"))
+  fi
 
   readonly submit_dir=${PWD}
 
@@ -130,59 +150,111 @@ calc_seq_stats () {
 
 ##########
 run_ingest() {
-# Retrieve nucleotide and protein data sets
+# Add positional information from GFF3 or 4- or 6-column BED to FASTA IDs
+# BED start coordinate converted to 1-based
   cd "${WORK_DIR}"
-  echo; echo "Run ingest: pull nucleotide and protein data sets into the work directory."
-  echo "Note that this is a simpler ingest than for the primary gene family or pangene construction,"
-  echo "as the identifiers aren't modified with positional information."
-  
-  mkdir -p 02_fasta_nuc_sup 02_fasta_prot_sup 
-
-    # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_pctl??_end.
-    # This is captured from the gene IDs using the annot_str_regex set in the config file.
-    cat /dev/null > stats_sup/tmp.gene_count_start_sup
-    cat /dev/null > stats_sup/tmp.fasta_seqstats
-    start_time=`date`
-    printf "Run started at: $start_time\n" > stats_sup/tmp.timing
+  echo; echo "Run ingest: from fasta and gff or bed data, create fasta with IDs containing positional info."
 
   export ANN_REX=${annot_str_regex}
+  mkdir -p 02_fasta_nuc_sup 02_fasta_prot_sup 01_posn_hsh_sup stats_sup
+  mkdir -p 02_fasta_nuc 02_fasta_prot 01_posn_hsh stats
 
-  echo "  Pull the protein files locally"
-  cat /dev/null > 02_all_main_prot_sup.fna # Collect all starting protein sequences, for later comparisons
-  for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
-    file_base=$(basename ${protein_files[file_num]%.*})
-    zcat "${protein_files[file_num]}" >> 02_all_main_prot_sup.fna # Collect original seqs for later comparisons
-    zcat "${protein_files[file_num]}" > 02_fasta_prot_sup/$file_base
-    # calc basic sequence stats
-    annot_name=$(basename 02_fasta_prot/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
-    printf "  Added with hmmsearch:  " >> stats_sup/tmp.fasta_seqstats
-    cat_or_zcat "${protein_files[file_num]}" | calc_seq_stats >> stats_sup/tmp.fasta_seqstats
-  done
+  # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_pctl??_end.
+  # This is captured from the gene IDs using the annot_str_regex set in the config file.
+  cat /dev/null > stats_sup/tmp.gene_count_start_sup
+  cat /dev/null > stats_sup/tmp.fasta_seqstats
+  start_time=`date`
+  printf "Run started at: $start_time\n" > stats_sup/tmp.timing
 
-  echo "  Pull the CDS files locally"
-  cat /dev/null > 02_all_main_cds_sup.fna # Collect all starting cds sequences, for later comparisons
+  echo "  Get position information from the main annotation sets."
+  cat /dev/null > 02_all_main_cds.fna # Collect all starting sequences, for later comparisons
   for (( file_num = 0; file_num < ${#cds_files[@]} ; file_num++ )); do
     file_base=$(basename ${cds_files[file_num]%.*})
-    zcat "${cds_files[file_num]}" >> 02_all_main_cds_sup.fna # Collect original seqs for later comparisons
-    zcat "${cds_files[file_num]}" > 02_fasta_nuc_sup/$file_base
+    cat_or_zcat "${cds_files[file_num]}" >> 02_all_main_cds.fna # Collect original seqs for later comparisons
+    echo "  Adding positional information to fasta file $file_base"
+    cat_or_zcat "${annotation_files[file_num]}" |
+      gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
+      hash_into_fasta_id.pl -nodef -fasta "${cds_files[file_num]}" \
+                          -hash 01_posn_hsh/$file_base.hsh \
+                          -out 02_fasta_nuc/$file_base
+    # calc basic sequence stats
+    annot_name=$(basename 02_fasta_nuc/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
+    printf "  Main:  " >> stats_sup/tmp.fasta_seqstats
+    cat_or_zcat "${cds_files[file_num]}" | calc_seq_stats >> stats_sup/tmp.fasta_seqstats
   done
+
+  echo "  Get position information from the extra annotation sets, if any."
+  if (( ${#cds_files_extra[@]} > 0 ))
+  then
+    cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
+    for (( file_num = 0; file_num < ${#cds_files_extra[@]} ; file_num++ )); do
+      file_base=$(basename ${cds_files_extra[file_num]%.*})
+      cat_or_zcat "${cds_files_extra[file_num]}" >> 02_all_extra_cds.fna  # Collect original seqs for later comparisons
+      echo "  Adding positional information to extra fasta file $file_base"
+      cat_or_zcat "${annotation_files_extra[file_num]}" |
+        gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
+      hash_into_fasta_id.pl -nodef -fasta "${cds_files_extra[file_num]}" \
+                            -hash 01_posn_hsh/$file_base.hsh \
+                            -out 02_fasta_nuc/$file_base
+      # calc basic sequence stats
+      annot_name=$(basename 02_fasta_nuc/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
+      printf "  Extra: " >> stats_sup/tmp.fasta_seqstats
+      cat_or_zcat "${cds_files_extra[file_num]}" | calc_seq_stats >> stats_sup/tmp.fasta_seqstats
+    done
+  fi
+
+  echo "  Get position information from the supplementary annotation sets, if any."
+  if (( ${#cds_files_sup[@]} > 0 ))
+  then
+    cat /dev/null > 02_all_sup_cds.fna # Collect all starting sequences, for later comparisons
+    for (( file_num = 0; file_num < ${#cds_files_sup[@]} ; file_num++ )); do
+      file_base=$(basename ${cds_files_sup[file_num]%.*})
+      cat_or_zcat "${cds_files_sup[file_num]}" >> 02_all_sup_cds.fna  # Collect original seqs for later comparisons
+      echo "  Adding positional information to sup fasta file $file_base"
+      cat_or_zcat "${annotation_files_sup[file_num]}" |
+        gff_or_bed_to_hash5.awk > 01_posn_hsh_sup/$file_base.hsh
+      hash_into_fasta_id.pl -nodef -fasta "${cds_files_sup[file_num]}" \
+                            -hash 01_posn_hsh_sup/$file_base.hsh \
+                            -out 02_fasta_nuc_sup/$file_base
+      # calc basic sequence stats
+      annot_name=$(basename 02_fasta_nuc_sup/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
+      printf "  sup: " >> stats_sup/tmp.fasta_seqstats
+      cat_or_zcat "${cds_files_sup[file_num]}" | calc_seq_stats >> stats_sup/tmp.fasta_seqstats
+    done
+  fi
 
   echo "  Count starting sequences, for later comparisons"
-  for file in 02_fasta_prot_sup/*.$faa; do
+  for file in 02_fasta_nuc/*.$fna 02_fasta_nuc_sup/*.$fna; do
     awk '$0~/UNDEFINED/ {ct++} 
       END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' $file
-    cat $file | grep '>' | perl -pe 's/__/\t/g' | cut -f2 | # extracts the GeneName from combined genspchr__GeneName__start__end__orient
+    cat $file | grep '>' | perl -pe 's/__/\t/g' | cut -f2 | # extracts the GeneName from id-string-with-coords
       perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex.+/$1/' |
-      grep -v UNDEFINED | sort | uniq -c | awk '{print $2 "\t" $1}' >> stats_sup/tmp.gene_count_start_sup
+      grep -v UNDEFINED | sort | uniq -c | awk '{print $2 "\t" $1}' >> stats_sup/tmp.gene_count_start
   done
 
-  sort -o stats_sup/tmp.gene_count_start_sup stats_sup/tmp.gene_count_start_sup
+  echo "  Also get protein files"
+  if (( ${#protein_files[@]} > 0 ))
+  then
+    for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
+      echo "  Copying protein file ${protein_files[file_num]}"
+      cp "${protein_files[file_num]}" 02_fasta_prot/
+    done
+  fi
+  if (( ${#protein_files_sup[@]} > 0 ))
+  then
+    for (( file_num = 0; file_num < ${#protein_files_sup[@]} ; file_num++ )); do
+      echo "  Copying protein file ${protein_files_sup[file_num]}"
+      cp "${protein_files_sup[file_num]}" 02_fasta_prot_sup/
+    done
+  fi
+
+  sort -o stats_sup/tmp.gene_count_start stats_sup/tmp.gene_count_start
 }
 
 ##########
 run_search_pangenes() {
   cd "${WORK_DIR}"
-  echo "Search provided annotation sets against a file of pangene representative sequences"
+  echo "Search provided supplemental annotation sets against a file of pangene representative sequences"
 
   if [ -d 33_mmseqs_pan_match ]; then rm -rf 33_mmseqs_pan_match; fi
   mkdir -p 33_mmseqs_pan_match 33_mmseqs_tmp
@@ -214,58 +286,112 @@ run_add_extra() {
   echo "== Place sequences into pangenes based on top mmseqs hits, using the consen_iden threshold of $consen_iden."
 
   cat 33_mmseqs_pan_match/*.m8.top | top_line.awk |
+    perl -pe 's/^\S+__(\S+)__\d+__\d+__[+-]\t/$1\t/' |
     awk -v IDEN=${consen_iden} '$3>=IDEN {print $2 "\t" $1}' |
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 41_sup_in_21_rep_cds.clust.tsv
   
   echo "  Retrieve sequences for the extra genes"
-    if [ -d 42_sup_in_21_rep]; then rm -rf 42_sup_in_21_rep; fi
+    if [ -d 42_sup_in_21_rep ]; then rm -rf 42_sup_in_21_rep; fi
     mkdir -p 42_sup_in_21_rep
-    get_fasta_from_family_file.pl "${cds_files[@]}" \
+    get_fasta_from_family_file.pl "${cds_files_sup[@]}" \
        -fam 41_sup_in_21_rep_cds.clust.tsv -out 42_sup_in_21_rep/
 
-    echo "  Make augmented cluster sets"
+    echo "  Make augmented cluster sets - starting from 19_pan_aug_leftover_merged_cds/ if available;"
+    echo "  else from 18_syn_pan_aug_extra.clust.tsv"
+    if [[ -d 19_pan_aug_leftover_merged_cds ]]; then
+      : # do nothing; the directory and file(s) exist
+    else 
+      if [ -f 18_syn_pan_aug_extra.clust.tsv ]; then
+        mkdir -p 19_pan_aug_leftover_merged_cds
+        get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra[@]}" \
+          -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_cds
+      else
+        echo "Neither 19_pan_aug_leftover_merged_cds/ nor 18_syn_pan_aug_extra.clust.tsv is available"
+        echo "in the work directory. Please provide at least 18_syn_pan_aug_extra.clust.tsv in ${WORK_DIR}."
+        exit 1
+      fi
+    fi
     augment_cluster_sets.awk leftovers_dir=42_sup_in_21_rep 19_pan_aug_leftover_merged_cds/* |
-      cat > 48_syn_pan_aug_sup.clust.tsv
+      cat > 48_syn_pan_sup.clust.tsv
 
     echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
-    perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 48_syn_pan_aug_sup.clust.tsv \
-      > 48_syn_pan_aug_sup.hsh.tsv
+    perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 48_syn_pan_sup.clust.tsv \
+      > 48_syn_pan_sup.hsh.tsv
 
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
     echo "    Fasta file:" "${cds_files[@]}"
-    if [ -d 49_pan_aug_leftover_merged_cds ]; then rm -rf 49_pan_aug_leftover_merged_cds; fi
-    mkdir -p 49_pan_aug_leftover_merged_cds
-    get_fasta_from_family_file.pl "${cds_files[@]}" \
-      -fam 48_syn_pan_aug_extra.clust.tsv -out 49_pan_aug_leftover_merged_cds
+    if [ -d 49_pan_sup_merged_cds ]; then rm -rf 49_pan_sup_merged_cds; fi
+    mkdir -p 49_pan_sup_merged_cds
+    get_fasta_from_family_file.pl "${cds_files[@]}"  "${cds_files_extra[@]}"  "${cds_files_sup[@]}" \
+      -fam 48_syn_pan_sup.clust.tsv -out 49_pan_sup_merged_cds
 
-    echo "  Merge files in 49_pan_aug_leftover_merged_cds, prefixing IDs with panID__"
-    merge_files_to_pan_fasta.awk 49_pan_aug_leftover_merged_cds/* > 49_pan_aug_leftover_merged_cds.fna
+    echo "  Merge files in 49_pan_sup_merged_cds, prefixing IDs with panID__"
+    merge_files_to_pan_fasta.awk 49_pan_sup_merged_cds/* > 49_pan_sup_merged_cds.fna
+}
 
+##########
+run_pick_exemplars() {
+  echo; echo "== Pick representative (exemplar) sequence for each pan-gene set (protein and CDS) =="
+  cd "${WORK_DIR}"
+
+  echo "  Get all protein sequences corresponding with 48_syn_pan_extra.counts.tsv"
+  cat /dev/null > 50_pan_fasta_prot.faa
+  for filepath in 02_fasta_prot/*.gz 02_fasta_prot_sup/*.gz; do
+    zcat $filepath >> 50_pan_fasta_prot.faa
+  done
+
+  echo "  Get protein sequences into pan-gene sets, corresponding with 19_pan_aug_leftover_merged_cds.fna"
+  if [ -d 49_pan_sup_merged_cds ]; then rm -rf 49_pan_sup_merged_cds; fi
+  mkdir -p 49_pan_sup_merged_cds
+  get_fasta_from_family_file.pl 50_pan_fasta_prot.faa \
+              -fam 48_syn_pan_sup.clust.tsv -out 49_pan_sup_merged_cds
+
+  echo "  Get all protein sequences from files in 49_pan_sup_merged_cds"
+  merge_files_to_pan_fasta.awk 49_pan_sup_merged_cds/* > 49_pan_sup_merged_cds.faa
+
+  echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
+  echo "    == first proteins:"
+  cat 49_pan_sup_merged_cds.faa | pick_family_rep.pl \
+    -nostop -prefer $preferred_annot -out 51_pan_fasta_clust_rep_prot.faa
+
+  echo "    == then CDS sequences, corresponding with 51_pan_fasta_clust_rep_prot.faa"
+  cat 51_pan_fasta_clust_rep_prot.faa | awk '$1~/^>/ {print substr($1,2) "__" $2}' > lists/lis.51_pan_fasta_clust_rep
+  get_fasta_subset.pl -in 49_pan_sup_merged_cds.fna -list lists/lis.51_pan_fasta_clust_rep \
+                    -clobber -out 51_pan_fasta_clust_rep_cds.fna
+
+  perl -pi -e 's/__/  /' 51_pan_fasta_clust_rep_cds.fna
+  perl -pi -e 's/__/  /' 51_pan_fasta_clust_rep_prot.faa
+
+  echo "  Retrieve genes present in the original CDS files but absent from 48_syn_pan_sup.hsh.tsv"
+  cut -f2 48_syn_pan_sup.hsh.tsv | LC_ALL=C sort > lists/lis.48_syn_pan_sup
+  cat 02_all_main_cds.fna 02_all_extra_cds.fna 02_all_main_cds_sup.fna > 02_all_cds.fna
+  get_fasta_subset.pl -in 02_all_cds.fna -out 48_syn_pan_sup_complement.fna \
+    -lis lists/lis.48_syn_pan_sup -xclude -clobber
 }
 
 ##########
 run_filter_to_pctile() {
   cd "${WORK_DIR}"
   echo "  Calculate matrix of gene counts per orthogroup and annotation set"
-  calc_pan_stats.pl -annot_regex $ANN_REX -pan 48_syn_pan_aug_extra.clust.tsv -out 48_syn_pan_aug_extra.counts.tsv
-  max_annot_ct=$(cat 48_syn_pan_aug_extra.counts.tsv |
+  calc_pan_stats.pl -annot_regex $ANN_REX -pan 48_syn_pan_sup.clust.tsv -out 48_syn_pan_extra.counts.tsv
+  max_annot_ct=$(cat 48_syn_pan_extra.counts.tsv |
                        awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
 
   echo "  Select orthogroups with genes from selected percentiles of max_annot_ct annotation sets"
   for percentile in $pctl_low $pctl_med $pctl_hi; do
-    cat 48_syn_pan_aug_extra.counts.tsv |
+    cat 48_syn_pan_extra.counts.tsv |
       awk -v PCTL=$percentile -v ANNCT=$max_annot_ct '$2>=ANNCT*(PCTL/100)&& $1!~/^#/ {print $1}' |
-        cat > lists/lis.48_syn_pan_aug_extra.pctl${percentile}
+        cat > lists/lis.48_syn_pan_extra.pctl${percentile}
 
     echo "  Get a fasta subset with only genes from at least $(($max_annot_ct*$pctl_low/100)) annotation sets"
-    get_fasta_subset.pl -in 21_pan_fasta_clust_rep_cds.fna \
-                        -list lists/lis.48_syn_pan_aug_extra.pctl${percentile} \
-                        -clobber -out 52_pan_fasta_rep_pctl${percentile}_cds.fna
+    get_fasta_subset.pl -in 51_pan_fasta_clust_rep_cds.$fna \
+                        -list lists/lis.48_syn_pan_extra.pctl${percentile} \
+                        -clobber -out 52_pan_fasta_rep_pctl${percentile}_cds.$fna
 
     echo "  Get a clust.tsv file with orthogroups with at least min_core_prop*max_annot_ct annotation sets"
-    join <(LC_ALL=C sort -k1,1 lists/lis.48_syn_pan_aug_extra.pctl${percentile}) \
-         <(LC_ALL=C sort -k1,1 48_syn_pan_aug_extra.clust.tsv) |
-            cat > 52_syn_pan_aug_extra_pctl${percentile}.clust.tsv
+    join <(LC_ALL=C sort -k1,1 lists/lis.48_syn_pan_extra.pctl${percentile}) \
+         <(LC_ALL=C sort -k1,1 48_syn_pan_sup.clust.tsv) |
+            cat > 52_pan_sup_pctl${percentile}.clust.tsv
   done
 }
 
@@ -296,7 +422,7 @@ run_summarize() {
       mkdir -p $full_out_dir
   fi
 
-  for file in 48_syn_pan_aug_sup.clust.tsv 48_syn_pan_aug_sup.hsh.tsv \
+  for file in 48_syn_pan_sup.clust.tsv 48_syn_pan_sup.hsh.tsv \
       52_pan_fasta_rep_pctl${pctl_low}_cds.fna \
       52_pan_fasta_rep_pctl${pctl_med}_cds.fna \
       52_pan_fasta_rep_pctl${pctl_hi}_cds.fna ; do
@@ -467,7 +593,7 @@ canonicalize_paths
 
 # Check for existence of third-party executables
 missing_req=0
-for program in hmmscan famsa; do
+for program in mmseqs hmmscan famsa; do
   if ! type $program &> /dev/null; then
     echo "Warning: executable $program is not on your PATH."
     missing_req=$((missing_req+1))
