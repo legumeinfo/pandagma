@@ -7,7 +7,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 
 scriptname=`basename "$0"`
-version="2023-11-16"
+version="2023-11-17"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -334,7 +334,7 @@ run_pick_exemplars() {
   echo; echo "== Pick representative (exemplar) sequence for each pan-gene set (protein and CDS) =="
   cd "${WORK_DIR}"
 
-  echo "  Get all protein sequences corresponding with 48_syn_pan_extra.counts.tsv"
+  echo "  Get all protein sequences corresponding with 48_syn_pan_sup.counts.tsv"
   cat /dev/null > 50_pan_fasta_prot.faa
   for filepath in 02_fasta_prot/*.gz 02_fasta_prot_sup/*.gz; do
     zcat $filepath >> 50_pan_fasta_prot.faa
@@ -373,13 +373,13 @@ run_pick_exemplars() {
 run_filter_to_pctile() {
   cd "${WORK_DIR}"
   echo "  Calculate matrix of gene counts per orthogroup and annotation set"
-  calc_pan_stats.pl -annot_regex $ANN_REX -pan 48_syn_pan_sup.clust.tsv -out 48_syn_pan_extra.counts.tsv
-  max_annot_ct=$(cat 48_syn_pan_extra.counts.tsv |
+  calc_pan_stats.pl -annot_regex $ANN_REX -pan 48_syn_pan_sup.clust.tsv -out 48_syn_pan_sup.counts.tsv
+  max_annot_ct=$(cat 48_syn_pan_sup.counts.tsv |
                        awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
 
   echo "  Select orthogroups with genes from selected percentiles of max_annot_ct annotation sets"
   for percentile in $pctl_low $pctl_med $pctl_hi; do
-    cat 48_syn_pan_extra.counts.tsv |
+    cat 48_syn_pan_sup.counts.tsv |
       awk -v PCTL=$percentile -v ANNCT=$max_annot_ct '$2>=ANNCT*(PCTL/100)&& $1!~/^#/ {print $1}' |
         cat > lists/lis.48_syn_pan_extra.pctl${percentile}
 
