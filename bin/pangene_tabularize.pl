@@ -21,14 +21,16 @@ my $usage = <<EOS;
   Usage:  pangene_tabularize.pl -annot_list FILE [-options]
   
   Given a stream of accession identifiers and a pangene file, return a table of genes in the order of the accession identifiers.
+
+  The pangene file can either be formatted as a tabular tsv file or as as a Berkeley DB file.
   
-  The pangene file should be structured thus, as a Berkeley DB file**:
+  If "-hash_method bdb", then the pangene file should be structured thus, as a Berkeley DB file:
     panID 
     gene1,gene2,gene3,... 
     panID
     gene1,gene2,gene3,... 
 
-  ** The other supported alternative is plain-text, tab-separated:
+  Otherwise, if "-hash_method tsv", then the pangene file should be plain-text, tab-separated:
     panID gene1 gene2 gene3 ... 
     panID gene1 gene2 gene3 ... 
 
