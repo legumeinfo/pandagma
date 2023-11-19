@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-11-17"
+version="2023-11-18"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -437,7 +437,7 @@ run_consense() {
     perl -pe 's/^(pan\d+)__(\S+)\t(\S)/$1\t$2\t$3/' > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj.tsv
 
   echo "  Add gene-pair information"
-  hash_into_table_id.pl 01_posn_hsh/*hsh -table 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj.tsv |
+  hash_into_table_2cols.pl 01_posn_hsh/*hsh -table 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj.tsv |
     cat > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv
 
   echo; echo "  Filter based on list of expected chromosome pairings if provided"
@@ -462,12 +462,14 @@ run_consense() {
   get_fasta_from_family_file.pl "${cds_files[@]}" \
     -fam 11_syn_pan_leftovers.clust.tsv -out 11_pan_leftovers/
 
-  echo "  Make augmented cluster sets"
-  cat /dev/null > 12_syn_pan_aug_pre.clust.tsv
-  augment_cluster_sets.awk leftovers_dir=11_pan_leftovers 07_pan_fasta/* > 12_syn_pan_aug_pre.clust.tsv
+  echo "  Make augmented cluster sets. Uniqify on the back end, converting from mcl clust format to hsh (clust_ID gene)."
+  cat /dev/null > 12_syn_pan_aug_pre.hsh.tsv
+  augment_cluster_sets.awk leftovers_dir=11_pan_leftovers 07_pan_fasta/* |
+    perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' |
+    sort -k1,1 -k2,2 | uniq > 12_syn_pan_aug_pre.hsh.tsv 
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
-  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 12_syn_pan_aug_pre.clust.tsv > 12_syn_pan_aug_pre.hsh.tsv
+  cat 12_syn_pan_aug_pre.hsh.tsv | hash_to_rows_by_1st_col.awk > 12_syn_pan_aug_pre.clust.tsv
 }
 
 ##########
@@ -488,7 +490,7 @@ run_cluster_rest() {
     --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
 
   echo "  Add gene-pair information"
-  hash_into_table_id.pl 01_posn_hsh/*hsh -idx1 0 -idx2 1 -table 03_mmseqs/${complmt_self_compare}_cluster.tsv |
+  hash_into_table_2cols.pl 01_posn_hsh/*hsh -idx1 0 -idx2 1 -table 03_mmseqs/${complmt_self_compare}_cluster.tsv |
     cat > 03_mmseqs/${complmt_self_compare}_cluster_posn.tsv
 
   if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
@@ -520,8 +522,8 @@ run_cluster_rest() {
   echo "  and clusters from the complement of that set. Skip singletons (\"clusters\" of size 1)."
   cat 12_syn_pan_aug_pre.clust.tsv 12_syn_pan_aug_complement.clust.tsv | awk 'NF>1' > 12_syn_pan_aug.clust.tsv
 
-  echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
-  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 12_syn_pan_aug.clust.tsv > 12_syn_pan_aug.hsh.tsv
+  echo "  Reshape from hash to mcl output format (clustered IDs on one line)"
+  cat 12_syn_pan_aug.clust.tsv | hash_to_rows_by_1st_col.awk > 12_syn_pan_aug.hsh.tsv
 }
 
 ##########
@@ -571,9 +573,13 @@ run_add_extra() {
     get_fasta_from_family_file.pl "${cds_files_extra[@]}" \
        -fam 14_syn_pan_extra.clust.tsv -out 16_pan_leftovers_extra/
   
-    echo "  Make augmented cluster sets"
+    echo "  Make augmented cluster sets. Uniqify on the back end, converting from mcl clust format to hsh (clust_ID gene)."
     augment_cluster_sets.awk leftovers_dir=16_pan_leftovers_extra 13_pan_aug_fasta/* |
-      cat > 18_syn_pan_aug_extra.clust.tsv
+      perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' |
+      sort -k1,1 -k2,2 | uniq > 18_syn_pan_aug_extra.hsh.tsv &
+
+    echo "  Reshape from hash to mcl output format (clustered IDs on one line)"
+    cat 18_syn_pan_aug_extra.hsh.tsv | hash_to_rows_by_1st_col.awk > 18_syn_pan_aug_extra.clust.tsv
 
     echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
     perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 18_syn_pan_aug_extra.clust.tsv \
