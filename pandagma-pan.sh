@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-11-18"
+version="2023-11-19"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -57,6 +57,7 @@ Subcommands (in order they are usually run):
                       annotation sets that may be of lower or uncertain quality.
      pick_exemplars - Pick representative sequence for each pan-gene
    filter_to_pctile - Calculate orthogroup composition and filter fasta files by selected percentiles.
+         tabularize - Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv
      order_and_name - Assign pan-gene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Copy results into output directory, and report summary statistics.
@@ -608,12 +609,6 @@ run_pick_exemplars() {
   echo; echo "== Pick representative (exemplar) sequence for each pan-gene set (protein and CDS) =="
   cd "${WORK_DIR}"
 
-  #echo "  From 19_pan_aug_leftover_merged_cds.fna, derive cluster-format file; used to extract corresponding protein files"
-  #cat 19_pan_aug_leftover_merged_cds.fna | awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/^(\w+\d+)__/$1\t/' | 
-  #  awk -v ORS="" '$1 == prev {print "\t" $2; count++} 
-  #                 $1 != prev && NR==1 { print $1 "\t" $2; prev=$1 } 
-  #                 $1 != prev && NR>1 { print "\n" $1 "\t" $2; prev=$1 }' > 19_pan_aug_leftover_merged.clust.tsv
-
   echo "  Get all protein sequences corresponding with 18_syn_pan_aug_extra.clust.tsv"
   cat /dev/null > 20_pan_fasta_prot.faa
   for filepath in 02_fasta_prot/*.gz; do 
@@ -647,6 +642,27 @@ run_pick_exemplars() {
   cat 02_all_main_cds.fna 02_all_extra_cds.fna > 02_all_cds.fna
   get_fasta_subset.pl -in 02_all_cds.fna -out 18_syn_pan_aug_extra_complement.fna \
     -lis lists/lis.18_syn_pan_aug_extra -xclude -clobber
+}
+
+##########
+run_tabularize() {
+  echo; echo "== Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv"
+  cd "${WORK_DIR}"
+
+  # Get table header 
+  pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv \
+                        -annot_str_regex $ANN_REX | head -1 > tmp.table_header 
+
+  # Find column on which to sort first
+  sort_col=$(cat tmp.table_header | tr '\t' '\n' | awk -v PR_ANN=$preferred_annot '$1~/$PR_ANN/ {print NR}')
+
+  # Sort, putting header row at top, and don't print pangenes that are all "NONE"
+  pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv \
+                        -annot_str_regex $ANN_REX |
+    sort -k$sort_col,$sort_col -k2,2 | 
+    sed '/^$/d; /^#pangene/d' |
+    perl -lane '$ct=0; for $gn (@F){if ($gn=~/NONE/){$ct++}}; if ($ct<(scalar(@F)-1)){print $_}' |
+    cat tmp.table_header - > 18_syn_pan_aug_extra.table.tsv
 }
 
 ##########
@@ -1356,7 +1372,7 @@ fi
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
 # Also, the steps align_cds, align_protein, model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
 commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra pick_exemplars \
-             filter_to_pctile order_and_name  calc_chr_pairs summarize"
+             filter_to_pctile tabularize order_and_name  calc_chr_pairs summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do
