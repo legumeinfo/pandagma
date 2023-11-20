@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-11-16"
+version="2023-11-20"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -742,26 +742,6 @@ run_add_extra() {
     get_fasta_from_family_file.pl "${protein_files[@]}" \
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
 
-# Remove cumbersome batch-merge process, which is handled better with augment_cluster_sets.awk
-    # echo "  Merge fasta sets (in parallel)"
-    # if [ -d batches ]; then rm -rf batches; fi
-    # mkdir -p batches
-    # ls 13_pan_aug_fasta | split - batches/
-    # if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot; fi
-    # mkdir -p 19_pan_aug_leftover_merged_prot
-    # for batch in batches/*; do
-    #   cat $batch | while read -r panID; do
-    #     #echo "$batch: $panID"
-    #     if [[ -f "16_pan_leftovers_extra/$panID" ]]; then
-    #       cat 13_pan_aug_fasta/$panID 16_pan_leftovers_extra/$panID > 19_pan_aug_leftover_merged_prot/$panID
-    #     else
-    #       cp 13_pan_aug_fasta/$panID 19_pan_aug_leftover_merged_prot/
-    #     fi
-    #   done & # Do the merging in parallel because of the number of flies
-    #   if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-    # done
-    # wait 
-  
     echo "  Merge fasta files from 19_pan_aug_leftover_merged_prot, prefixing IDs with panID__"
     merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_prot/* > 19_pan_aug_leftover_merged_prot.faa
 
