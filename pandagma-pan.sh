@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-11-19"
+version="2023-11-21"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -577,20 +577,16 @@ run_add_extra() {
     echo "  Make augmented cluster sets. Uniqify on the back end, converting from mcl clust format to hsh (clust_ID gene)."
     augment_cluster_sets.awk leftovers_dir=16_pan_leftovers_extra 13_pan_aug_fasta/* |
       perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' |
-      sort -k1,1 -k2,2 | uniq > 18_syn_pan_aug_extra.hsh.tsv &
+      sort -k1,1 -k2,2 | uniq > 18_syn_pan_aug_extra.hsh.tsv 
 
     echo "  Reshape from hash to mcl output format (clustered IDs on one line)"
     cat 18_syn_pan_aug_extra.hsh.tsv | hash_to_rows_by_1st_col.awk > 18_syn_pan_aug_extra.clust.tsv
-
-    echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
-    perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 18_syn_pan_aug_extra.clust.tsv \
-      > 18_syn_pan_aug_extra.hsh.tsv
 
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
     echo "    Fasta file:" "${protein_files[@]}"
     if [ -d 19_pan_aug_leftover_merged_cds ]; then rm -rf 19_pan_aug_leftover_merged_cds; fi
     mkdir -p 19_pan_aug_leftover_merged_cds
-    get_fasta_from_family_file.pl "${cds_files[@]}" \
+    get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra[@]}" \
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_cds
   
     echo "  Merge files in 19_pan_aug_leftover_merged_cds, prefixing IDs with panID__"
@@ -615,7 +611,7 @@ run_pick_exemplars() {
     zcat $filepath >> 20_pan_fasta_prot.faa
   done
 
-  echo "  Get protein sequences into pan-gene sets, corresponding with 19_pan_aug_leftover_merged_cds.fna"
+  echo "  Get protein sequences into pan-gene sets, corresponding with 18_syn_pan_aug_extra.clust.tsv"
   if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot; fi
   mkdir -p 19_pan_aug_leftover_merged_prot
   get_fasta_from_family_file.pl 20_pan_fasta_prot.faa \
@@ -627,7 +623,7 @@ run_pick_exemplars() {
   echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
   echo "    == first proteins:"
   cat 19_pan_aug_leftover_merged_prot.faa | pick_family_rep.pl \
-    -nostop -prefer $preferred_annot -out 21_pan_fasta_clust_rep_prot.$faa
+    -nostop -prefer $preferred_annot -out 21_pan_fasta_clust_rep_prot.faa
 
   echo "    == then CDS sequences, corresponding with 21_pan_fasta_clust_rep_prot.faa"
   cat 21_pan_fasta_clust_rep_prot.faa | awk '$1~/^>/ {print substr($1,2)}' > lists/lis.21_pan_fasta_clust_rep
@@ -650,19 +646,25 @@ run_tabularize() {
   cd "${WORK_DIR}"
 
   # Get table header 
-  pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv \
-                        -annot_str_regex $ANN_REX | head -1 > tmp.table_header 
+  pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv -annot_str_regex $ANN_REX > tmp.18_syn_pan_aug_extra.clust.tsv
+  head -1 tmp.18_syn_pan_aug_extra.clust.tsv > tmp.table_header
 
   # Find column on which to sort first
-  sort_col=$(cat tmp.table_header | tr '\t' '\n' | awk -v PR_ANN=$preferred_annot '$1~/$PR_ANN/ {print NR}')
+  export PR_ANN=$preferred_annot
+  sort_col=$( cat tmp.table_header | 
+     perl -ane 'BEGIN{use List::Util qw(first); $PA=$ENV{"PR_ANN"}}; $idx = first { $F[$_] =~ /$PA/ } 0..$#F; print ($idx+1) ' )
 
-  # Sort, putting header row at top, and don't print pangenes that are all "NONE"
-  pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv \
-                        -annot_str_regex $ANN_REX |
+  echo "  Field for sorting 18_syn_pan_aug_extra.table.tsv is sort_col: $sort_col"
+
+  echo "  Sort, putting header row at top, and don't print pangenes that are all NONE"
+    cat tmp.18_syn_pan_aug_extra.clust.tsv |
     sort -k$sort_col,$sort_col -k2,2 | 
     sed '/^$/d; /^#pangene/d' |
     perl -lane '$ct=0; for $gn (@F){if ($gn=~/NONE/){$ct++}}; if ($ct<(scalar(@F)-1)){print $_}' |
     cat tmp.table_header - > 18_syn_pan_aug_extra.table.tsv
+
+    rm tmp.18_syn_pan_aug_extra.clust.tsv
+    rm tmp.table_header
 }
 
 ##########
@@ -1034,7 +1036,7 @@ run_summarize() {
   for file in 06_syn_pan.clust.tsv 06_syn_pan.hsh.tsv \
               12_syn_pan_aug.clust.tsv 12_syn_pan_aug.hsh.tsv \
               18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv 18_syn_pan_aug_extra.counts.tsv \
-              18_syn_pan_aug_extra_complement.fna \
+              18_syn_pan_aug_extra_complement.fna 18_syn_pan_aug_extra.table.tsv \
               21_pan_fasta_clust_rep_cds.fna 21_pan_fasta_clust_rep_prot.faa \
               22_pan_fasta_rep_pctl${pctl_low}_cds.fna \
               22_pan_fasta_rep_pctl${pctl_med}_cds.fna \
