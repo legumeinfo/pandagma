@@ -67,8 +67,12 @@ For example, using conda:
 ~~~
   conda create -n pandagma
   conda install -n pandagma -c conda-forge -c bioconda perl-bioperl-core perl-parallel-forkmanager \
-    perl-list-moreutils dagchainer mcl mmseqs2 emboss famsa fasttree hmmer
+    perl-bioperl-run perl-list-moreutils dagchainer mcl mmseqs2 emboss famsa fasttree hmmer
   conda activate pandagama
+~~~
+Or on some systems, activate conda thus:
+~~~
+  source activate pandagma
 ~~~
 
 ## Usage for the main pandagma-pan.sh <a name="usage"></a>
