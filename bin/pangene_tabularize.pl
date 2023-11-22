@@ -61,10 +61,11 @@ my $usage = <<EOS;
 EOS
 
 GetOptions(
-  'pan_to_gn=s'   => \$pan_to_gn,   
-  'list_annot:s'  => \$list_annot,  
-  'hash_method:s' => \$hash_method,
-  'h|help'        => \$help,
+  'pan_to_gn=s'       => \$pan_to_gn,
+  'list_annot:s'      => \$list_annot,
+  'hash_method:s'     => \$hash_method,
+  'annot_str_regex:s' => \$annot_str_regex,
+  'help'            => \$help,
 );
 
 die "$usage\n" if $help;
