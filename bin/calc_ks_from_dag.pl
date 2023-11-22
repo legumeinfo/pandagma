@@ -21,7 +21,7 @@ use DB_File;
 use Getopt::Long;
 use File::Basename;
 use feature "say";
-use Data::Dumper;
+#use Data::Dumper;
 #use Carp;
 
 my $scriptname = basename($0);
@@ -44,21 +44,21 @@ my $usage = <<EOS;
                         In the berkeleydb, the key is comprised of \"query target\"
                         and the remaining columns become columns 0-11 in the value record.
   Options:
-    -aln_out            Name for optional CDS alignment file, e.g. chrA.chrB.outcds
+    -align_out      Name for optional CDS alignment file, e.g. chrA.chrB.outcds
     -align_method   Method for generating protein alignments. Options: clustalw, precalc [precalc]
     -help           See this information
     -verbose        Run in verbose mode
 EOS
 
 my ($CODONSIZE, $KA_CUTOFF, $KS_CUTOFF, $frame, $codontable, $verbose) = (3, 4, 4, 0, 1, 0);
-my ($dagin, $chrA_fas, $chrB_fas, $report_out, $aln_out, $match_table, $help);
+my ($dagin, $chrA_fas, $chrB_fas, $report_out, $align_out, $match_table, $help);
 my $align_method = "precalc";
 
 GetOptions( 
   'dagin=s'        => \$dagin,      # required
   'report_out=s'   => \$report_out, # required
   'match_table:s'  => \$match_table,  # Required if align_method is "precalc"
-  'aln_out:s'      => \$aln_out,
+  'align_out:s'      => \$align_out,
   'help'           => \$help,
   'align_method:s' => \$align_method,
   'verbose+'       => \$verbose,
@@ -118,7 +118,7 @@ open (my $DAG, "< $dagin") or die "can't open $dagin: $!";
 open (my $RPTOUT, "> $report_out") or die "cannot open out $report_out:$!";
 
 my $align_obj;
-if ($aln_out) { $align_obj = new Bio::AlignIO('-format' => "fasta", '-file' => ">$aln_out") }
+if ($align_out) { $align_obj = new Bio::AlignIO('-format' => "fasta", '-file' => ">$align_out") }
 
 my $table = new Bio::Tools::CodonTable();
 
@@ -266,19 +266,19 @@ while (<$DAG>) {
     ## Align sequences
     my $dna_aln;
     eval {
-      if ($verbose) { say "ALIGNING $nuc_objA, $nuc_objB, $prot_objA, $prot_objB"; }
+      if ($verbose) { say "ALIGNING $idA and $idB (nuc_objA, nuc_objB, prot_objA, prot_objB)"; }
       $dna_aln = align_pair($nuc_objA, $nuc_objB, $prot_objA, $prot_objB);
     }; 
-    #warn $@ if $@;
+    warn $@ if $@;
     
     ## Calculate and report Ka and Ks
     eval {
       $count++;
-      if ($verbose) { say "CALCULATING KA & KS for $nuc_objA, $nuc_objB, $prot_objA, $prot_objB"; }
+      if ($verbose) { say "CALCULATING KA & KS for $idA and $idB"; }
       ($out_KaKs_aryref_all, $out_KaKsSum_hshref, $out_Ka_aryref, $out_Ks_aryref, $out_KaKs_aryref, $count) = 
         KaKs_report($dna_aln, $nuc_objA, $nuc_objB, $count);
     }; 
-    #warn $@ if $@;
+    warn $@ if $@;
   }
 }
 
@@ -397,7 +397,7 @@ sub align_pair {
   #say "GG ";
   
   if ($verbose) { say "WRITING $dna_aln" }
-  if ($aln_out) { $align_obj->write_aln($dna_aln) }
+  if ($align_out) { $align_obj->write_aln($dna_aln) }
   
   return $dna_aln;
 }
@@ -410,21 +410,24 @@ sub KaKs_report {
   my $A_id = $nuc_objA->display_id;
   my $B_id = $nuc_objB->display_id;
   my $aln_len = $dna_aln->length;
+  #say "CC: $A_id $B_id $aln_len";
 
   my ($kaks_factory, $Ka, $Ks, $KaKs);
   
   # Use codeml method (yn00 is't handled in this script yet; probably no reason to.)
+
   $kaks_factory = Bio::Tools::Run::Phylo::PAML::Codeml->new(-params => { 'runmode' => -2, 'seqtype' => 1 } );
   $kaks_factory->alignment($dna_aln);
   my ($rc, $parser) = $kaks_factory->run();
   my $result = $parser->next_result;
+  if ($verbose) { print "HERE2: Parsing on obj [$result]\n" } # We aren't seeing this.
   my $MLmatrix = $result->get_MLmatrix();
   
   $Ka = $MLmatrix->[0]->[1]->{'dN'};
   $Ks = $MLmatrix->[0]->[1]->{'dS'};
   $KaKs = $MLmatrix->[0]->[1]->{'omega'};
-  say "DD: $A_id\t$B_id\t$aln_len\t$Ka\t$Ks\t$KaKs";
-  
+  #say "DD: $A_id\t$B_id\t$aln_len\t$Ka\t$Ks\t$KaKs\n";
+
   if ($Ka < $KA_CUTOFF) {
     $out_KaKsSum_hsh{"sum_Ka"} += $Ka;
     push @out_Ka_ary, $Ka;
