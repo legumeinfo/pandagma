@@ -425,15 +425,16 @@ run_ks_calc() {
   fi
   
   for MATCHFILE in $WORK_DIR/03_mmseqs/*.m8; do
-    base=`basename $MATCHFILE .db`
-    echo "  Create berkeleydb file for $base"
+    base=`basename $MATCHFILE .m8`
+    dir=`dirname $MATCHFILE`
+    echo "  Create berkeleydb file for $base.m8"
     cat $MATCHFILE | 
-      perl -lane '($qry, $sbj, @rest) = $F[0], $F[1], @F[2..14]);
+      perl -lane '($qry, $sbj, @rest) = ($F[0], $F[1], @F[2..14]);
                    $qry =~ s/^\S+__(\S+)__\d+__\d+__[+-]$/$1/;
                    $sbj =~ s/^\S+__(\S+)__\d+__\d+__[+-]$/$1/;
                    print "$qry $sbj";
                    print join(" ", @rest);
-                  ' | db_load -T -t hash $base.db &
+                 ' | db_load -T -t hash $dir/$base.db &
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
@@ -442,15 +443,18 @@ run_ks_calc() {
     base=`basename $DAGFILE _matches.tsv.aligncoords`
     echo "  Calculate Ks values for $base"
 
-    echo "calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -match_table 03_mmseqs/$base.db ";
+    echo "calc_ks_from_dag.pl $WORK_DIR/02_*_cds.fna -match_table 03_mmseqs/$base.db ";
     echo "  -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout --align_method precalc";
-    calc_ks_from_dag.pl $WORK_DIR/*_cds.fna -match_table 03_mmseqs/$base.db  --align_method precalc -dagin $DAGFILE \
+    calc_ks_from_dag.pl $WORK_DIR/02_*_cds.fna -match_table 03_mmseqs/$base.db  --align_method precalc -dagin $DAGFILE \
       -report_out $WORK_DIR/05_kaksout/$base.rptout 1> /dev/null 2> /dev/null &
       #-dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout 
     echo
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
+
+  #echo "  Delete large Berkeleydb files (they derive from the .m8 files in 03_mmseqs)"
+  #rm 03_mmseqs/*.db
 
   echo "Determine provisional Ks peaks (Ks values and amplitudes) and generate Ks plots."
   export ANN_REX=${annot_str_regex}
