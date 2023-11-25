@@ -12,7 +12,6 @@ use Bio::AlignIO;
 use Bio::LocatableSeq;
 use Bio::SimpleAlign;
 use Bio::Tools::Run::Alignment::Clustalw;
-use Bio::Tools::Run::Alignment::MAFFT;
 use Bio::Tools::CodonTable;
 use Bio::Align::DNAStatistics;
 use Bio::Tools::Run::Phylo::PAML::Codeml;
@@ -58,7 +57,7 @@ GetOptions(
   'dagin=s'        => \$dagin,      # required
   'report_out=s'   => \$report_out, # required
   'match_table:s'  => \$match_table,  # Required if align_method is "precalc"
-  'align_out:s'      => \$align_out,
+  'align_out:s'    => \$align_out,
   'help'           => \$help,
   'align_method:s' => \$align_method,
   'verbose+'       => \$verbose,
@@ -83,9 +82,6 @@ elsif ($align_method =~ /precalc/i){
   tie %match_table_hsh, 'DB_File', $match_table, O_RDWR|O_CREAT, 0666, $DB_HASH 
     or die "Cannot open match_table $match_table: $!\n";
 }
-#elsif ($align_method =~ /mafft/i){
-#  $align_engine = Bio::Tools::Run::Alignment::MAFFT->new();
-#}
 else {
   die "Alignment method is not recognized. Available methods: clustalw, precalc";
 }
@@ -107,7 +103,6 @@ foreach my $input_fas ( @ARGV ) {
 
   while ( my $seq_obj = $seqio_obj->next_seq ) {
     my $display_id = $seq_obj->display_id();
-    #$seq_hsh{$display_id} = $seq_obj->seq();
     $seq_hsh{$display_id} = $seq_obj;
   }
 }
@@ -135,6 +130,10 @@ while (<$DAG>) {
   my $line = $_;
   
   if ($line =~ /^#/) {
+    # say "AA header line: $line";
+    # looks like:
+    #   ## alignment Medicago.pan2.chr1 vs. cerca.ISC453364.gnm3.Chr01 Alignment #1  score = 22213.0 (num aligned pairs: 512):
+    # NOTE: DAGChainer sorts the query and subject lexically, putting upper case before lower.
     # Process and print summary header lines from previous DAGchainer block
     my ($ave_Ka, $ave_Ks, $ave_KaKs, $median_Ka, $median_Ks, $median_KaKs);
     if ($count > 0) { # means $ave_Ka, $ave_Ks were calculable, so $count incremented; prepare for printing.
@@ -195,7 +194,9 @@ while (<$DAG>) {
     next
   }
   else { # Process data line and print Ka and Ks results.
-    #say "BB: $line";
+    #say "BB data line: $line";
+    # looks like:
+    # NOTE: DAGChainer sorts the query and subject lexically, putting upper case before lower.
     
     my ($IDchrA, $idA, $startA, $stopA, $IDchrB, $idB, $startB, $stopB, $Eval) = split /\s+/, $line;
   
@@ -231,6 +232,10 @@ while (<$DAG>) {
       }
 
       my @fields = split(/\s/, $match_table_hsh{"$idA $idB"});
+      if (scalar(@fields)<=1){
+        die "No match for key \"$idA $idB\". " .
+            "Are the identifiers in lexical order, to match the order in the DAGChainer coords file?"
+      }
 
       #say "CC: ", join "][", @fields, "]\n";
         # qry   sbj   fident  alnlen  mismatch  gapopen  qstart  qend  tstart  tend  evalue  bits  qaln  taln
@@ -238,7 +243,6 @@ while (<$DAG>) {
       my ($protA_start, $protA_end, $protA_aln) = ($fields[4], $fields[5], $fields[10]);
       my ($protB_start, $protB_end, $protB_aln) = ($fields[6], $fields[7], $fields[11]);
       
-      my $protA_adj = substr($protA_aln, $protA_start-1, $protA_end-$protA_start);
       #say "DD: $protA_start\t$protA_end\t$protA_aln";
       #say "DD: $protB_start\t$protB_end\t$protB_aln";
       
@@ -250,12 +254,12 @@ while (<$DAG>) {
 
       my $lenA = $nuc_objA->length;
       my $lenB = $nuc_objB->length;
-      #say join("\t", "EE:", $nuc_objA->length, $nuc_objA_adj->length);
-      #say "EE:\t", $nuc_objA->seq;
-      #say "EE:\t", $nuc_objA_adj->seq;
-      #say join("\t", "EE:", $nuc_objB->length, $nuc_objB_adj->length);
-      #say "EE:\t", $nuc_objB->seq;
-      #say "EE:\t", $nuc_objB_adj->seq;
+      # say join("\t", "EE:", $nuc_objA->length, $nuc_objA_adj->length);
+      # say "EE:\t", $nuc_objA->seq;
+      # say "EE:\t", $nuc_objA_adj->seq;
+      # say join("\t", "EE:", $nuc_objB->length, $nuc_objB_adj->length);
+      # say "EE:\t", $nuc_objB->seq;
+      # say "EE:\t", $nuc_objB_adj->seq;
       $prot_objA = Bio::Seq->new( -display_id => $idA, -seq => $protA_aln );
       $prot_objB = Bio::Seq->new( -display_id => $idB, -seq => $protB_aln );
       ($nuc_objA, $nuc_objB) = ($nuc_objA_adj, $nuc_objB_adj);
@@ -477,4 +481,4 @@ Versions
 2023-09-08 Add "precalc" to take in precomputed alignment from mmseqs, rather than using clustalw 
 2023-09-18 Add warning for undefined keys in match_table_hsh
 2023-10-11 Implement berkeleydb for the large match tables (for precalc method)
-
+2023-11-25 Check for lexical ordering of query & subject in key, for precalc method, for consistency with DAGChainer

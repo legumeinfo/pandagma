@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-11-20"
+version="2023-11-25"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -414,7 +414,10 @@ run_dagchainer() {
 ##########
 run_ks_calc() {
   echo; echo "Calculate Ks values from processed DAGChainer output, generating gene-pair and "
-  echo       "block-median Ks values for subsequent filtering."
+  echo       "block-median Ks values for subsequent filtering. For this step, alignments from mmseqs "
+  echo       "are converted to berkeleydb key-value hashes, where the key is composed of "
+  echo       "\"query subject\" or \"subject query\", in lexical order -- since the output of "
+  echo       "DAGChainer has query and subject in lexical order."
   echo "NPROC: ${NPROC}"
 
   cd "${WORK_DIR}"
@@ -424,16 +427,26 @@ run_ks_calc() {
     mkdir -p $WORK_DIR/05_kaksout
   fi
   
+  # Generate berkeleydb such that the sequence IDs are in lexical order, and coords and seqs are ordered accordingly
+  # qry, sbj, iden, len, mism, gap, qstart, qend, sstart, ssend, eval, bitsc, qaln, saln
+  # 0    1    2     3    4     5    6       7     8       9      10    11     12    13
   for MATCHFILE in $WORK_DIR/03_mmseqs/*.m8; do
     base=`basename $MATCHFILE .m8`
     dir=`dirname $MATCHFILE`
     echo "  Create berkeleydb file for $base.m8"
     cat $MATCHFILE | 
-      perl -lane '($qry, $sbj, @rest) = ($F[0], $F[1], @F[2..14]);
+      perl -lane '($qry, $sbj, $iden, $len, $mism, $gap, $qstart, $qend, $sstart, $ssend, $eval, $bitsc, $qaln, $saln) = @F;
+                   if ($qry gt $sbj){ 
+                     ($qry, $sbj)      = ($F[1], $F[0]);
+                     ($qstart, $qend)  = ($F[8], $F[9]);
+                     ($sstart, $ssend) = ($F[6], $F[7]);
+                     ($qaln, $saln)    = ($F[13], $F[12]);
+                   }
                    $qry =~ s/^\S+__(\S+)__\d+__\d+__[+-]$/$1/;
                    $sbj =~ s/^\S+__(\S+)__\d+__\d+__[+-]$/$1/;
+
                    print "$qry $sbj";
-                   print join(" ", @rest);
+                   print join(" ", $iden, $len, $mism, $gap, $qstart, $qend, $sstart, $ssend, $eval, $bitsc, $qaln, $saln);
                  ' | db_load -T -t hash $dir/$base.db &
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
@@ -443,11 +456,14 @@ run_ks_calc() {
     base=`basename $DAGFILE _matches.tsv.aligncoords`
     echo "  Calculate Ks values for $base"
 
-    echo "calc_ks_from_dag.pl $WORK_DIR/02_*_cds.fna -match_table 03_mmseqs/$base.db ";
-    echo "  -dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout --align_method precalc";
-    calc_ks_from_dag.pl $WORK_DIR/02_*_cds.fna -match_table 03_mmseqs/$base.db  --align_method precalc -dagin $DAGFILE \
-      -report_out $WORK_DIR/05_kaksout/$base.rptout 1> /dev/null 2> /dev/null &
-      #-dagin $DAGFILE -report_out $WORK_DIR/05_kaksout/$base.rptout 
+    echo "calc_ks_from_dag.pl $WORK_DIR/02_*_cds.fna \\ ";
+    echo "  -match_table 03_mmseqs/$base.db \\ ";
+    echo "  -dagin $DAGFILE \\ ";
+    echo "  -report_out $WORK_DIR/05_kaksout/$base.rptout -align_method precalc";
+    calc_ks_from_dag.pl $WORK_DIR/02_*_cds.fna \
+      -match_table 03_mmseqs/$base.db  -align_method precalc -dagin $DAGFILE \
+      -report_out $WORK_DIR/05_kaksout/$base.rptout 1> /dev/null 2> /dev/null & # send verbose warnings from LocatableSeq.pm to /dev/null
+      #-report_out $WORK_DIR/05_kaksout/$base.rptout &
     echo
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
@@ -457,7 +473,6 @@ run_ks_calc() {
   #rm 03_mmseqs/*.db
 
   echo "Determine provisional Ks peaks (Ks values and amplitudes) and generate Ks plots."
-  export ANN_REX=${annot_str_regex}
   cat /dev/null > stats/ks_peaks_auto.tsv
   cat /dev/null > stats/ks_histograms.tsv
   cat /dev/null > stats/ks_histplots.tsv
@@ -875,7 +890,6 @@ run_summarize() {
   conf_base=`basename $CONF .conf`
   full_out_dir="${out_dir_base}_$conf_base"
   stats_file=${full_out_dir}/stats.$conf_base.txt
-  export ANN_REX=${annot_str_regex}
 
   cd "${submit_dir}"
 
