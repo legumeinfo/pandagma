@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-11-25"
+version="2023-11-26"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -86,8 +86,9 @@ for example, \"Cicer\" and \"cerca\" matching the genus and \"gensp\" matching p
   cerca.ISC453364.gnm3.Chr03
 
 2. The second option for additional filtering is to provide a file of Ks peak values for synteny-block-median Ks values.
-This requires calculating gene-pair and block-median Ks values from DAGChainer output, using the included
-calc_ks_from_dag.pl script. A cutoff multiplier also needs to be provided. A value of 1.5 is recommended,
+This requires calculating gene-pair and block-median Ks values from DAGChainer output, using the first five steps,
+through the \"ks_calc\" . Several ks-related parameters also need to be provided in the configuration file. These
+are described briefly below. For the Ks multiplier value (mult_for_ks_cutoff) a value of 1.5 is recommended,
 taking advantage of the fact that the median absolute deviation value for a standard normal distribution is 1.48. 
 
 Variables in pandagma config file (Set the config with the CONF environment variable)
@@ -123,8 +124,10 @@ File sets (arrays):
           cds_files
 annotation_files_extra
    protein_files_extra
-     expected_quotas
-          ks_cutoffs
+
+Optional files with quotas or cutoff values
+     expected_quotas.tsv
+          ks_cutoffs.tsv
  """
 
 ########################################
@@ -469,8 +472,8 @@ run_ks_calc() {
   done
   wait
 
-  #echo "  Delete large Berkeleydb files (they derive from the .m8 files in 03_mmseqs)"
-  #rm 03_mmseqs/*.db
+  echo "  Delete large Berkeleydb files (they derive from the .m8 files in 03_mmseqs)"
+  rm 03_mmseqs/*.db
 
   echo "Determine provisional Ks peaks (Ks values and amplitudes) and generate Ks plots."
   cat /dev/null > stats/ks_peaks_auto.tsv
