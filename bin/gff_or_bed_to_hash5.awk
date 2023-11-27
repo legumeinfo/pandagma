@@ -9,13 +9,17 @@
 #     
 # OPERANDS
 #     INPUT_FILE
-#         A file containing GFF or four- or six-column BED data
+#         A file containing GFF or four-, six-, or seven-column BED data
+#         four:  molecule, feature-start, feature-end, mRNA-ID, score(0)
+#         six:   molecule, feature-start, feature-end, mRNA-ID, score(0), strand
+#         seven: molecule, feature-start, feature-end, mRNA-ID, score(0), strand, gene-ID
+
 BEGIN { FS = OFS = "\t" }
 NF == 4 { # 4-column BED. Code orientation as "+" in all cases.
    print $4,  $1 "__" $4 "__" $2 + 1 "__" $3 "__+"
    next
 }
-NF == 6 { # 6-column BED
+NF == 6 || NF == 7 { # 6- or 7-column BED (seventh column isn't used here)
    print $4,  $1 "__" $4 "__" $2 + 1 "__" $3 "__" $6
    next
 }
