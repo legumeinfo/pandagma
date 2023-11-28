@@ -95,8 +95,7 @@ for example, \"Cicer\" and \"cerca\" matching the genus and \"gensp\" matching p
 2. The second option for additional filtering is to provide a file of Ks peak values for synteny-block-median Ks values.
 This requires calculating gene-pair and block-median Ks values from DAGChainer output, using the first five steps,
 through the \"ks_calc\" . Several ks-related parameters also need to be provided in the configuration file. These
-are described briefly below. For the Ks multiplier value (mult_for_ks_cutoff) a value of 1.5 is recommended,
-taking advantage of the fact that the median absolute deviation value for a standard normal distribution is 1.48. 
+are described briefly below. 
 
 Variables in pandagma config file (Set the config with the CONF environment variable)
          clust_iden - Minimum identity threshold for mmseqs clustering [0.40]
@@ -109,7 +108,6 @@ Variables in pandagma config file (Set the config with the CONF environment vari
       ks_low_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values less than this. [0.5]
        ks_hi_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values greater than this. [2.0]
          ks_binsize - For calculating and displaying histograms. [0.05]
- mult_for_ks_cutoff - Multiply by Ks_peak to give the per-species cutoff for Ks block-medians. [1.5]
 ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
         max_pair_ks - Fallback value for excluding gene pairs, if a ks_cutoffs file is not provided. [4.0]
 
@@ -792,9 +790,7 @@ run_tabularize() {
   head -1 tmp.18_syn_pan_aug_extra.clust.tsv > tmp.table_header
 
   echo "  Sort, putting header row at top, and don't print pangenes that are all NONE"
-    cat tmp.18_syn_pan_aug_extra.clust.tsv |
-    sort -k2-10 |
-    sed '/^$/d; /^#pangene/d' |
+    cat tmp.18_syn_pan_aug_extra.clust.tsv | sort -k1,1 | sed '/^$/d; /^#pangene/d' |
     perl -lane '$ct=0; for $gn (@F){if ($gn=~/NONE/){$ct++}}; if ($ct<(scalar(@F)-1)){print $_}' |
     cat tmp.table_header - > 18_syn_pan_aug_extra.table.tsv
 
@@ -1090,9 +1086,9 @@ export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 # mmseqs uses significant number of threads on its own. Set a maximum, which may be below NPROC.
 MMSEQSTHREADS=$(( 4 < ${NPROC} ? 4 : ${NPROC} ))
 
-pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation strict_synt dagchainer_args 
-  ks_low_cutoff ks_hi_cutoff ks_binsize mult_for_ks_cutoff ks_block_wgd_cutoff max_pair_ks 
-  out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex work_dir'
+pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation strict_synt 
+ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff max_pair_ks 
+out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex work_dir '
 
 ##########
 # Command-line interpreter
