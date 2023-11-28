@@ -13,6 +13,7 @@ The pangene workflow (pandagma-pan.sh) is essentially as follows:
 * Cluster (mcl)
 * Add back the genes that were excluded to this point 
 * Add "extra" annotation sets by homology 
+* Generate a tabular form of the pangenes
 * Identify a representative sequence for each pangene
 * Calculate consensus order of the pangenes, based on whole-chromosome multiple alignments of ordered panIDs
 * Calculate and report statistics
@@ -29,10 +30,14 @@ and uses an optional "quotas" file to determine the initial expected gene duplic
 considering known or suspected whole-genome duplication histories at the evolutionary depth of interest.
 * Add positional information to the gene IDs
 * Find gene homologies among pairs of annotation sets, using mmseqs2
-* Filter by synteny (DAGChainer) -- and, optionally, by a "quotas" file with expected ortholog and paralog counts per species pairs.
+* Filter by synteny (DAGChainer) 
+*   Additional filter options -- either or both can be used:
+*     - by a list of provided "quotas", with whole-genome duplication counts per species.
+*     - by Ks peak values, calculated by the ks_calc step
 * Cluster (mcl)
 * Add back the genes that were excluded to this point 
 * Add "extra" annotation sets by homology 
+* Generate a tabular form of the pangenes
 * Align sequences in each family
 * Build HMMs for each alignment
 * Realign to the HMMs and trim to HMM match-states
@@ -56,7 +61,10 @@ To run pandamga using singularity, use `singularity run --cleanenv pandagma.sif 
 ### Installation method 2: manual installation of scripts and dependencies
 
 These dependencies are required: 
-```  bioperl, mmseqs, dagchainer, mcl, EMBOSS, famsa ```
+```  
+  bioperl, bioperl-run, perl-parallel-forkmanager, perl-list-moreutils 
+  mmseqs, dagchainer, mcl, EMBOSS, famsa, fasttree, hmmer
+```
 These need to be installed and available in the script's environment.
 
 Once those are available on your PATH, the program can be called directly with its options.
@@ -116,7 +124,7 @@ CDS coordinates are derived from CDS features:
 
 BED files are assumed to contain a single feature for each primary coding sequence specified, where the coordinates represent the minimum start (0-based) and maximum end positions of the the primary coding sequence in the reference:
 
-	Chr1	2221	5555	id1
+  molecule, feature-start, feature-end, mRNA-ID, score(0), strand, gene-ID
 
 Optionally, a file specified in the expected_chr_matches variable can be specified in GENUS.conf,
 which provides anticipated chromosome pairings, e.g.
@@ -147,9 +155,10 @@ Subcommands (in order they are usually run):
        cluster_rest - Retrieve unclustered sequences and cluster those that can be.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
+         tabularize - Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv
      pick_exemplars - Pick representative sequence for each pangene
      filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
-      order_and_name - Assign pangene names with consensus chromosomes and ordinal positions.
+     order_and_name - Assign pangene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
 
