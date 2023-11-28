@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-11-26"
+version="2023-11-28"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -38,6 +38,7 @@ Primary protein sequences and annotation (GFF3 or BED) files must be listed in t
 config file, in the arrays annotation_files and protein_files. See example files.
 
 Subcommands (in order they are usually run):
+  Run these first (if using ks_calc)
                 all - All of the steps below, except for ks_filter, clean and ReallyClean
                         (Or equivalently: omit the -s flag; \"all\" is default).
              ingest - Prepare the assembly and annotation files for analysis.
@@ -45,6 +46,9 @@ Subcommands (in order they are usually run):
              filter - Filter the synteny results for chromosome pairings, returning gene pairs.
          dagchainer - Run DAGchainer to filter for syntenic blocks.
             ks_calc - Calculation of Ks values on gene pairs from DAGchainer output.
+
+  Evaluate the stats/ks_histplots.tsv and stats/ks_peaks_auto.tsv files and
+  put ks_peaks.tsv into the original data directory, then run the following commands:
           ks_filter - Filtering based on provided ks_peaks.tsv file (assumes prior ks_calc step)
                 mcl - Derive clusters, with Markov clustering.
            consense - Calculate a consensus sequences from each pan-gene set, 
@@ -52,10 +56,13 @@ Subcommands (in order they are usually run):
        cluster_rest - Retrieve unclustered sequences and cluster those that can be.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
+         tabularize - Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv
+          summarize - Move results into output directory, and report summary statistics.
+
+  If generating alignments, models, and trees, run the following steps:
               align - Align families.
      model_and_trim - Build HMMs and trim the alignments, preparatory to calculating trees.
          calc_trees - Calculate gene trees.
-          summarize - Move results into output directory, and report summary statistics.
 
   Run the following subcommands separately if you wish:
               clean - Clean (delete) files in the working directory that are not needed 
@@ -758,10 +765,10 @@ run_add_extra() {
       > 18_syn_pan_aug_extra.hsh.tsv
 
     echo "  For each family set, retrieve sequences into a multifasta file."
-    echo "    Fasta file:" "${protein_files[@]}"
+    echo "    Fasta file:" "${protein_files[@]} ${protein_files_extra[@]}"
     if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot ; fi
     mkdir -p 19_pan_aug_leftover_merged_prot
-    get_fasta_from_family_file.pl "${protein_files[@]}" \
+    get_fasta_from_family_file.pl "${protein_files[@]}" "${protein_files_extra[@]}" \
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
 
     echo "  Merge fasta files from 19_pan_aug_leftover_merged_prot, prefixing IDs with panID__"
@@ -773,6 +780,33 @@ run_add_extra() {
     cp 12_syn_pan_aug.clust.tsv 18_syn_pan_aug_extra.clust.tsv
     cp 12_syn_pan_aug.hsh.tsv 18_syn_pan_aug_extra.hsh.tsv
   fi
+}
+
+##########
+run_tabularize() {
+  echo; echo "== Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv"
+  cd "${WORK_DIR}"
+
+  # Get table header
+  pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv -annot_str_regex $ANN_REX > tmp.18_syn_pan_aug_extra.clust.tsv
+  head -1 tmp.18_syn_pan_aug_extra.clust.tsv > tmp.table_header
+
+  # Find column on which to sort first
+  export PR_ANN=$preferred_annot
+  sort_col=$( cat tmp.table_header |
+     perl -ane 'BEGIN{use List::Util qw(first); $PA=$ENV{"PR_ANN"}}; $idx = first { $F[$_] =~ /$PA/ } 0..$#F; print ($idx+1) ' )
+
+  echo "  Field for sorting 18_syn_pan_aug_extra.table.tsv is sort_col: $sort_col"
+
+  echo "  Sort, putting header row at top, and don't print pangenes that are all NONE"
+    cat tmp.18_syn_pan_aug_extra.clust.tsv |
+    sort -k$sort_col,$sort_col -k2,2 |
+    sed '/^$/d; /^#pangene/d' |
+    perl -lane '$ct=0; for $gn (@F){if ($gn=~/NONE/){$ct++}}; if ($ct<(scalar(@F)-1)){print $_}' |
+    cat tmp.table_header - > 18_syn_pan_aug_extra.table.tsv
+
+    rm tmp.18_syn_pan_aug_extra.clust.tsv
+    rm tmp.table_header
 }
 
 ##########
@@ -903,7 +937,8 @@ run_summarize() {
 
   for file in 06_syn_pan.clust.tsv 06_syn_pan_ge3.hsh.tsv \
               12_syn_pan_aug.clust.tsv 12_syn_pan_aug.hsh.tsv \
-              18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv 18_syn_pan_aug_extra.counts.tsv; do
+              18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv \
+              18_syn_pan_aug_extra.table.tsv 18_syn_pan_aug_extra.counts.tsv; do
     if [ -f ${WORK_DIR}/$file ]; then
       cp ${WORK_DIR}/$file ${full_out_dir}/
     else 
@@ -1157,7 +1192,8 @@ fi
 # Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
 commandlist="ingest mmseqs filter dagchainer \
              run_ks_calc ks_filter \
-             mcl consense cluster_rest add_extra align model_and_trim calc_trees summarize"
+             mcl consense cluster_rest add_extra tabularize \
+             align model_and_trim calc_trees summarize"
 
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do
