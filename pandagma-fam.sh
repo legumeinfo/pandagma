@@ -791,16 +791,9 @@ run_tabularize() {
   pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv -annot_str_regex $ANN_REX > tmp.18_syn_pan_aug_extra.clust.tsv
   head -1 tmp.18_syn_pan_aug_extra.clust.tsv > tmp.table_header
 
-  # Find column on which to sort first
-  export PR_ANN=$preferred_annot
-  sort_col=$( cat tmp.table_header |
-     perl -ane 'BEGIN{use List::Util qw(first); $PA=$ENV{"PR_ANN"}}; $idx = first { $F[$_] =~ /$PA/ } 0..$#F; print ($idx+1) ' )
-
-  echo "  Field for sorting 18_syn_pan_aug_extra.table.tsv is sort_col: $sort_col"
-
   echo "  Sort, putting header row at top, and don't print pangenes that are all NONE"
     cat tmp.18_syn_pan_aug_extra.clust.tsv |
-    sort -k$sort_col,$sort_col -k2,2 |
+    sort -k2-10 |
     sed '/^$/d; /^#pangene/d' |
     perl -lane '$ct=0; for $gn (@F){if ($gn=~/NONE/){$ct++}}; if ($ct<(scalar(@F)-1)){print $_}' |
     cat tmp.table_header - > 18_syn_pan_aug_extra.table.tsv
