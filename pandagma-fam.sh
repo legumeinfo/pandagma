@@ -463,18 +463,16 @@ run_ks_calc() {
   echo "  Create berkeleydb file for fasta file(s) 02_*_cds.fna"
   cat 02_*_cds.fna | fasta_to_berkeleydb.awk | db_load -T -t hash 02_tmp_fasta.db
     
-
   for DAGFILE in 04_dag/*aligncoords; do
     base=`basename $DAGFILE _matches.tsv.aligncoords`
     echo "  Calculate Ks values for $base"
 
-    echo "cat $DAGFILE | calc_ks_from_dag.pl \\ ";
-    echo "  -fasta_db 02_tmp_fasta.db \\ ";
-    echo "  -match_table 03_mmseqs/$base.db \\ ";
-    echo "  -report_out 05_kaksout/$base.rptout -align_method precalc";
+    echo "cat $DAGFILE | calc_ks_from_dag.pl -fasta_db 02_tmp_fasta.db \\ ";
+    echo "   -align_method precalc -match_table 03_mmseqs/$base.db \\ ";
+    echo "  -report_out 05_kaksout/$base.rptout";
     cat $DAGFILE | calc_ks_from_dag.pl -fasta_db 02_tmp_fasta.db \
       -match_table 03_mmseqs/$base.db  -align_method precalc \
-      -report_out 05_kaksout/$base.rptout 2> /dev/null & # send verbose warnings from LocatableSeq.pm to /dev/null
+      -report_out 05_kaksout/$base.rptout 2> /dev/null & # discard verbose warnings from LocatableSeq.pm
     echo
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
