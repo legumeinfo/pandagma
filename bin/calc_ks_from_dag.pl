@@ -95,46 +95,6 @@ else {
 
 tie my %seq_hsh, 'DB_File', $fasta_db, O_RDWR|O_CREAT, 0666, $DB_HASH;
 
-say "  == Processing FASTA file(s): ", join(", "), @ARGV;
-foreach my $fasta_file ( @ARGV ) {
-  my $FAS_FH;
-
-  tie %seq_hsh, 'DB_File', $fasta_db, O_RDWR|O_CREAT, 0666, $DB_HASH;
-
-  if ( $fasta_file =~ /gz$/ ){
-    open( $FAS_FH, "zcat $fasta_file|" ) or die "Can't do zcat $fasta_file| : $!";
-  }
-  else {
-    open ( $FAS_FH, "<", $fasta_file ) or die "Can't open in $fasta_file: $!\n";
-  }
-
-  my ($display_id, $prev_seqid, $seq);
-  my $seq_ct = 0;
-  while (<$FAS_FH>){
-    chomp;
-    my $line = $_;
-    if ($line =~ /^>(\S+)/){
-      $display_id = $1;
-      if ($seq_ct > 0){
-        unless ($seen_seq_id{$prev_seqid}){
-          $seen_seq_id{$prev_seqid}++;
-          $seq_hsh{$prev_seqid} = $seq;
-        }
-      }
-      $seq = "";
-      $prev_seqid = $display_id;
-      $seq_ct++;
-    }
-    elsif ($line !~ /^>/){
-      $seq .= $line; 
-    }
-  }
-  # Flush last seq_id and seq
-  unless ($seen_seq_id{$prev_seqid}){
-    $seq_hsh{$prev_seqid} = $seq;
-  }
-}
-
 ##################################################
 # Process the DAGchainer output (FILE.aligncoords) 
 open (my $RPTOUT, "> $report_out") or die "cannot open out $report_out $!";
