@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-11-28"
+version="2023-11-30"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -460,25 +460,29 @@ run_ks_calc() {
   done
   wait
 
-  for DAGFILE in $WORK_DIR/04_dag/*aligncoords; do
+  echo "  Create berkeleydb file for fasta file(s) 02_*_cds.fna"
+  cat 02_*_cds.fna | fasta_to_berkeleydb.awk | db_load -T -t hash 02_tmp_fasta.db
+    
+
+  for DAGFILE in 04_dag/*aligncoords; do
     base=`basename $DAGFILE _matches.tsv.aligncoords`
     echo "  Calculate Ks values for $base"
 
-    echo "calc_ks_from_dag.pl $WORK_DIR/02_*_cds.fna \\ ";
+    echo "cat $DAGFILE | calc_ks_from_dag.pl \\ ";
+    echo "  -fasta_db 02_tmp_fasta.db \\ ";
     echo "  -match_table 03_mmseqs/$base.db \\ ";
-    echo "  -dagin $DAGFILE \\ ";
-    echo "  -report_out $WORK_DIR/05_kaksout/$base.rptout -align_method precalc";
-    calc_ks_from_dag.pl $WORK_DIR/02_*_cds.fna \
-      -match_table 03_mmseqs/$base.db  -align_method precalc -dagin $DAGFILE \
-      -report_out $WORK_DIR/05_kaksout/$base.rptout 1> /dev/null 2> /dev/null & # send verbose warnings from LocatableSeq.pm to /dev/null
-      #-report_out $WORK_DIR/05_kaksout/$base.rptout &
+    echo "  -report_out 05_kaksout/$base.rptout -align_method precalc";
+    cat $DAGFILE | calc_ks_from_dag.pl -fasta_db 02_tmp_fasta.db \
+      -match_table 03_mmseqs/$base.db  -align_method precalc \
+      -report_out 05_kaksout/$base.rptout 2> /dev/null & # send verbose warnings from LocatableSeq.pm to /dev/null
     echo
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
 
-  echo "  Delete large Berkeleydb files (they derive from the .m8 files in 03_mmseqs)"
+  echo "  Delete large Berkeleydb files (they derive from the .m8 files in 03_mmseqs and 02_*_cds.fna)"
   rm 03_mmseqs/*.db
+  rm 02_tmp_fasta.db
 
   echo "Determine provisional Ks peaks (Ks values and amplitudes) and generate Ks plots."
   cat /dev/null > stats/ks_peaks_auto.tsv
