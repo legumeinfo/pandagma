@@ -4,7 +4,7 @@ There are two main workflows: pandagma-pan.sh for pangene sets, and pandagma-fam
 The pangene workflow is designed to operate primarily on CDS sequences, at the level of a species or genus.
 The family workflow is designed to operate on protein sequences, at the level of an organismal family or order.
 
-Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023.
+Authors: Steven Cannon, Hyunoh Lee, Nathan Weeks, Joel Berendzen, 2020-2023.
 
 The pangene workflow (pandagma-pan.sh) is essentially as follows:
 * Add positional information to the gene IDs
@@ -24,10 +24,10 @@ Alignments and trees can also be calculated with these optional steps:
 * calc_trees
 * xfr_aligns_trees
 
-
 The gene family workflow (pandagma-fam.sh) is similar to the pangene workflow, but operates on proteins rather than CDS,
 and uses an optional "quotas" file to determine the initial expected gene duplication relationships between species,
-considering known or suspected whole-genome duplication histories at the evolutionary depth of interest.
+considering known or suspected whole-genome duplication histories at the evolutionary depth of interest,
+and can filter using synonymous-distance (Ks) parameters calculated from the data and thresholds provided by the user.
 * Add positional information to the gene IDs
 * Find gene homologies among pairs of annotation sets, using mmseqs2
 * Filter by synteny (DAGChainer) 
@@ -62,8 +62,14 @@ To run pandamga using singularity, use `singularity run --cleanenv pandagma.sif 
 
 These dependencies are required: 
 ```  
-  bioperl, bioperl-run, perl-parallel-forkmanager, perl-list-moreutils 
+  bioperl, bioperl-run, Bio::Tools::Run::Phylo::PAML, Bio::Tools::Run::Alignment::Clustalw
+  perl-parallel-forkmanager, perl-list-moreutils 
   mmseqs, dagchainer, mcl, EMBOSS, famsa, fasttree, hmmer
+
+-c bioconda perl-bio-tools-phylo-paml
+-c bioconda perl-bio-tools-run-alignment-clustalw
+
+
 ```
 These need to be installed and available in the script's environment.
 
@@ -74,12 +80,15 @@ Installing the dependencies is up to you. They can be installed via a suitable p
 For example, using conda: 
 ~~~
   conda create -n pandagma
-  conda install -n pandagma -c conda-forge -c bioconda perl-bioperl-core perl-parallel-forkmanager \
-    perl-bioperl-run perl-list-moreutils dagchainer mcl mmseqs2 emboss famsa fasttree hmmer
+  conda install -n pandagma -c conda-forge -c bioconda perl-bioperl-core perl-bioperl-run \
+    perl-bio-tools-phylo-paml perl-bio-tools-run-alignment-clustalw \
+    perl-parallel-forkmanager perl-list-moreutils \
+    dagchainer mcl mmseqs2 emboss famsa fasttree hmmer
+~~~
+Then, depending on your computing environment, activate the conda environment in one of the following ways:
+~~~
   conda activate pandagama
-~~~
-Or on some systems, activate conda thus:
-~~~
+or
   source activate pandagma
 ~~~
 
@@ -98,6 +107,7 @@ Usage:
 
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
            -w (working directory, for temporary and intermediate files.
+  conda activate pandagama
                 Must be specified in config file if not specified here.)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
            -r (retain. Don't do subcommand \"clean\" after running \"all\".)
@@ -109,6 +119,7 @@ The bin/ directory should be added to your PATH, to make the scripts there acces
 
 Primary coding and protein sequences (both fasta) and annotation (GFF3 or BED) files must be listed in the
 config file, in the arrays cds_files, annotation_files, and protein_files. See example files.
+
 Note that the annotation and CDS files need to be listed in CORRESPONDING ORDER in the config.
 
 FASTA deflines are assumed to be formatted with the ID separated from any additional fields by a space:
@@ -142,7 +153,7 @@ At the end of the process, remaining genes will be added to initial clusters, ba
 Remaining genes may be those falling on unanchored scaffolds, or on chromosomes by not part of
 synteny blocks and so not making it into the synteny-based clusters.
 
-Subcommands (in order they are usually run):
+Subcommands for the pangene workflow, pandagma-pan.sh, in order they are usually run:
                 all - All of the steps below, except for clean and ReallyClean
                         (Or equivalently: omit the -s flag; "all" is default)
              ingest - Prepare the assembly and annotation files for analysis
@@ -162,7 +173,34 @@ Subcommands (in order they are usually run):
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
 
-  Run either of the following subcommands separately if you wish:
+Subcommands for the gene family workflow, pandagma-fam.sh, in order they are usually run:
+  Run these first (if using ks_calc)
+                all - All of the steps below, except for ks_filter, clean and ReallyClean
+                        (Or equivalently: omit the -s flag; \"all\" is default).
+             ingest - Prepare the assembly and annotation files for analysis.
+             mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies.
+             filter - Filter the synteny results for chromosome pairings, returning gene pairs.
+         dagchainer - Run DAGchainer to filter for syntenic blocks.
+            ks_calc - Calculation of Ks values on gene pairs from DAGchainer output.
+
+  Evaluate the stats/ks_histplots.tsv and stats/ks_peaks_auto.tsv files and
+  put ks_peaks.tsv into the original data directory, then run the following commands:
+          ks_filter - Filtering based on provided ks_peaks.tsv file (assumes prior ks_calc step)
+                mcl - Derive clusters, with Markov clustering.
+           consense - Calculate a consensus sequences from each pan-gene set,
+                      adding sequences missed in the first clustering round.
+       cluster_rest - Retrieve unclustered sequences and cluster those that can be.
+          add_extra - Add other gene model sets to the primary clusters. Useful for adding
+                      annotation sets that may be of lower or uncertain quality.
+         tabularize - Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv
+          summarize - Move results into output directory, and report summary statistics.
+
+  If generating alignments, models, and trees, run the following steps:
+              align - Align families.
+     model_and_trim - Build HMMs and trim the alignments, preparatory to calculating trees.
+         calc_trees - Calculate gene trees.
+
+  For both pandagma-pan and pandagma-fam, run either of the following subcommands separately if you wish:
               clean - Clean (delete) files in the working directory that are not needed
                         for later addition of data using add_extra and subsequent run commands.
                         By default, \"clean\" is run as part of \"all\" unless the -r flag is set.
@@ -190,6 +228,32 @@ Variables in pandagma config file:
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
            work_dir - Working directory, for temporary and intermediate files. 
+
+Variables in pandagma config file (Set the config with the CONF environment variable)
+         clust_iden - Minimum identity threshold for mmseqs clustering [0.40]
+          clust_cov - Minimum coverage for mmseqs clustering [0.40]
+        consen_iden - Minimum identity threshold for consensus generation [0.30]
+         extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [0.30]
+      mcl_inflation - Inflation parameter, for Markov clustering [1.6]
+        strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs [1]
+                        The alternative (0) is to use all homologous pairs that satisfy expected_quotas.tsv
+      ks_low_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values less than this. [0.5]
+       ks_hi_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values greater than this. [2.0]
+         ks_binsize - For calculating and displaying histograms. [0.05]
+ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
+        max_pair_ks - Fallback value for excluding gene pairs, if a ks_cutoffs file is not provided. [4.0]
+
+      consen_prefix - Prefix to use in orthogroup names
+       out_dir_base - Base name for the output directory [default: './out']
+    annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g.
+                        \"([^.]+\.[^.]+)\..+\"
+                          for two dot-separated fields, e.g. vigan.Shumari
+                        or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
+    preferred_annot - String to match and select an annotation set, from a gene ID.
+                        This is used for picking representative IDs+sequence from an orthogroup, when
+                        this annotation is among those with the median length for the orthogroup.
+                        Otherwise, one is selected at random from those with median length.
+           work_dir - Working directory, for temporary and intermediate files.
 
 ~~~
 
@@ -285,5 +349,6 @@ Variables in pandagma config file:
 
     These values can be used to constrain matches in a subsequent run, via the file data/expected_chr_matches.tsv
     (For the Zea run, these values were already provided, generated by get_data/get_Zea.sh 
+
 
 
