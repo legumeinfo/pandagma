@@ -1,0 +1,112 @@
+---
+augment_cluster_sets.awk: Combine sets of files from two directories EXTRA_DIR
+  and FASTA_DIR, to  produce a new gene-family "cluster" file.
+calc_avg_pangene_order.awk: Given input consisting of two columns with the first
+  column having identifiers that occur one or multiple times, and a second
+  column having numbers (e.g. ordinal positions), calculate the average of the
+  numbers per identifier.
+calc_ks_from_dag.pl: Calculates Ks for genes in DAGchainer synteny gene pairs.
+calc_pan_stats.pl: Calculate matrix of gene counts per orthogroup and annotation
+  set, given input of pan-gene results in "clust.tsv" format (pan-gene ID in
+  first column, followed by gene IDs, tab-separated), and a regex for capturing
+  assembly/annotation string from the gene IDs.
+do_align.sh: Computing alignment, using program famsa, for indicated fasta files.
+do_align_clean.sh: Manage the filtering of alignments, in preparation for tree
+  calculation. Calls script filter_align.pl
+fasta_to_berkeleydb.awk: remove line returns from fasta files, and report in
+  alternating format, to permit creation of a berkeleydb.
+fasta_to_table.awk: Remove line returns from fasta files, and report in table format -- ID, seq
+filter_align.pl: Eliminate columns in a fasta-format alignment that just contain gaps.
+filter_mmseqs_by_chroms.pl: Filter on patterns in the two chromosomes, provided
+  in an input file via the flag -chr_pat
+filter_mmseqs_by_ks.pl: Filter gene pairs on block-median values against values
+  provided in the file specified by -ks_peaks and cutoff values determined by
+  those peak values and the supplied mult_for_ks_cutoff (default 1.5).
+filter_mmseqs_by_quotas.pl: Filter to the number of sseqid matches per qseqid
+  indicated in the quotas file, such that up to the quota number of subject
+  chromosomes are seen per query. Output is to stdout.
+gene_trans_db_load.sh: A little script to create berkeleydb files for use by gene_translate.pl
+gene_translate.pl: Given a stream of "FROM" genes, return a table of "FROM - TO"
+  correspondences and pangene IDs.
+get_fasta_from_family_file.pl: Read a file of gene family membership, consisting
+  of rows each containing a list of genes in a family. The row can begin with a
+  family ID, or unique IDs can be assigned as an option by this program. Print
+  sequences from each family to new fasta files, one per family.
+get_fasta_subset.pl: Read a list of fasta IDs and a fasta file and either
+  exclude or include those sequences into a new fasta file.
+gff_or_bed_to_hash5.awk: Generate hash of gene ID and positional information.
+  The hash value has five fields, separated by "__", i.e. chr, geneID, start,
+  end, orient
+gff_to_bed7_mRNA.awk: Generate mRNA-level seven-column BED file from GFF.
+  Columns, i.e. molecule, feature-start, feature-end, mRNA-ID, score(0), strand,
+  gene-ID
+hash_into_fasta_id.pl: Read a key-value hash file, and a fasta file (may be
+  compressed or not). Swap the IDs with the values from the hash file.
+hash_into_table_2cols.pl: Read key-value pairs from one or more hash files as
+  first argument(s), and a file with tabular data.   Swap the IDs with the
+  values in the two indicated columns of the tabular data with values from the
+  hash.
+hash_into_table_id.pl: Read key-value pairs from one or more hash files as first
+  argument(s), and a file with tabular data.   Swap the IDs with the values in
+  the indicated column of the tabular data with values from the hash.
+hash_to_rows_by_1st_col.awk: Given input consisting of two columns with the
+  first column having identifiers that occur one or multiple times, and a second
+  column having unique identifiers, pull the IDs in the second column into a
+  single row anchored by the ID in the first column.
+histogram.pl: Calculate frequency histogram out of lists of stuff. Author - Flavio Poletti
+histplot.pl: Converts a two-column histogram (bins, counts) to an ascii plot of
+  count values.
+make_peptide_hash.pl: Generates a list of unique strings consisting of amino
+  acid sequences, e.g. FDFLS, WLDAV, ... The intended purpose is to generate
+  codes that will be interpreted as amino acid sequences by alignment programs
+  -- for example, to encode a list of elements as peptide strings.
+merge_files_to_pan_fasta.awk: Combine sets of fasta files from one directory
+  into a new merged fasta file with the filename prefixed to the sequence ID,
+  e.g. >pan00001__gene_ID
+n50stats.sh: Print some basic stats about sequences in a multifasta file
+order_by_consensus.pl: Given five-column input (pan-IDs, gene_IDs, annot.chr#,
+  start, end), calculate gene order per annotation, then report (1) pan-ID; (2)
+  consensus (median) chromosome for each pan-gene; (3) consensus ordering on the
+  chromosome, based on median of orders of the genes in each pan-gene; (4)
+  median start position from the pan-genes; (5) median end position from the
+  pan-genes.
+order_by_reference.pl: Given a file with panIDs, geneIDs, annotation names, and
+  positional information, and the name of a prefered annotation to use as a
+  reference, return the order of panIDs following the order of genes in the
+  preferred annotation.
+order_decode.pl: Given alignment of gene order with pangene IDs encoded as
+  peptide strings, decode these back into pangene IDs.
+order_encode.pl: Given six-column input (pan-IDs, gene_IDs, annot.chr#, start,
+  end, orientation), Produce chromosome multifasta files, with a representation
+  of gene order per annotation. Gene order is coded as a set of unique peptide
+  strings that can be aligned using a standard protein multiple alignment
+  program.
+order_gapfill.pl: Given alignment of gene order with pangene IDs determined
+  previously (by alignment, with order_encode.pl and order_decode.pl or by
+  reference, with order_by_reference.pl), place the leftover pangenes relative
+  to the pangenes that have established, alignment-based placements.
+pan_histplot.pl: Converts a two-column histogram (bins, counts) to an ascii plot
+  of count values.
+pangene_compare.sh: Operates on files with a two-column hash format, with the
+  set ID in the first column and gene IDs in the second.
+pangene_search.pl: Given a search string (either a gene name or pangene ID),
+  return the pangene ID that contains that string, and the constituent gene IDs
+  in that pangene set.
+pangene_tabularize.pl: Given a pangene file in mcl cluster format (panID gene
+  gene gene), return a table of genes in columns by annotation.
+pick_family_rep.pl: Given fasta sequences in pan-genes sets (on STDIN), identify
+  a representative sequence to for each pan-gene, with representative chosen
+  from the median(ish) sequence length.
+rename.pl: Change filenames.
+root_tree_by_species.pl: Calculate a RAxML tree and root it by specified
+  sequence patterns, if those sequences are present.
+sort_gff.pl: Sorts GFF data by feature type, putting parent features before
+  child features. The sorted output should be suitable for indexing using
+  Samtools tabix.
+split_table_to_files.pl: Split tabular data into a set of files. Input is a
+  table to be split into sub-tables, with the sub-tables named by values in the
+  sorted input table.
+top_hmmscan_line.awk: Filter tabular hmmscan output to top hit per query.
+top_line.awk: Filter tabular (ARGV or STDIN) to the first record per the first
+  column. The input data should be sorted on the first column.
+transpose.pl: Given tabular data on STDIN, return transposed table on STDOUT

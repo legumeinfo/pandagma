@@ -1,0 +1,21 @@
+---
+LICENSE: License
+README.md: README
+
+batch_fam_example_singularity.sh: Example job-control script for SLURM, using
+  Singularity for dependency installation
+batch_pan_example_conda.sh: Example job-control script for SLURM, using Conda for dependency installation
+
+bin: Directory of utility scripts used in the pandagma workflows
+config: Directory of sample configuration files
+get_data: Directory of sample files for retrieval and formatting of data sets,
+  corresponding with the configuration files
+manifests: Directory of file manifests, with brief descriptions of contents.
+
+pandagma-pan.sh: Pangene workflow - main configuration and workflow-control script
+pandagma-pupdate.sh: Workflow for adding annotation sets to an existing gene family set, by homology
+
+pandagma-fam.sh: Gene family workflow - main configuration and workflow-control script
+pandagma-fsup.sh: Workflow for adding annotation sets to an existing gene family set, by homology
+
+singularity.def: Definition file for installation of dependencies using Singularity

@@ -1,0 +1,23 @@
+---
+06_syn_pan.clust.tsv: Gene family sets of "main" annotations only, clustered by homology and synteny, 
+  in cluster format - i.e., ID in first column, followed by tab-separated gene list.
+06_syn_pan_ge3.hsh.tsv: Gene family sets of "main" annotations only, clustered by homology and synteny,
+  in a two-column hash format, with the set ID in the first column and genes in the second. 
+  Filtered to include three or more members.
+12_syn_pan_aug.clust.tsv: Gene family sets of "main" annotations only, clustered by homology and synteny
+  and augmented by leftover genes into the initial clusters plus clusters of remaining genes, 
+  in cluster format - i.e., ID in first column, followed by tab-separated gene list.
+12_syn_pan_aug.hsh.tsv: Gene family sets of "main" annotations only, clustered by homology and synteny
+  and augmented by leftover genes into the initial clusters plus clusters of remaining genes, 
+  in a two-column hash format, with the set ID in the first column and genes in the second.
+18_syn_pan_aug_extra.clust.tsv: Gene family sets, in cluster format - i.e., ID in
+  first column, followed by tab-separated gene list.
+18_syn_pan_aug_extra.counts.tsv: Matrix of counts of genes per annotation set for each gene family.
+18_syn_pan_aug_extra.hsh.tsv: Gene family file, in a two-column hash format, with
+  the set ID in the first column and genes in the second.
+18_syn_pan_aug_extra.table.tsv: Tabular format of all gene families, in columns by species. Multiple paralogs 
+  from a species in a gene family are comma-separated within the column of the species.
+19_pan_aug_leftover_merged_prot: Directory of fasta files for all families corresponding with 18_syn_pan_aug_extra.clust.tsv
+stats.family_4_3.txt: Descriptive statistics about program parameters, input
+  sequences, and Gene family products.
+

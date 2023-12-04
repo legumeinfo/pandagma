@@ -1,0 +1,21 @@
+---
+18_syn_pan_aug_extra.clust.tsv: Pan-gene sets, in cluster format - i.e., ID in
+  first column, followed by tab-separated gene list.
+18_syn_pan_aug_extra.counts.tsv: Matrix of counts of genes per annotation set for each pan-gene set.
+18_syn_pan_aug_extra.hsh.tsv: Pan-gene sets, in a two-column hash format, with
+  the set ID in the first column and genes in the second.
+18_syn_pan_aug_extra_complement.fna: Complement of genes in this pan-gene set;
+  i.e. not clustered, presumed to be singletons.
+18_syn_pan_aug_extra_table.tsv.gz: Table of genes in each family or pangene, in columns by accession
+21_pan_fasta_clust_rep_cds.fna: CDS pan-gene sequence, inclusive (not filtered
+  by minimum cluster size or annotation-set representation).
+21_pan_fasta_clust_rep_prot.faa: Protein pan-gene sequence, inclusive (not
+  filtered by minimum cluster size or annotation-set representation).
+23_syn_pan_pctl25_posn_cds.fna: CDS pan-gene sequence, omitting pan-genes
+  smaller than 25% of the mode, with derived pan-gene IDs corresponding with
+  consensus chromosome and ordinal position.
+23_syn_pan_pctl25_posn_prot.faa: Protein pan-gene sequence, omitting pan-genes
+  smaller than 25% of the mode, with derived pan-gene IDs corresponding with
+  consensus chromosome and ordinal position.
+stats.Glycine_18_35.txt: Descriptive statistics about program parameters, input
+  sequences, and pan-gene products.
