@@ -1,6 +1,16 @@
 #!/usr/bin/env perl
 use strict; 
 use warnings;
+
+# NAME
+#   transpose.pl - Given tabular data on STDIN, return transposed table on STDOUT
+#
+# SYNOPSIS
+#   cat TABLE | ./transpose.pl
+#
+# OPERANDS
+#   Tabular data on STDIN
+
 my(%data);  
 my($maxcol, $rownum) = (0, 0);
 while (<>) {

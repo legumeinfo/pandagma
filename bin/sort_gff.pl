@@ -2,6 +2,24 @@
 use strict;
 use warnings;
 
+use Getopt::Long;
+
+my $help;
+GetOptions ( "help" => \$help);
+
+my $usage = <<EOS;
+Sorts GFF data by feature type, putting parent features before child features. 
+The sorted output should be suitable for indexing using Samtools tabix. 
+Note that the feature types in the GFF must be present in the %type_collate array. 
+Errors will result if a feature type is absent.
+
+Usage: cat FILE.gff3 | sort_gff.pl
+
+    -help      This message
+EOS
+
+die "$usage\n" if $help;
+
 my %type_collate = (
   region => 0.00,
   gene => 0.01,
@@ -46,3 +64,4 @@ foreach my $line (@lines) {
 
 # Changes
 #2023-07-08 Add some types for collate sort. With extra items, switch to floats (0.00..0.23) for the collate sort.
+#2023-12-04 Add usage information.
