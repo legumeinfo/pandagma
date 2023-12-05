@@ -141,6 +141,7 @@ while (my $thisline = <>) {
     my ($chrA, $chrB, $diag_orient, $diag_num, $diag_score, $diag_ct) = @dag_header_bits;
     # GFF:  seqid  source  type  start  end  score  strand  phase  attributes
     unless ($dag_header eq "nullstring") {
+      say $RPTOUT "$dag_header"; 
       say $RPTOUT  "##GFF_A\t$chrA\tDAGchainer\tsynteny\t$dag_startA\t$dag_stopA\t$diag_score\t$diag_orient\t." . 
                        "\tID=$chrA.$chrB.$diag_num.$diag_orient;median_Ks=$median_Ks;ave_Ks=$ave_Ks;matches=$chrB:$dag_startB..$dag_stopB";
       say $RPTOUT  "##GFF_B\t$chrB\tDAGchainer\tsynteny\t$dag_startB\t$dag_stopB\t$diag_score\t$diag_orient\t." .
