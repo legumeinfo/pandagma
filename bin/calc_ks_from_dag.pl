@@ -114,12 +114,12 @@ my (@out_Ka_ary, @out_Ks_ary, @out_KaKs_ary, $out_Ka_aryref, $out_Ks_aryref, $ou
 my (%out_KaKsSum_hsh, $out_KaKsSum_hshref);
 my ($dag_startA, $dag_stopA, $dag_startB, $dag_stopB) = (999999999999999999,0,999999999999999999,0);
 
-while (<>) {
-  chomp;
-  my $line = $_;
+while (my $thisline = <>) {
+  chomp $thisline;
+  #say $thisline;
   
-  if ($line =~ /^#/) {
-    if ($verbose){ say "AA: header line: $line"; }
+  if ($thisline =~ /^#/) {
+    if ($verbose){ say "\nAA: line $. header: $thisline"; }
     # looks like:
     #   ## alignment Medicago.pan2.chr1 vs. cerca.ISC453364.gnm3.Chr01 Alignment #1  score = 22213.0 (num aligned pairs: 512):
     # NOTE: DAGChainer sorts the query and subject lexically, putting upper case before lower.
@@ -174,7 +174,7 @@ while (<>) {
     ## alignment Gm10 vs. Gm20 (reverse) Alignment #3  score = 348.9 (num aligned pairs: 10):
     ## alignment Gm10 vs. Gm20 Alignment #3  score = 1458.8 (num aligned pairs: 32):
     
-    $dag_header = $line;
+    $dag_header = $thisline;
     if ($dag_header =~ /reverse/) { $diag_orient = "-" } else { $diag_orient = "+" }
     $dag_header =~ /alignment ([^ ]+) vs. ([^ ]+) .*Alignment #(\d+) +score = (\d+.\d+) .num aligned pairs: (\d+).:/;
     ($chrA, $chrB, $diag_num, $diag_score, $diag_ct) = ($1, $2, "$3", $4, $5);
@@ -183,11 +183,10 @@ while (<>) {
     next
   }
   else { # Process data line and print Ka and Ks results.
-    if ($verbose){ say "BB: data line: $line"; }
-    # looks like:
+    if ($verbose){ say "\nBB: line $. data: $thisline"; }
     # NOTE: DAGChainer sorts the query and subject lexically, putting upper case before lower.
     
-    my ($IDchrA, $idA, $startA, $stopA, $IDchrB, $idB, $startB, $stopB, $Eval) = split /\s+/, $line;
+    my ($IDchrA, $idA, $startA, $stopA, $IDchrB, $idB, $startB, $stopB, $Eval) = split /\s+/, $thisline;
   
     $dag_startA = $startA unless ($dag_startA < $startA);
     $dag_stopA  = $stopA unless  ($dag_stopA >  $stopA);    
@@ -211,20 +210,25 @@ while (<>) {
     $prot_objB = $nuc_objB->translate(-frame => 0, -codontable_id => $codontable);
     
     if ($align_method =~ /precalc/i){ # Seqs in prot aligns may be truncated/partial. Adjust prot and nucl seqs.
-      #say "WW: idA.x.idB: [$idA.x.$idB]";
+      # say "WW: idA.x.idB: [$idA.x.$idB]";
       unless (defined $idA){
-        say "WARNING: undefined idA; skipping";
+        say "WARNING: undefined idA; skipping. Line was parsed as\n" .
+          "  $IDchrA, $idA, $startA, $stopA, $IDchrB, $idB, $startB, $stopB, $Eval\n";
         next;
       }
       unless (defined $idB){
-        say "WARNING: undefined idB; skipping";
+        say "WARNING: undefined idB; skipping. Line was parsed as\n" .
+          "  $IDchrA, $idA, $startA, $stopA, $IDchrB, $idB, $startB, $stopB, $Eval\n";
         next;
       }
 
       my @fields = split(/\s/, $match_table_hsh{"$idA $idB"});
       if (scalar(@fields)<=1){
-        die "No match for key \"$idA $idB\". " .
-            "Are the identifiers in lexical order, to match the order in the DAGChainer coords file?"
+        warn "WARNING: In data line \n$thisline\n" .
+             "parsed as \n$IDchrA, $idA, $startA, $stopA, $IDchrB, $idB, $startB, $stopB, $Eval\n" .
+             "No match for key \"$idA $idB\".\n" .
+             "Are the identifiers in lexical order, to match the order in the DAGChainer coords file?\n";
+        next;
       }
 
       #say "CC: ", join "][", @fields, "]\n";
@@ -266,11 +270,20 @@ while (<>) {
     warn $@ if $@;
     
     ## Calculate and report Ka and Ks
+    local $SIG{ALRM} = sub {
+      die;
+    };
     eval {
       $count++;
       if ($verbose) { say "CALCULATING KA & KS for $idA and $idB"; }
+      alarm 2;
       ($out_KaKs_aryref_all, $out_KaKsSum_hshref, $out_Ka_aryref, $out_Ks_aryref, $out_KaKs_aryref, $count) = 
         KaKs_report($dna_aln, $nuc_objA, $nuc_objB, $count);
+      if ($@) {
+        say "ABORTED from calculating ka & ks for $idA and $idB";
+      }
+      alarm 0;
+
     }; 
     warn $@ if $@;
   }
@@ -318,7 +331,9 @@ say "  == FINISHED calculating Ks with alignments from $match_table";
 
 sub align_pair {
   my ($nuc_objA, $nuc_objB, $prot_objA, $prot_objB) = @_;
-  
+
+  local $SIG{__WARN__} = sub { };
+
   my @nucpair = ($nuc_objA, $nuc_objB);
   my @protpair = ($prot_objA, $prot_objB);
       
@@ -408,6 +423,12 @@ sub KaKs_report {
   my $aln_len = $dna_aln->length;
   #say "CC: $A_id $B_id $aln_len";
 
+  my $min_align_len = 30;
+  if ($aln_len<$min_align_len){
+    say "Alignment length is $aln_len; skipping because less than $min_align_len";
+    next;
+  }
+
   my ($kaks_factory, $Ka, $Ks, $KaKs);
   
   # Use codeml method (yn00 is't handled in this script yet; probably no reason to.)
@@ -416,7 +437,7 @@ sub KaKs_report {
   $kaks_factory->alignment($dna_aln);
   my ($rc, $parser) = $kaks_factory->run();
   my $result = $parser->next_result;
-  if ($verbose) { print "HERE2: Parsing on obj [$result]\n" } # We aren't seeing this.
+  if ($verbose > 1) { print "HERE2: Parsing on obj [$result]\n" } # We aren't seeing this.
   my $MLmatrix = $result->get_MLmatrix();
   
   $Ka = $MLmatrix->[0]->[1]->{'dN'};
@@ -441,7 +462,7 @@ sub KaKs_report {
   }
   
   push @out_KaKs_ary_all, "\t$A_id\t$B_id\t$aln_len\t$Ka\t$Ks\t$KaKs";
-  #say "EE: \t$A_id\t$B_id\t$aln_len\t$Ka\t$Ks\t$KaKs";
+  # say "EE: \t$A_id\t$B_id\t$aln_len\t$Ka\t$Ks\t$KaKs";
   
   return (\@out_KaKs_ary_all, \%out_KaKsSum_hsh, \@out_Ka_ary, \@out_Ks_ary, \@out_KaKs_ary, $count);
 }
@@ -475,3 +496,4 @@ Versions
 2023-10-11 Implement berkeleydb for the large match tables (for precalc method)
 2023-11-25 Check for lexical ordering of query & subject in key, for precalc method, for consistency with DAGChainer
 2023-11-30 Load fasta sequence into a berkeleydb file. Take .aligncoords in via STDIN.
+2023-12-05 Set $min_align_len. More debugging output. Attempt to catch and kill long-running KaKs_reports.
