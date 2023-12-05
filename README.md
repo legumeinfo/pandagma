@@ -90,7 +90,7 @@ or
   source activate pandagma
 ~~~
 
-## Usage for the main pandagma-pan.sh <a name="usage"></a>
+## Usage for the main pandagma-pan.sh <a name="usage_pan"></a>
 
 ~~~
 Usage: 
@@ -152,7 +152,7 @@ Remaining genes may be those falling on unanchored scaffolds, or on chromosomes 
 synteny blocks and so not making it into the synteny-based clusters.
 
 Subcommands for the pangene workflow, pandagma-pan.sh, in order they are usually run:
-```
+
                 all - All of the steps below, except for clean and ReallyClean
                         (Or equivalently: omit the -s flag; "all" is default)
              ingest - Prepare the assembly and annotation files for analysis
@@ -171,10 +171,35 @@ Subcommands for the pangene workflow, pandagma-pan.sh, in order they are usually
      order_and_name - Assign pangene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
           summarize - Move results into output directory, and report summary statistics.
-```
 
+Variables in pandagma config file:
+
+    dagchainer_args - Argument for DAGchainer command
+         clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
+          clust_cov - Minimum coverage for mmseqs clustering [0.50]
+        consen_iden - Minimum identity threshold for consensus generation [0.80]
+         extra_iden - Minimum identity threshold for mmseqs addition of "extra" annotations [80]
+      mcl_inflation - Inflation parameter, for Markov clustering [default: 2]
+        strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs (1)
+                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches.tsv
+      consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
+       out_dir_base - Base name for the output directory [default: './out']
+    annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
+                        "([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+" 
+                          for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1
+                        or "(\D+\d+\D+)\d+.+" for Zea assembly+annot string, e.g. Zm00032ab
+    preferred_annot - String to match and select an annotation set, from a gene ID.
+                        This is used for picking representative IDs+sequence from an orthogroup, when
+                        this annotation is among those with the median length for the orthogroup.
+                        Otherwise, one is selected at random from those with median length.
+           work_dir - Working directory, for temporary and intermediate files. 
+
+~~~
+
+## Usage for the main pandagma-fam.sh <a name="usage_fam"></a>
+~~~
 Subcommands for the gene family workflow, pandagma-fam.sh, in order they are usually run:
-```
+
   Run these first (if using ks_calc)
                 all - All of the steps below, except for ks_filter, clean and ReallyClean
                         (Or equivalently: omit the -s flag; \"all\" is default).
@@ -208,33 +233,10 @@ Subcommands for the gene family workflow, pandagma-fam.sh, in order they are usu
         ReallyClean - Do complete clean-up of files in the working directory.
                         Use this if you want to start over, OR if you are satisified with the results and
                         don't anticipate adding other annotation sets to this pangene set.
-```
 
-Variables in pandagma config file:
-```
-    dagchainer_args - Argument for DAGchainer command
-         clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
-          clust_cov - Minimum coverage for mmseqs clustering [0.50]
-        consen_iden - Minimum identity threshold for consensus generation [0.80]
-         extra_iden - Minimum identity threshold for mmseqs addition of "extra" annotations [80]
-      mcl_inflation - Inflation parameter, for Markov clustering [default: 2]
-        strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs (1)
-                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches.tsv
-      consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
-       out_dir_base - Base name for the output directory [default: './out']
-    annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
-                        "([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+" 
-                          for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1
-                        or "(\D+\d+\D+)\d+.+" for Zea assembly+annot string, e.g. Zm00032ab
-    preferred_annot - String to match and select an annotation set, from a gene ID.
-                        This is used for picking representative IDs+sequence from an orthogroup, when
-                        this annotation is among those with the median length for the orthogroup.
-                        Otherwise, one is selected at random from those with median length.
-           work_dir - Working directory, for temporary and intermediate files. 
-```
 
-Variables in pandagma config file (Set the config with the CONF environment variable)
-```
+Variables in pandagma_fam config file (Set the config with the CONF environment variable)
+
          clust_iden - Minimum identity threshold for mmseqs clustering [0.40]
           clust_cov - Minimum coverage for mmseqs clustering [0.40]
         consen_iden - Minimum identity threshold for consensus generation [0.30]
@@ -259,40 +261,39 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
            work_dir - Working directory, for temporary and intermediate files.
-```
+~~~
 
 ## Example run for the pangene workflow <a name="pangene_example"></a>
 
 1. Clone the program and associated files from github and cd into it:
-```
-      clone https://github.com/legumeinfo/pandagma
-      cd pandagma
-```
+
+      `clone https://github.com/legumeinfo/pandagma`
+      `cd pandagma`
+
 
 2. Make a work directory. A good practice is to name the directory with an indication of the 
    type of workflow (family or pan) and the number of "main" and "extra" annotations to be included:
 
-            `mkdir ../work_pan_7_3`
+      `mkdir ../work_pan_7_3`
 
 3. Get into a suitable work environment (computation node), and load dependencies.
 
     These can be loaded using a module-loading system, or with a package manager such as conda, or
     via a Singularity image. 
       
-          `pandagma_sing_img=$YOURPATH/pandagma.sif`
+      `pandagma_sing_img=$YOURPATH/pandagma.sif`
     
     OR:
-```
-          module load miniconda
-          source activate pandagma    
+      `module load miniconda`
+      `source activate pandagma`   
             # Here, `pandagma` is the name of the conda environment where the dependencies are installed.
-```
+
 
 4. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if needed.
     You can do this with a simple shell script that executes curl commands and then applies some transformations.
     See the files in get_data/ for examples. There are \"get_data\" scripts for Glycine, Medicago, Phaseolus, Vigna, and Zea.
     
-          ./get_data/get_Glycine_7_3.sh
+      `./get_data/get_Glycine_7_3.sh`
             # This puts the data into data_pan/, 
     
 5. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
@@ -317,14 +318,14 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
     Output will go into a directory composed from a provided prefix name (default "out") and
     information about key parameter values, e.g.
 
-          out_Glycine_7_3
+          `out_Glycine_7_3`
 
     The summary of the run is given in the file stats.[parameters].txt .
     Look at the modal values in the histograms, the report of proportion of each assembly with matches, etc.
     One of the output files that may be of use in a subsequent run is observed_chr_pairs.tsv .
     This can indicate possible translocations among genomes in the input data. For example, in Zea, the values
     for one run are:
-
+```
            1  1  39612   <== Main chromosome correspondences
            5  5  30156
            2  2  30074
@@ -338,19 +339,18 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
            9 10    748  <== corresponding with a known translocation in Oh7B
            1  3    527
            1  2    515
-
+```
     These values can be used to constrain matches in a subsequent run, via the file data/expected_chr_matches.tsv
     (For the Zea run, these values were already provided, generated by get_data/get_Zea.sh 
-
 
 ## Example run for the family workflow <a name="family_example"></a>
 
 1. Clone the program and associated files from github and cd into it. 
    (You can use the same instance as for the pangene run above if you wish).
-```
-      clone https://github.com/legumeinfo/pandagma
-      cd pandagma
-```
+
+      `clone https://github.com/legumeinfo/pandagma`
+      `cd pandagma`
+
 
 2. Make a work directory. A good practice is to name the directory with an indication of the 
    type of workflow (family or pan) and the number of "main" and "extra" annotations to be included:
@@ -365,17 +365,17 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
           `pandagma_sing_img=$YOURPATH/pandagma.sif`
     
     OR:
-```
-          module load miniconda
-          source activate pandagma    
+
+          `module load miniconda`
+          `source activate pandagma`  
             # Here, `pandagma` is the name of the conda environment where the dependencies are installed.
-```
+
 
 4. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if needed.
     You can do this with a simple shell script that executes curl commands and then applies some transformations.
     See the files in get_data/ for examples. There are \"get_data\" scripts for Glycine, Medicago, Phaseolus, Vigna, and Zea.
     
-          ./get_data/get_family_7_3.sh
+          `./get_data/get_family_7_3.sh`
             # This puts the data into data_fam/, 
     
 5. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
@@ -414,7 +414,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
     Output will go into a directory composed from a provided prefix name (default "out") and
     information about key parameter values, e.g.
 
-          out_family_7_3
+          `out_family_7_3`
 
     The summary of the run is given in the file stats.[parameters].txt .
     Look at the modal values in the histograms, the report of proportion of each assembly with matches, etc.
