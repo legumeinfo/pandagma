@@ -60,6 +60,18 @@ for file in *gff3.gz; do
   gzip $base.bed
 done
 
+# Patch glyso.W05.gnm1.ann1 annotations: the CDS and protein files have Glysoja.10G027808, but the BED does not.
+zcat glyso.W05.gnm1.ann1.T47J.protein_primary.faa.gz | ../bin/fasta_to_table.awk | awk '$1!~/Glysoja.10G027808/' | 
+  awk -v FS="\t" '{print ">" $1; print $2}' > tmp.prot_primary.faa
+  mv tmp.prot_primary.faa glyso.W05.gnm1.ann1.T47J.protein_primary.faa
+  gzip -f glyso.W05.gnm1.ann1.T47J.protein_primary.faa
+
+zcat glyso.W05.gnm1.ann1.T47J.cds_primary.fna.gz | ../bin/fasta_to_table.awk | awk '$1!~/Glysoja.10G027808/' |
+  awk -v FS="\t" '{print ">" $1; print $2}'  > tmp.cds_primary.fna
+  mv tmp.cds_primary.fna glyso.W05.gnm1.ann1.T47J.cds_primary.fna
+  gzip -f glyso.W05.gnm1.ann1.T47J.cds_primary.fna
+  
+
 # Write file expected_chr_matches.tsv
 cat <<DATA > expected_chr_matches.tsv
 # Expected chromosome matches for Glycine soja and Glycine max
