@@ -349,7 +349,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
    (You can use the same instance as for the pangene run above if you wish).
 
       `clone https://github.com/legumeinfo/pandagma`
-      `cd pandagma`
+        cd pandagma
 
 
 2. Make a work directory. A good practice is to name the directory with an indication of the 
