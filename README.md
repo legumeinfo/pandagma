@@ -268,7 +268,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
 1. Clone the program and associated files from github and cd into it:
 
         git clone https://github.com/legumeinfo/pandagma.git
-      `cd pandagma`
+        cd pandagma
 
 
 2. Make a work directory. A good practice is to name the directory with an indication of the 
