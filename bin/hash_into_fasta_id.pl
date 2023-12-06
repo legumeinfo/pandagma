@@ -46,7 +46,7 @@ GetOptions (
   "splice_regex:s" =>  \$splice_regex,   
   "strip_regex:s" =>   \$strip_regex,   
   "out_file:s" =>      \$out_file,   
-  "swap_IDs" =>        \$swap_IDs,
+  "swap_IDs:s" =>      \$swap_IDs,
   "nodef" =>           \$nodef,   
   "help" =>            \$help,
 );
@@ -184,4 +184,5 @@ Versions
 2022-12-26 Add option -swap_IDs to print new ID and old ID
 2023-02-16 Add option -swap_IDs to print new ID and old ID ... also in the case where defline has no description.
 2023-03-26 Add warning for undefined hash
+2023-12-06 Fix getopts for -swap_IDs
 
