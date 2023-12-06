@@ -274,7 +274,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
 2. Make a work directory. A good practice is to name the directory with an indication of the 
    type of workflow (family or pan) and the number of "main" and "extra" annotations to be included:
 
-      `mkdir ../work_pan_7_3`
+        mkdir ../work_pan_7_3
 
 3. Get into a suitable work environment (computation node), and load dependencies.
 
