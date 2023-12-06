@@ -285,7 +285,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
     
     OR:
         module load miniconda
-      `source activate pandagma`   
+        source activate pandagma
             # Here, `pandagma` is the name of the conda environment where the dependencies are installed.
 
 
