@@ -241,11 +241,25 @@ while (my $thisline = <>) {
       #say "DD: $protA_start\t$protA_end\t$protA_aln";
       #say "DD: $protB_start\t$protB_end\t$protB_aln";
       
-      my $nucA_adj = $nuc_objA->subseq(3*($protA_start-1)+1, 3*($protA_end));
-      my $nuc_objA_adj = Bio::Seq->new( -display_id => $idA, -seq => $nucA_adj );
+      my ($nucA_adj, $nuc_objA_adj);
+      eval {
+        $nucA_adj = $nuc_objA->subseq(3*($protA_start-1)+1, 3*($protA_end));
+        $nuc_objA_adj = Bio::Seq->new( -display_id => $idA, -seq => $nucA_adj );
+      };
+      if ($@) {
+        say "ABORTED from calculating ka & ks for $idA and $idB, input line $.\n  Error: $@\n";
+        next;
+      }
 
-      my $nucB_adj = $nuc_objB->subseq(3*($protB_start-1)+1, 3*($protB_end));
-      my $nuc_objB_adj = Bio::Seq->new( -display_id => $idB, -seq => $nucB_adj );
+      my ($nucB_adj, $nuc_objB_adj);
+      eval {
+        $nucB_adj = $nuc_objB->subseq(3*($protB_start-1)+1, 3*($protB_end));
+        $nuc_objB_adj = Bio::Seq->new( -display_id => $idB, -seq => $nucB_adj );
+      };
+      if ($@) {
+        say "ABORTED from calculating ka & ks for $idA and $idB, input line $.\n  Error: $@\n";
+        next;
+      }
 
       my $lenA = $nuc_objA->length;
       my $lenB = $nuc_objB->length;
@@ -498,3 +512,4 @@ Versions
 2023-11-25 Check for lexical ordering of query & subject in key, for precalc method, for consistency with DAGChainer
 2023-11-30 Load fasta sequence into a berkeleydb file. Take .aligncoords in via STDIN.
 2023-12-05 Set $min_align_len. More debugging output. Attempt to catch and kill long-running KaKs_reports.
+2023-12-06 Catch and report errors around subseq (e.g. for cases where a sequence isn't found)
