@@ -414,7 +414,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
     Output will go into a directory composed from a provided prefix name (default "out") and
     information about key parameter values, e.g.
 
-          `out_family_7_3`
+        out_family_7_3
 
     The summary of the run is given in the file stats.[parameters].txt .
     Look at the modal values in the histograms, the report of proportion of each assembly with matches, etc.
