@@ -375,7 +375,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
     You can do this with a simple shell script that executes curl commands and then applies some transformations.
     See the files in get_data/ for examples. There are \"get_data\" scripts for Glycine, Medicago, Phaseolus, Vigna, and Zea.
     
-          `./get_data/get_family_7_3.sh`
+        ./get_data/get_family_7_3.sh
             # This puts the data into data_fam/, 
     
 5. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
