@@ -281,7 +281,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
     These can be loaded using a module-loading system, or with a package manager such as conda, or
     via a Singularity image. 
       
-      `pandagma_sing_img=$YOURPATH/pandagma.sif`
+        pandagma_sing_img=$YOURPATH/pandagma.sif
     
     OR:
       `module load miniconda`
