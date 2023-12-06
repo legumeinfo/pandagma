@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-11-21"
+version="2023-12-06"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -1050,6 +1050,13 @@ run_summarize() {
       echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
     fi
   done
+
+  echo "Copy manifest file into the output directory"
+  if [ -f "${submit_dir}/manifests/MANIFEST_output_pan.yml" ]; then
+    cp "${submit_dir}/manifests/MANIFEST_output_pan.yml" $full_out_dir/
+  else 
+    echo "Couldn't find file manifests/MANIFEST_output_pan.yml"
+  fi
 
   printf "Run of program $scriptname, version $version\n" > ${stats_file}
 
