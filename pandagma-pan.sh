@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-12-06"
+version="2023-12-10"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -128,10 +128,15 @@ canonicalize_paths() {
   cds_files=($(realpath --canonicalize-existing "${cds_files[@]}"))
   annotation_files=($(realpath --canonicalize-existing "${annotation_files[@]}"))
   protein_files=($(realpath --canonicalize-existing "${protein_files[@]}"))
-  if (( ${#cds_files_extra[@]} > 0 ))
+  if (( ${#cds_files_extra_constr[@]} > 0 ))
   then
-    cds_files_extra=($(realpath --canonicalize-existing "${cds_files_extra[@]}"))
-    annotation_files_extra=($(realpath --canonicalize-existing "${annotation_files_extra[@]}"))
+    cds_files_extra_constr=($(realpath --canonicalize-existing "${cds_files_extra_constr[@]}"))
+    annotation_files_extra_constr=($(realpath --canonicalize-existing "${annotation_files_extra_constr[@]}"))
+  fi
+  if (( ${#cds_files_extra_free[@]} > 0 ))
+  then
+    cds_files_extra_free=($(realpath --canonicalize-existing "${cds_files_extra_free[@]}"))
+    annotation_files_extra_free=($(realpath --canonicalize-existing "${annotation_files_extra_free[@]}"))
   fi
   readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
   readonly submit_dir=${PWD}
@@ -219,25 +224,53 @@ run_ingest() {
     cat_or_zcat "${cds_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
   done
 
-  echo "  Get position information from the extra annotation sets, if any."
-  if (( ${#cds_files_extra[@]} > 0 ))
+  echo "  Get position information from the extra annotation sets, if any,"
+  echo "  for the annotations that will be added chromosome constraints (_constr)"
+  if (( ${#cds_files_extra_constr[@]} > 0 ))
   then
     cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
-    for (( file_num = 0; file_num < ${#cds_files_extra[@]} ; file_num++ )); do
-      file_base=$(basename ${cds_files_extra[file_num]%.*})
-      cat_or_zcat "${cds_files_extra[file_num]}" >> 02_all_extra_cds.fna  # Collect original seqs for later comparisons
+    for (( file_num = 0; file_num < ${#cds_files_extra_constr[@]} ; file_num++ )); do
+      file_base=$(basename ${cds_files_extra_constr[file_num]%.*})
+      cat_or_zcat "${cds_files_extra_constr[file_num]}" >> 02_all_extra_cds.fna  # Collect original seqs for later comparisons
       echo "  Adding positional information to extra fasta file $file_base"
-      cat_or_zcat "${annotation_files_extra[file_num]}" | 
+      cat_or_zcat "${annotation_files_extra_constr[file_num]}" | 
         gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
-      hash_into_fasta_id.pl -nodef -fasta "${cds_files_extra[file_num]}" \
+      hash_into_fasta_id.pl -nodef -fasta "${cds_files_extra_constr[file_num]}" \
                             -hash 01_posn_hsh/$file_base.hsh \
                             -out 02_fasta_nuc/$file_base
       # calc basic sequence stats
       annot_name=$(basename 02_fasta_nuc/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
+
       printf "  Extra: " >> stats/tmp.fasta_seqstats
-      cat_or_zcat "${cds_files_extra[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
+      cat_or_zcat "${cds_files_extra_constr[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
     done
   fi
+
+  echo "  Get position information from the extra annotation sets, if any,"
+  echo "  for the annotations that will be added without chromosome constraints (_free)"
+  if (( ${#cds_files_extra_free[@]} > 0 ))
+  then
+    cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
+    for (( file_num = 0; file_num < ${#cds_files_extra_free[@]} ; file_num++ )); do
+      file_base=$(basename ${cds_files_extra_free[file_num]%.*})
+      cat_or_zcat "${cds_files_extra_free[file_num]}" >> 02_all_extra_cds.fna  # Collect original seqs for later comparisons
+      echo "  Adding positional information to extra fasta file $file_base"
+      cat_or_zcat "${annotation_files_extra_free[file_num]}" | 
+        gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
+      hash_into_fasta_id.pl -nodef -fasta "${cds_files_extra_free[file_num]}" \
+                            -hash 01_posn_hsh/$file_base.hsh \
+                            -out 02_fasta_nuc/$file_base
+      # calc basic sequence stats
+      annot_name=$(basename 02_fasta_nuc/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
+
+      printf "  Extra: " >> stats/tmp.fasta_seqstats
+      cat_or_zcat "${cds_files_extra_free[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
+    done
+  fi
+
+  cat /dev/null > 01_combined_posn.hsh # Collect combined file of position hashes
+    echo "  Make a combined file of position hashes for later use in step add_extra"
+      cat 01_posn_hsh/*.hsh >> 01_combined_posn.hsh
 
   echo "  Count starting sequences, for later comparisons"
   for file in 02_fasta_nuc/*.$fna; do
@@ -532,9 +565,10 @@ run_add_extra() {
   echo; echo "== Add extra annotation sets (if provided) to the augmented clusters, by homology =="
   cd "${WORK_DIR}"
 
-  if [ -d 13_extra_out_dir ]; then rm -rf 13_extra_out_dir; fi
   if [ -d 13_pan_aug_fasta ]; then rm -rf 13_pan_aug_fasta; fi
-  mkdir -p 13_extra_out_dir 13_pan_aug_fasta
+  if [ -d 13_extra_out_constr_dir ]; then rm -rf 13_extra_out_constr_dir; fi
+  if [ -d 13_extra_out_free_dir ]; then rm -rf 13_extra_out_free_dir; fi
+  mkdir -p 13_extra_out_constr_dir 13_extra_out_free_dir 13_pan_aug_fasta
 
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
   get_fasta_from_family_file.pl "${cds_files[@]}" -fam 12_syn_pan_aug.clust.tsv -out 13_pan_aug_fasta
@@ -542,7 +576,17 @@ run_add_extra() {
   echo "  Merge fasta files in 13_pan_aug_fasta, prefixing IDs with panID__"
   merge_files_to_pan_fasta.awk 13_pan_aug_fasta/* > 13_pan_aug_fasta.fna
 
-  if (( ${#cds_files_extra[@]} > 0 ))
+  echo "  Store the panID - geneID in a hash to be retrieved later, after filtering by chromosome"
+  awk '$1~/^>/ {print substr($1,2)}' 13_pan_aug_fasta.fna | 
+    perl -pe 's/(pan\d+)__(.+)/$2\t$1/' | sort -k1,1 -k2,2 > 13_pan_gene.hsh
+  perl -pi -e 's/>pan\d+__/>/' 13_pan_aug_fasta.fna
+
+  echo "  Add position information to 13_pan_aug_fasta.fna"
+  hash_into_fasta_id.pl -nodef -fasta 13_pan_aug_fasta.fna \
+                        -hash 01_combined_posn.hsh \
+                        -out 13_pan_aug_fasta_posn.fna
+
+  if (( ${#cds_files_extra_constr[@]} > 0 )) || (( ${#cds_files_extra_free[@]} > 0 ))
   then # handle the "extra" annotation files
     echo "  Search non-clustered genes against pan-gene consensus sequences"
     # Check sequence type (in case this run function is called separately from the usually-prior ones)
@@ -550,28 +594,69 @@ run_add_extra() {
     SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
     echo "SEQTYPE is: $SEQTYPE"
 
-    for filepath in "${cds_files_extra[@]}"; do
-      fasta_file=`basename ${filepath%.*}`
-      echo "Extra: $fasta_file"
+    for file in "${cds_files_extra_constr[@]}"; do
+      file_base=$(basename $file .gz)
+      echo "Extra: 02_fasta_nuc/$file_base"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
-      mmseqs easy-search "${filepath}" 13_pan_aug_fasta.fna 13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
+      mmseqs easy-search "02_fasta_nuc/$file_base" 13_pan_aug_fasta_posn.fna 13_extra_out_constr_dir/${file_base}.x.all_cons.m8 \
                    $MMTEMP --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
 
       if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
     done
     wait # wait for jobs to finish
-  
-    echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
-    echo "  Use identity threshold extr_iden: $extra_iden."
-    top_line.awk 13_extra_out_dir/*.x.all_cons.m8 |
-      awk -v IDEN=${extra_iden} '$3>=IDEN {print $2 "\t" $1}' | perl -pe 's/^(pan\d+)__\S+/$1/' |
-      perl -pe 's/^(\w+)\.\d+/$1/' |
-      sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 14_syn_pan_extra.clust.tsv
-  
+
+    for file in "${cds_files_extra_free[@]}"; do
+      file_base=$(basename $file .gz)
+      echo "Extra: 02_fasta_nuc/$file_base"
+      MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
+      mmseqs easy-search "02_fasta_nuc/$file_base" 13_pan_aug_fasta_posn.fna 13_extra_out_free_dir/${file_base}.x.all_cons.m8 \
+                   $MMTEMP --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
+
+      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+    done
+    wait # wait for jobs to finish
+
+    if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
+      echo "Filtering on chromosome patterns from file ${chr_match_list} and by identity and top match."
+      echo "First find top match without respect to chromosome match, then with chromosome matches."
+      echo "A top hit with chromosome match trumps a top hit on the wrong chromosome."
+      for m8file in 13_extra_out_constr_dir/*.m8; do
+        base=`basename $m8file .m8`
+        echo "  Processing file $m8file"
+        cat $m8file | 
+            top_line.awk | awk -v IDEN=${extra_iden} '$3>=IDEN {print $1 "\t" $2}' |
+            perl -pe 's/^\S+__(\S+)__\d+__\d+\t\S+__(\S+)__\d+__\d+$/$1\t$2/' > 13_extra_out_constr_dir/$base.top
+        cat $m8file | filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} |
+            top_line.awk | awk -v IDEN=${extra_iden} '$3>=IDEN {print $1 "\t" $2}' | 
+            perl -pe 's/^\S+__(\S+)__\d+__\d+\t\S+__(\S+)__\d+__\d+$/$1\t$2/' > 13_extra_out_constr_dir/$base.top
+      done
+    else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
+      echo "WARNING: No expected_chr_matches.tsv file was provided, but annotations were indicated in the "
+      echo "file sets annotation_files_extra_constr and cds_files_extra_constr. Please check that "
+      echo "expected_chr_matches.tsv is in the data directory OR that extra annotations are in the "
+      echo "annotation_files_extra_free and cds_files_extra_free file collections."
+      exit 1;
+    fi
+
+    for m8file in 13_extra_out_free_dir/*.m8; do
+      base=`basename $m8file .m8`
+      echo "  Processing file $m8file"
+      cat $m8file | 
+          top_line.awk | awk -v IDEN=${extra_iden} '$3>=IDEN {print $1 "\t" $2}' |
+          perl -pe 's/^\S+__(\S+)__\d+__\d+__[+-]\t\S+__(\S+)__\d+__\d+__[+-]$/$1\t$2/' > 13_extra_out_free_dir/$base.top
+    done
+
+    echo "Join panIDs to unclustered genes"
+    cat 13_extra_out_*_dir/*top | sort -k2,2 -k1,1 | join -1 2 -2 1 - 13_pan_gene.hsh | 
+      awk 'NF==3 {print $3 "\t" $2}' | sort -k1,1 -k2,2 > 14_syn_pan_extra.hsh.tsv
+
+    echo "Derive a cluster-format file from the hash of panIDs and extra genes"
+    cat 14_syn_pan_extra.hsh.tsv | hash_to_rows_by_1st_col.awk > 14_syn_pan_extra.clust.tsv
+
     echo "  Retrieve sequences for the extra genes"
     if [ -d 16_pan_leftovers_extra ]; then rm -rf 16_pan_leftovers_extra; fi
     mkdir -p 16_pan_leftovers_extra
-    get_fasta_from_family_file.pl "${cds_files_extra[@]}" \
+    get_fasta_from_family_file.pl "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
        -fam 14_syn_pan_extra.clust.tsv -out 16_pan_leftovers_extra/
   
     echo "  Make augmented cluster sets. Uniqify on the back end, converting from mcl clust format to hsh (clust_ID gene)."
@@ -586,7 +671,7 @@ run_add_extra() {
     echo "    Fasta file:" "${protein_files[@]}"
     if [ -d 19_pan_aug_leftover_merged_cds ]; then rm -rf 19_pan_aug_leftover_merged_cds; fi
     mkdir -p 19_pan_aug_leftover_merged_cds
-    get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra[@]}" \
+    get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_cds
   
     echo "  Merge files in 19_pan_aug_leftover_merged_cds, prefixing IDs with panID__"
@@ -830,7 +915,7 @@ run_align_cds() {
   else
     mkdir -p 19_pan_aug_leftover_merged_cds
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra[@]}" \
+    get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_cds
   fi
 
@@ -857,7 +942,7 @@ run_align_protein() {
   else
     mkdir -p 19_pan_aug_leftover_merged_prot
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra[@]}" \
+    get_fasta_from_family_file.pl "${protein_files[@]}" \
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
   fi
 
