@@ -40,13 +40,15 @@ my %type_collate = (
   five_prime_UTR => 0.14,
   protein_match => 0.15,
   cDNA_match => 0.16,
-  match => 0.17,
-  match_part => 0.18,
-  protein_match => 0.19,
-  expressed_sequence_match => 0.20,
-  translated_nucleotide_match => 0.21,
+  rRNA_primary_transcript => 0.17,
+  tRNA_primary_transcript => 0.18,
+  match => 0.19,
+  match_part => 0.20,
+  protein_match => 0.21,
   expressed_sequence_match => 0.22,
-  contig => 0.23,
+  translated_nucleotide_match => 0.23,
+  expressed_sequence_match => 0.24,
+  contig => 0.25,
 );
 my $line;
 while ($line = <>) {
