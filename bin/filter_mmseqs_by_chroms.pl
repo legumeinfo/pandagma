@@ -33,6 +33,9 @@ my $usage = <<EOS;
     optionally with a preceding cluster-id column:
       pan00010  chromosome__gene__start__end   chromosome__gene__start__end
 
+    or an equivalent 12-column -m8 format, with the first two fields as above:
+      chromosome__gene__start__end__+   chromosome__gene__start__end__- [blast -m8 format]
+
   ... filter on patterns in the two chromosomes, provided in an input file
   via the flag -chr_pat .
   
@@ -93,6 +96,7 @@ while (<$PAT_IN>){ # two fields, e.g. "01 01"
 }
 
 # Process homology data, comparing to the stored chr patterns
+my @rest;
 while (my $line = <>) {
   chomp $line;
   $line =~ s/>//g; # data shouldn't have ">", but do this to make sure.
@@ -107,6 +111,10 @@ while (my $line = <>) {
   elsif (scalar(@fields) == 3 && $fields[1] =~ /__/ && $fields[2] =~ /__/){
     ($panID, $gene1, $gene2) = @fields;
     $format = 3;
+  }
+  elsif (scalar(@fields) == 12 && $fields[0] =~ /__/ && $fields[1] =~ /__/){
+    ($gene1, $gene2, @rest) = @fields;
+    $format = 12;
   }
   else {
     warn "WARN| Unexpected format: $line\n";
@@ -130,8 +138,11 @@ while (my $line = <>) {
       if ($format == 2){
         say join("\t", @parts1), "\t", join("\t", @parts2);
       }
-      else {
+      elsif ($format == 3) {
         say $panID, "\t", join("\t", @parts1), "\t", join("\t", @parts2);
+      }
+      elsif ($format == 12) {
+        say join("__", @parts1), "\t", join("__", @parts2), "\t", join("\t", @rest)
       }
       $matches++;
     }
@@ -153,3 +164,4 @@ VERSIONS
 2022-12-31 In regex, ignore leading zeroes in e.g. chr01
 2023-03-10 Change -noself to -keepself, and allow orientation code in chromosome__gene fields.
 2023-08-27 Handle a three-column form, to allow match data with leading pangene ID field
+2023-12-08 Add option to handle 12-column BLAST -m8 format
