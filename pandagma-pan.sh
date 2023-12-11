@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-12-10"
+version="2023-12-11"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -620,15 +620,17 @@ run_add_extra() {
       echo "Filtering on chromosome patterns from file ${chr_match_list} and by identity and top match."
       echo "First find top match without respect to chromosome match, then with chromosome matches."
       echo "A top hit with chromosome match trumps a top hit on the wrong chromosome."
+      echo "The placement with chromosome match is prefixed with 1 and that without is prefixed with 2;"
+      echo "then the first (top) gene is selected - i.e., 1 geneA before 2 geneA."
       for m8file in 13_extra_out_constr_dir/*.m8; do
         base=`basename $m8file .m8`
         echo "  Processing file $m8file"
         cat $m8file | 
             top_line.awk | awk -v IDEN=${extra_iden} '$3>=IDEN {print $1 "\t" $2}' |
-            perl -pe 's/^\S+__(\S+)__\d+__\d+\t\S+__(\S+)__\d+__\d+$/$1\t$2/' > 13_extra_out_constr_dir/$base.top
+            perl -pe 's/^\S+__(\S+)__\d+__\d\S*\t\S+__(\S+)__\d+__\d\S+$/2\t$1\t$2/' > 13_extra_out_constr_dir/$base.top_2nd
         cat $m8file | filter_mmseqs_by_chroms.pl -chr_pat ${chr_match_list} |
             top_line.awk | awk -v IDEN=${extra_iden} '$3>=IDEN {print $1 "\t" $2}' | 
-            perl -pe 's/^\S+__(\S+)__\d+__\d+\t\S+__(\S+)__\d+__\d+$/$1\t$2/' > 13_extra_out_constr_dir/$base.top
+            perl -pe 's/^\S+__(\S+)__\d+__\d+\t\S+__(\S+)__\d+__\d+$/1\t$1\t$2/' > 13_extra_out_constr_dir/$base.top_1st
       done
     else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
       echo "WARNING: No expected_chr_matches.tsv file was provided, but annotations were indicated in the "
@@ -643,12 +645,12 @@ run_add_extra() {
       echo "  Processing file $m8file"
       cat $m8file | 
           top_line.awk | awk -v IDEN=${extra_iden} '$3>=IDEN {print $1 "\t" $2}' |
-          perl -pe 's/^\S+__(\S+)__\d+__\d+__[+-]\t\S+__(\S+)__\d+__\d+__[+-]$/$1\t$2/' > 13_extra_out_free_dir/$base.top
+          perl -pe 's/^\S+__(\S+)__\d+__\d\S*\t\S+__(\S+)__\d+__\d\S+$/2\t$1\t$2/' > 13_extra_out_free_dir/$base.top_2nd
     done
 
     echo "Join panIDs to unclustered genes"
-    cat 13_extra_out_*_dir/*top | sort -k2,2 -k1,1 | join -1 2 -2 1 - 13_pan_gene.hsh | 
-      awk 'NF==3 {print $3 "\t" $2}' | sort -k1,1 -k2,2 > 14_syn_pan_extra.hsh.tsv
+    cat 13_extra_out_*_dir/*top_* | sort -k3,3 -k2,2 -k1,1 | cut -f2,3 | join -1 2 -2 1 - 13_pan_gene.hsh | 
+      awk 'NF==3 {print $3 "\t" $2}' | sort -k1,1 -k2,2 | uniq > 14_syn_pan_extra.hsh.tsv
 
     echo "Derive a cluster-format file from the hash of panIDs and extra genes"
     cat 14_syn_pan_extra.hsh.tsv | hash_to_rows_by_1st_col.awk > 14_syn_pan_extra.clust.tsv
