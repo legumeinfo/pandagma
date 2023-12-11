@@ -289,7 +289,7 @@ if ($verbose>2) {print "\n"}
 
 my $tmpdir = "consen_tmp";
 unless ( -d $tmpdir ){ mkdir $tmpdir or die "Can't mkdir $tmpdir $!\n" };
-say "# Scoring each gene relative to $ct_unplaced unplaced target panIDs; will report one dot per panID.";
+say "# Scoring each gene relative to $ct_unplaced unplaced target panIDs.";
 say "# This step is done in parallel, writing to temp files at $tmpdir/";
 
 my $pm1 = Parallel::ForkManager->new($nproc);
@@ -301,7 +301,7 @@ foreach my $ann (keys %annots){
   my $SYM = gensym; # method from Symbol;  creates an anonymous glob and returns a reference to it.
   open $SYM, ">", $ann_file or die "Can't open out $ann_file: $!\n";
   foreach my $target_panID (keys %unplaced){
-    print ".";
+    #print ".";
     select()->flush();
     my $main_chr = $top_chr{$target_panID};
     #say "$count\tDominant chr of $target_panID is $main_chr\n  ";
@@ -636,3 +636,4 @@ S. Cannon
 02-28 Fix bug in determining the consensus orientation.
 03-05 Improve runtime feedback and debugging info.
 03-11 More checking for uninitialized transition index / panID
+12-11 Stop reporting per-gene progress 
