@@ -62,10 +62,11 @@ These dependencies are required:
 * fasttree
 * hmmer
 
-These need to be installed and available in the script's environment. Once those are available on your PATH, the program can be called directly with its options.
-(see Usage below).
+These need to be installed and available in the script's environment. Once those are available on your PATH, 
+the program can be called directly with its options. (see Usage below).
 
-Installing the dependencies is up to you. They can be installed via a suitable package manager. For example, using conda, creating an environment called `pandagma`: 
+Installing the dependencies is up to you. They can be installed via a suitable package manager. For example, 
+using conda, creating an environment called `pandagma`: 
 ```
   conda create -n pandagma
   conda install -n pandagma -c conda-forge -c bioconda perl-bioperl-core perl-bioperl-run \
@@ -86,11 +87,14 @@ or
 
 ### Installation method 2: by creating a Singularity container image
 
-To build a [Singularity](https://singularity.hpcng.org/) container image from the provided [Singularity definition file](https://singularity.hpcng.org/user-docs/master/definition_files.html) (`singularity.def`), after cloning this repository:
+To build a [Singularity](https://singularity.hpcng.org/) container image from the provided 
+[Singularity definition file](https://singularity.hpcng.org/user-docs/master/definition_files.html) (`singularity.def`), 
+after cloning this repository:
 ```
   singularity build [--remote] pandagma.sif singularity.def
 ```
-Where the `--remote` option is used if building the image as an unprivileged user using (by default) the [Sylabs Cloud Remote Builder](https://cloud.sylabs.io/builder).
+Where the `--remote` option is used if building the image as an unprivileged user using (by default) 
+the [Sylabs Cloud Remote Builder](https://cloud.sylabs.io/builder).
 
 To run pandamga using singularity, use `singularity run --cleanenv pandagma.sif [options]`, e.g.:
 ```
@@ -137,7 +141,9 @@ CDS coordinates are derived from CDS features:
     Chr1	.	CDS	2222	3333	.	.	.	Parent=id1
     Chr1	.	CDS	4444	5555	.	.	.	Parent=id1
 
-BED files are assumed to contain a single feature for each primary coding sequence specified, where the coordinates represent the minimum start (0-based) and maximum end positions of the the primary coding sequence in the reference:
+BED files are assumed to contain a single feature for each primary coding sequence specified, 
+where the coordinates represent the minimum start (0-based) and maximum end positions of the 
+primary coding sequence in the reference:
 
   molecule, feature-start, feature-end, mRNA-ID, score(0), strand, gene-ID
 
