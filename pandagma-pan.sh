@@ -645,12 +645,19 @@ run_add_extra() {
       echo "  Processing file $m8file"
       cat $m8file | 
           top_line.awk | awk -v IDEN=${extra_iden} '$3>=IDEN {print $1 "\t" $2}' |
-          perl -pe 's/^\S+__(\S+)__\d+__\d\S*\t\S+__(\S+)__\d+__\d\S+$/2\t$1\t$2/' > 13_extra_out_free_dir/$base.top_2nd
+          perl -pe 's/^\S+__(\S+)__\d+__\d\S*\t\S+__(\S+)__\d+__\d\S+$/1\t$1\t$2/' > 13_extra_out_free_dir/$base.top_2nd
     done
 
-    echo "Join panIDs to unclustered genes"
-    cat 13_extra_out_*_dir/*top_* | sort -k3,3 -k2,2 -k1,1 | cut -f2,3 | join -1 2 -2 1 - 13_pan_gene.hsh | 
-      awk 'NF==3 {print $3 "\t" $2}' | sort -k1,1 -k2,2 | uniq > 14_syn_pan_extra.hsh.tsv
+    if [ "$strict_synt" -eq 1 ]; then
+      echo "Join panIDs to unclustered genes. This RESTRICTIVE filtering requires that genes have a chromosome match."
+      cat 13_extra_out_*_dir/*top_* | awk '$1==1' | # restrict to those with chromosome matches
+        sort -k3,3 -k2,2 -k1,1 | cut -f2,3 | join -1 2 -2 1 - 13_pan_gene.hsh | 
+        awk 'NF==3 {print $3 "\t" $2}' | sort -k1,1 -k2,2 | uniq > 14_syn_pan_extra.hsh.tsv
+    else
+      echo "Join panIDs to unclustered genes. This PERMISSIVE filtering allows gene placement for genes that lack a chromosome match."
+      cat 13_extra_out_*_dir/*top_* | sort -k3,3 -k2,2 -k1,1 | cut -f2,3 | join -1 2 -2 1 - 13_pan_gene.hsh | 
+        awk 'NF==3 {print $3 "\t" $2}' | sort -k1,1 -k2,2 | uniq > 14_syn_pan_extra.hsh.tsv
+    fi
 
     echo "Derive a cluster-format file from the hash of panIDs and extra genes"
     cat 14_syn_pan_extra.hsh.tsv | hash_to_rows_by_1st_col.awk > 14_syn_pan_extra.clust.tsv
