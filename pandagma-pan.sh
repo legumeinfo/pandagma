@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-12-11"
+version="2023-12-13"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -226,12 +226,12 @@ run_ingest() {
 
   echo "  Get position information from the extra annotation sets, if any,"
   echo "  for the annotations that will be added chromosome constraints (_constr)"
+  cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
   if (( ${#cds_files_extra_constr[@]} > 0 ))
   then
-    cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
     for (( file_num = 0; file_num < ${#cds_files_extra_constr[@]} ; file_num++ )); do
       file_base=$(basename ${cds_files_extra_constr[file_num]%.*})
-      cat_or_zcat "${cds_files_extra_constr[file_num]}" >> 02_all_extra_cds.fna  # Collect original seqs for later comparisons
+      cat_or_zcat "${cds_files_extra_constr[file_num]}" >> 02_all_extra_cds.fna  
       echo "  Adding positional information to extra fasta file $file_base"
       cat_or_zcat "${annotation_files_extra_constr[file_num]}" | 
         gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
@@ -250,10 +250,9 @@ run_ingest() {
   echo "  for the annotations that will be added without chromosome constraints (_free)"
   if (( ${#cds_files_extra_free[@]} > 0 ))
   then
-    cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
     for (( file_num = 0; file_num < ${#cds_files_extra_free[@]} ; file_num++ )); do
       file_base=$(basename ${cds_files_extra_free[file_num]%.*})
-      cat_or_zcat "${cds_files_extra_free[file_num]}" >> 02_all_extra_cds.fna  # Collect original seqs for later comparisons
+      cat_or_zcat "${cds_files_extra_free[file_num]}" >> 02_all_extra_cds.fna  
       echo "  Adding positional information to extra fasta file $file_base"
       cat_or_zcat "${annotation_files_extra_free[file_num]}" | 
         gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
@@ -729,7 +728,7 @@ run_pick_exemplars() {
 
   echo "  Retrieve genes present in the original CDS files but absent from 18_syn_pan_aug_extra"
   cut -f2 18_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.18_syn_pan_aug_extra
-  cat 02_all_main_cds.fna 02_all_extra_cds.fna > 02_all_cds.fna
+  cat 02_all_*_cds.fna > 02_all_cds.fna
   get_fasta_subset.pl -in 02_all_cds.fna -out 18_syn_pan_aug_extra_complement.fna \
     -lis lists/lis.18_syn_pan_aug_extra -xclude -clobber
 }
