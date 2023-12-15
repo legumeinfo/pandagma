@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=`basename "$0"`
-version="2023-12-13"
+version="2023-12-15"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -639,13 +639,15 @@ run_add_extra() {
       exit 1;
     fi
 
-    for m8file in 13_extra_out_free_dir/*.m8; do
-      base=`basename $m8file .m8`
-      echo "  Processing file $m8file"
-      cat $m8file | 
-          top_line.awk | awk -v IDEN=${extra_iden} '$3>=IDEN {print $1 "\t" $2}' |
-          perl -pe 's/^\S+__(\S+)__\d+__\d\S*\t\S+__(\S+)__\d+__\d\S+$/1\t$1\t$2/' > 13_extra_out_free_dir/$base.top_2nd
-    done
+    if (( ${#cds_files_extra_free[@]} > 0 )); then
+      for m8file in 13_extra_out_free_dir/*.m8; do
+        base=`basename $m8file .m8`
+        echo "  Processing file $m8file"
+        cat $m8file | 
+            top_line.awk | awk -v IDEN=${extra_iden} '$3>=IDEN {print $1 "\t" $2}' |
+            perl -pe 's/^\S+__(\S+)__\d+__\d\S*\t\S+__(\S+)__\d+__\d\S+$/1\t$1\t$2/' > 13_extra_out_free_dir/$base.top_2nd
+      done
+    fi
 
     if [ "$strict_synt" -eq 1 ]; then
       echo "Join panIDs to unclustered genes. This RESTRICTIVE filtering requires that genes have a chromosome match."
