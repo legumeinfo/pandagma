@@ -5,12 +5,13 @@
 # Authors: Steven Cannon, Hyunoh Lee, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=$(basename "$0")
-version="2023-12-06"
+version="2023-12-16"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
-HELP_DOC << EOS
+HELP_DOC=$(
+cat <<'EOS'
 Compute orthogroups using a combination of synteny and homology,
 using the programs mmseqs, dagchainer, and mcl, and additional pre- and post-refinement steps.
 
@@ -73,8 +74,10 @@ Subcommands (in order they are usually run):
                         Use this if you want to start over, OR if you are satisified with the results and
                         don't anticipate adding other annotation sets to this pan-gene set.
 EOS
+)
 
-MORE_INFO << EOS
+MORE_INFO=$(
+cat <<'EOS'
 Two options are provided for filtering gene homologies based on additional provided information.
 
 1. One option for additional filtering is to provide a file of gene matches for each species. 
@@ -134,6 +137,7 @@ Optional files with quotas or cutoff values
      expected_quotas.tsv
           ks_cutoffs.tsv
 EOS
+)
 
 ########################################
 # Helper functions begin here
@@ -240,7 +244,7 @@ run_ingest() {
     echo "  Adding positional information to fasta file $file_base"
     cat_or_zcat "${annotation_files[file_num]}" | 
       gff_or_bed_to_hash5.awk > 01_posn_hsh/"$file_base".hsh
-      hash_into_fasta_id.pl -nodef -fasta "${protein_files[file_num]}" \
+    hash_into_fasta_id.pl -nodef -fasta "${protein_files[file_num]}" \
                           -hash 01_posn_hsh/"$file_base".hsh \
                           -out 02_fasta_prot/"$file_base"
     # calc basic sequence stats

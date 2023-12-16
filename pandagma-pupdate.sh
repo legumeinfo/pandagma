@@ -25,8 +25,9 @@
 # AUTHOR
 #     Steven Cannon <steven.cannon@usda.gov>
 
-set -o errexit
-set -o nounset
+scriptname=$(basename "$0")
+version="2023-12-16"
+set -o errexit -o errtrace -o nounset -o pipefail
 
 PG1=$1
 PG2=$2

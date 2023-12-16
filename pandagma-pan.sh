@@ -5,12 +5,13 @@
 # Authors: Steven Cannon, Hyunoh Lee, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=$(basename "$0")
-version="2023-12-15"
+version="2023-12-16"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
-HELP_DOC << EOS
+HELP_DOC=$(
+cat <<'EOS'
 Compute pan-gene clusters using a combination of synteny and homology,
 using the programs mmseqs, dagchainer, and mcl, and additional pre- and post-refinement steps.
 
@@ -76,9 +77,10 @@ Subcommands (in order they are usually run):
                         Use this if you want to start over, OR if you are satisified with the results and
                         don't anticipate adding other annotation sets to this pan-gene set.
 EOS
-# end main usage string
+) # end main usage string
 
-MORE_INFO << EOS
+MORE_INFO=$(
+cat <<'EOS'
 Optionally, a file specified in the expected_chr_matches variable can be specified in pandagma.conf,
 which provides anticipated chromosome pairings, e.g.
   01 01
@@ -114,6 +116,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
        order_method - Method to determine consensus panID order. reference or alignment [default reference]
            work_dir - Working directory, for temporary and intermediate files. 
 EOS
+)
 
 ########################################
 # Helper functions begin here
@@ -216,8 +219,8 @@ run_ingest() {
     cat_or_zcat "${annotation_files[file_num]}" | 
       gff_or_bed_to_hash5.awk > 01_posn_hsh/"$file_base".hsh
     hash_into_fasta_id.pl -nodef -fasta "${cds_files[file_num]}" \
-                        -hash 01_posn_hsh/"file_base".hsh \
-                        -out 02_fasta_nuc/"file_base"
+                          -hash 01_posn_hsh/"$file_base".hsh \
+                          -out 02_fasta_nuc/"$file_base"
     # calc basic sequence stats
     annot_name=$(basename 02_fasta_nuc/"$file_base" | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
     printf "  Main:  " >> stats/tmp.fasta_seqstats

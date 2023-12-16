@@ -7,12 +7,13 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=$(basename "$0")
-version="2023-11-14"
+version="2023-11-16"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
-HELP_DOC << EOS
+HELP_DOC=$(
+cat <<'EOS'
 Place annotation sets (CDS and protein) into pangene or gene family sets, using hmmsearch 
 to compare the indicated annotations against HMMs calculated in a prior run of pandagma-pan or pandagma-fam.
 
@@ -46,8 +47,10 @@ Subcommands (in order they are usually run):
          calc_trees - 
           summarize - Move results into output directory, and report summary statistics.
 EOS
+)
 
-MORE_INFO << EOS
+MORE_INFO=$(
+cat <<'EOS'
 Variables in pandagma config file (Set the config with the CONF environment variable)
         consen_iden - Minimum identity threshold for consensus generation [0.30]
           clust_cov - Minimum alignment coverage [0.40]
@@ -64,6 +67,7 @@ File sets (arrays):
       protein_files
           cds_files
 EOS
+)
 
 ########################################
 # Helper functions begin here
