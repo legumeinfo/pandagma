@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 #
-# Configuration and run script which, with other scripts in this package, generates gene-family 
-# orthogroups using the programs mmseqs, dagchainer, and mcl. 
-# Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
+# Configuration and run script which, with other scripts in this package, generates 
+# gene-family orthogroups using the programs mmseqs, dagchainer, and mcl. 
+# Authors: Steven Cannon, Hyunoh Lee, Joel Berendzen, Nathan Weeks, 2020-2023
 #
-scriptname=`basename "$0"`
+scriptname=$(basename "$0")
 version="2023-12-06"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
-HELP_DOC="""Compute orthogroups using a combination of synteny and homology,
+HELP_DOC << EOS
+Compute orthogroups using a combination of synteny and homology,
 using the programs mmseqs, dagchainer, and mcl, and additional pre- and post-refinement steps.
 
 Usage:
@@ -71,9 +72,9 @@ Subcommands (in order they are usually run):
         ReallyClean - Do complete clean-up of files in the working directory.
                         Use this if you want to start over, OR if you are satisified with the results and
                         don't anticipate adding other annotation sets to this pan-gene set.
-"""
+EOS
 
-MORE_INFO="""
+MORE_INFO << EOS
 Two options are provided for filtering gene homologies based on additional provided information.
 
 1. One option for additional filtering is to provide a file of gene matches for each species. 
@@ -100,7 +101,6 @@ are described briefly below.
 Variables in pandagma config file (Set the config with the CONF environment variable)
          clust_iden - Minimum identity threshold for mmseqs clustering [0.40]
           clust_cov - Minimum coverage for mmseqs clustering [0.40]
-        consen_iden - Minimum identity threshold for consensus generation [0.30]
          extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [0.30]
       mcl_inflation - Inflation parameter, for Markov clustering [1.6]
         strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs [1]
@@ -133,33 +133,32 @@ annotation_files_extra
 Optional files with quotas or cutoff values
      expected_quotas.tsv
           ks_cutoffs.tsv
- """
+EOS
 
 ########################################
 # Helper functions begin here
 
 version() {
-  echo $scriptname $version
+  echo "$scriptname" $version
 }
 
 ##########
 canonicalize_paths() {
-  echo "Entering canonicalize_paths. Annotation files: ${annotation_files[@]}"
+  echo "Entering canonicalize_paths. Annotation files: " "${annotation_files[@]}"
 
-  annotation_files=($(realpath --canonicalize-existing "${annotation_files[@]}"))
-  protein_files=($(realpath --canonicalize-existing "${protein_files[@]}"))
-  cds_files=($(realpath --canonicalize-existing "${cds_files[@]}"))
+  mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
+  mapfile -t annotation_files < <(realpath --canonicalize-existing "${annotation_files[@]}")
+  mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
 
   if (( ${#protein_files_extra[@]} > 0 ))
   then
-    protein_files_extra=($(realpath --canonicalize-existing "${protein_files_extra[@]}"))
-    annotation_files_extra=($(realpath --canonicalize-existing "${annotation_files_extra[@]}"))
+    mapfile -t protein_files_extra < <(realpath --canonicalize-existing "${protein_files_extra[@]}")
   fi
 
   if (( ${#cds_files_extra[@]} > 0 ))
   then
-    cds_files_extra=($(realpath --canonicalize-existing "${cds_files_extra[@]}"))
-    #annotation_files_extra=($(realpath --canonicalize-existing "${annotation_files_extra[@]}"))
+    mapfile -t cds_files_extra < <(realpath --canonicalize-existing "${cds_files_extra[@]}")
+    mapfile -t annotation_files_extra < <(realpath --canonicalize-existing "${annotation_files_extra[@]}")
   fi
 
   readonly expected_quotas=${expected_quotas:+$(realpath "${expected_quotas}")}
@@ -183,8 +182,9 @@ cat_or_zcat() {
 ##########
 check_seq_type () {
   someseq=${1}
-  export proportion_nuc=$(echo $someseq | fold -w1 | 
-                          awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
+  proportion_nuc=$(echo "$someseq" | fold -w1 | 
+    awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
+  export proportion_nuc
   perl -le '$PN=$ENV{"proportion_nuc"}; if ($PN>0.9){print 3} else {print 1}'
 }
 
@@ -199,7 +199,7 @@ calc_seq_stats () {
        END { print "\n" }' |
   awk '/^[^>]/ {print length($1); tot_bp+=length($1) } END { print "bases: " tot_bp "\n" }' \
    | sort -n \
-   | awk -v ANN=$annot_name 'BEGIN { min=99999999999999 }
+   | awk -v ANN="$annot_name" 'BEGIN { min=99999999999999 }
           /bases:/ { N50_ct = $2/2; bases=$2 } 
           /^[0-9]/ { 
              ct++; sum+=$1; if ( sum >= N50_ct && !printed ) { N50=$1; printed = 1 } 
@@ -223,28 +223,28 @@ run_ingest() {
   
   mkdir -p 02_fasta_nuc 02_fasta_prot 01_posn_hsh stats
 
-    # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_pctl??_end.
+    # Prepare the tmp.gene_count_start to be joined, in run_summarize.
     # This is captured from the gene IDs using the annot_str_regex set in the config file.
     cat /dev/null > stats/tmp.gene_count_start
     cat /dev/null > stats/tmp.fasta_seqstats
-    start_time=`date`
-    printf "Run started at: $start_time\n" > stats/tmp.timing
+    start_time=$(date)
+    printf "Run started at: %s\n" "$start_time" > stats/tmp.timing
 
   export ANN_REX=${annot_str_regex}
 
   echo "  Get position information from the main annotation sets (protein)."
   cat /dev/null > 02_all_main_prot.faa # Collect all starting protein sequences, for later comparisons
   for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
-    file_base=$(basename ${protein_files[file_num]%.*})
+    file_base=$(basename "${protein_files[file_num]%.*}")
     cat_or_zcat "${protein_files[file_num]}" >> 02_all_main_prot.faa # Collect original seqs for later comparisons
     echo "  Adding positional information to fasta file $file_base"
     cat_or_zcat "${annotation_files[file_num]}" | 
-      gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
+      gff_or_bed_to_hash5.awk > 01_posn_hsh/"$file_base".hsh
       hash_into_fasta_id.pl -nodef -fasta "${protein_files[file_num]}" \
-                          -hash 01_posn_hsh/$file_base.hsh \
-                          -out 02_fasta_prot/$file_base
+                          -hash 01_posn_hsh/"$file_base".hsh \
+                          -out 02_fasta_prot/"$file_base"
     # calc basic sequence stats
-    annot_name=$(basename 02_fasta_prot/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
+    annot_name=$(basename 02_fasta_prot/"$file_base" | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
     printf "  Main:  " >> stats/tmp.fasta_seqstats
     cat_or_zcat "${protein_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
   done
@@ -252,14 +252,14 @@ run_ingest() {
   echo "  Get position information from the main annotation sets (cds)."
   cat /dev/null > 02_all_main_cds.fna # Collect all starting cds sequences, for later comparisons
   for (( file_num = 0; file_num < ${#cds_files[@]} ; file_num++ )); do
-    file_base=$(basename ${cds_files[file_num]%.*})
+    file_base=$(basename "${cds_files[file_num]%.*}")
     cat_or_zcat "${cds_files[file_num]}" >> 02_all_main_cds.fna # Collect original seqs for later comparisons
     echo "  Adding positional information to fasta file $file_base"
     cat_or_zcat "${annotation_files[file_num]}" | 
-      gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
+      gff_or_bed_to_hash5.awk > 01_posn_hsh/"$file_base".hsh
       hash_into_fasta_id.pl -nodef -fasta "${cds_files[file_num]}" \
-                          -hash 01_posn_hsh/$file_base.hsh \
-                          -out 02_fasta_nuc/$file_base
+                          -hash 01_posn_hsh/"$file_base".hsh \
+                          -out 02_fasta_nuc/"$file_base"
   done
 
   echo "  Get position information from the extra annotation sets (protein), if any."
@@ -267,16 +267,16 @@ run_ingest() {
   then
     cat /dev/null > 02_all_extra_protein.faa # Collect all starting sequences, for later comparisons
     for (( file_num = 0; file_num < ${#protein_files_extra[@]} ; file_num++ )); do
-      file_base=$(basename ${protein_files_extra[file_num]%.*})
+      file_base=$(basename "${protein_files_extra[file_num]%.*}")
       cat_or_zcat "${protein_files_extra[file_num]}" >> 02_all_extra_protein.faa  # Collect original seqs for later comparisons
       echo "  Adding positional information to extra fasta file $file_base"
       cat_or_zcat "${annotation_files_extra[file_num]}" | 
-        gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
+        gff_or_bed_to_hash5.awk > 01_posn_hsh/"$file_base".hsh
       hash_into_fasta_id.pl -nodef -fasta "${protein_files_extra[file_num]}" \
-                            -hash 01_posn_hsh/$file_base.hsh \
-                            -out 02_fasta_prot/$file_base
+                            -hash 01_posn_hsh/"$file_base".hsh \
+                            -out 02_fasta_prot/"$file_base"
       # calc basic sequence stats
-      annot_name=$(basename 02_fasta_prot/$file_base | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
+      annot_name=$(basename 02_fasta_prot/"$file_base" | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
       printf "  Extra: " >> stats/tmp.fasta_seqstats
       cat_or_zcat "${protein_files_extra[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
     done
@@ -287,22 +287,22 @@ run_ingest() {
   then
     cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
     for (( file_num = 0; file_num < ${#cds_files_extra[@]} ; file_num++ )); do
-      file_base=$(basename ${cds_files_extra[file_num]%.*})
+      file_base=$(basename "${cds_files_extra[file_num]%.*}")
       cat_or_zcat "${cds_files_extra[file_num]}" >> 02_all_extra_cds.fna  # Collect original seqs for later comparisons
       echo "  Adding positional information to extra fasta file $file_base"
       cat_or_zcat "${annotation_files_extra[file_num]}" | 
-        gff_or_bed_to_hash5.awk > 01_posn_hsh/$file_base.hsh
+        gff_or_bed_to_hash5.awk > 01_posn_hsh/"$file_base".hsh
       hash_into_fasta_id.pl -nodef -fasta "${cds_files_extra[file_num]}" \
-                            -hash 01_posn_hsh/$file_base.hsh \
-                            -out 02_fasta_nuc/$file_base
+                            -hash 01_posn_hsh/"$file_base".hsh \
+                            -out 02_fasta_nuc/"$file_base"
     done
   fi
 
   echo "  Count starting sequences, for later comparisons"
-  for file in 02_fasta_prot/*.$faa; do
+  for file in 02_fasta_prot/*."$faa"; do
     awk '$0~/UNDEFINED/ {ct++} 
-      END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' $file
-    cat $file | grep '>' | perl -pe 's/__/\t/g' | cut -f2 | # extracts the GeneName from combined genspchr__GeneName__start__end__orient
+      END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' "$file"
+    grep '>' "$file" | perl -pe 's/__/\t/g' | cut -f2 | # extracts the GeneName from combined genspchr__GeneName__start__end__orient
       perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex.+/$1/' |
       grep -v UNDEFINED | sort | uniq -c | awk '{print $2 "\t" $1}' >> stats/tmp.gene_count_start
   done
@@ -321,21 +321,21 @@ run_mmseqs() {
   mkdir -p 03_mmseqs 03_mmseqs_tmp
   SEQTYPE=1;  # 1=pep; 3=nuc
   for (( file1_num = 0; file1_num < ${#protein_files[@]} ; file1_num++ )); do
-    qry_base=$(basename ${protein_files[file1_num]%.*} .$faa)
-    for (( file2_num = $file1_num; file2_num < ${#protein_files[@]} ; file2_num++ )); do  # file2_num = $file1_num includes self-comparisons
-      sbj_base=$(basename ${protein_files[file2_num]%.*} .$faa)
+    qry_base=$(basename "${protein_files[file1_num]%.*}" ."$faa")
+    for (( file2_num = file1_num; file2_num < ${#protein_files[@]} ; file2_num++ )); do  # file2_num = $file1_num includes self-comparisons
+      sbj_base=$(basename "${protein_files[file2_num]%.*}" ."$faa")
       echo "  Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
 
-      if [[ ${qry_base} == ${sbj_base} ]]; then # self-comparison, so use flag --add-self-matches
+      if [[ ${qry_base} == "${sbj_base}" ]]; then # self-comparison, so use flag --add-self-matches
         mmseqs easy-search \
-          02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa 03_mmseqs/${qry_base}.x.${sbj_base}.m8 $MMTEMP \
-          --add-self-matches --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} --min-seq-id ${clust_iden} \
+          02_fasta_prot/"$qry_base"."$faa" 02_fasta_prot/"$sbj_base"."$faa" 03_mmseqs/"${qry_base}".x."${sbj_base}".m8 "$MMTEMP" \
+          --add-self-matches --search-type ${SEQTYPE} --cov-mode 0 -c "${clust_cov}" --min-seq-id "${clust_iden}" \
           --format-output "query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,qaln,taln" 1>/dev/null 
       else # not a self-comparison, do omit flag --add-self-matches
         mmseqs easy-search \
-          02_fasta_prot/$qry_base.$faa 02_fasta_prot/$sbj_base.$faa 03_mmseqs/${qry_base}.x.${sbj_base}.m8 $MMTEMP \
-          --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} --min-seq-id ${clust_iden} \
+          02_fasta_prot/"$qry_base"."$faa" 02_fasta_prot/"$sbj_base"."$faa" 03_mmseqs/"${qry_base}".x."${sbj_base}".m8 "$MMTEMP" \
+          --search-type ${SEQTYPE} --cov-mode 0 -c "${clust_cov}" --min-seq-id "${clust_iden}" \
           --format-output "query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,qaln,taln" 1>/dev/null 
       fi
     done
@@ -353,14 +353,14 @@ run_filter() {
   if [[ -f ${expected_quotas} ]]; then  # filter based on list of match quotas if provided
     echo "Filtering on quotas from file ${expected_quotas}"
     for mmseqs_path in 03_mmseqs/*.m8; do
-      outfilebase=`basename $mmseqs_path .m8`
+      outfilebase=$(basename "$mmseqs_path" .m8)
       echo "  Filtering $outfilebase based on expected quotas"
-      cat ${mmseqs_path} | filter_mmseqs_by_quotas.pl -quotas ${expected_quotas} |
+      filter_mmseqs_by_quotas.pl -quotas "${expected_quotas}" < "${mmseqs_path}" |
         perl -pe 's/\t[\+-]//g' |  # strip orientation, which isn't used by DAGChainer 
         cat | # Next: for self-comparisons, suppress same chromosome && different gene ID (local dups)
         perl -lane 'print $_ unless($F[0] eq $F[4] && $F[1] ne $F[5])' |
         awk 'NF==8' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
-        cat > 04_dag/${outfilebase}_matches.tsv &
+        cat > 04_dag/"${outfilebase}"_matches.tsv &
 
       # allow to execute up to $NPROC in parallel
       if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
@@ -369,13 +369,13 @@ run_filter() {
   else   # don't filter, since quotas file isn't provided; just remove orientation, which isn't used by DAGChainer
     echo "No expected_quotas.tsv file was provided, so proceeding without quota (expected gene-count) filtering."
     for mmseqs_path in 03_mmseqs/*.m8; do
-      outfilebase=`basename $mmseqs_path .m8`
-      cat ${mmseqs_path} | cut -f1,2 | 
+      outfilebase=$(basename "$mmseqs_path" .m8)
+      cut -f1,2 "${mmseqs_path}" | 
         perl -pe 's/__/\t/g; s/\t[\+-]//g' | 
         cat | # Next: for self-comparisons, suppress same chromosome && different gene ID (local dups)
         perl -lane 'print $_ unless($F[0] eq $F[4] && $F[1] ne $F[5])' |
         awk 'NF==8' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
-        cat > 04_dag/${outfilebase}_matches.tsv 
+        cat > 04_dag/"${outfilebase}"_matches.tsv 
     done
   fi
 }
@@ -389,18 +389,18 @@ run_dagchainer() {
   # Check and preemptively remove malformed \*_matches.file, which can result from an aborted run
   if [ -f 04_dag/\*_matches.tsv ]; then rm 04_dag/\*_matches.tsv; fi
   for match_path in 04_dag/*_matches.tsv; do
-    align_file=`basename $match_path _matches.tsv`
-    qryfile=$(echo $align_file | perl -pe 's/(\S+)\.x\..+/$1/')
-    sbjfile=$(echo $align_file | perl -pe 's/\S+\.x\.(\S+)/$1/')
+    align_file=$(basename "$match_path" _matches.tsv)
+    qryfile=$(echo "$align_file" | perl -pe 's/(\S+)\.x\..+/$1/')
+    sbjfile=$(echo "$align_file" | perl -pe 's/\S+\.x\.(\S+)/$1/')
 
     echo "Find average distance between genes for the query and subject files: "
     echo "  $qryfile and $sbjfile"
-    ave_gene_gap=$(cat 02_fasta_prot/$qryfile.$faa 02_fasta_prot/$sbjfile.$faa | 
+    ave_gene_gap=$(cat 02_fasta_prot/"$qryfile"."$faa" 02_fasta_prot/"$sbjfile"."$faa" | 
                      awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/__/\t/g' | sort -k1,1 -k3n,3n |
                      awk '$1 == prev1 && $3 > prev4 {sum+=$3-prev4; ct++; prev1=$1; prev3=$3; prev4=$4};
                           $1 != prev1 || $3 <= prev4 {prev1=$1; prev3=$3; prev4=$4}; 
                           END{print 100*int(sum/ct/100)}')
-    let "max_gene_gap = ave_gene_gap * 20"
+    max_gene_gap=$(( ave_gene_gap * 20 ))
 
     echo "Running DAGchainer on comparison: $align_file"
     echo "  Calculated DAGchainer parameters: -g (ave_gene_gap): $ave_gene_gap -D (max_gene_gap): $max_gene_gap"; echo
@@ -410,8 +410,8 @@ run_dagchainer() {
     (
       tmpdir=$(mktemp -d)
       cd "${tmpdir}"
-      run_DAG_chainer.pl $dagchainer_args  -g $ave_gene_gap -D $max_gene_gap -i "${OLDPWD}/${match_path}" 1>/dev/null
-      rmdir ${tmpdir}
+      run_DAG_chainer.pl "$dagchainer_args"  -g "$ave_gene_gap" -D $max_gene_gap -i "${OLDPWD}/${match_path}" 1>/dev/null
+      rmdir "${tmpdir}"
     ) &
     # allow to execute up to $NPROC in parallel
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
@@ -430,19 +430,19 @@ run_ks_calc() {
 
   cd "${WORK_DIR}"
 
-  if [ ! -d $WORK_DIR/05_kaksout ]; then
+  if [ ! -d "$WORK_DIR"/05_kaksout ]; then
     echo "creating output directory $WORK_DIR/05_kaksout"
-    mkdir -p $WORK_DIR/05_kaksout
+    mkdir -p "$WORK_DIR"/05_kaksout
   fi
   
   # Generate berkeleydb such that the sequence IDs are in lexical order, and coords and seqs are ordered accordingly
   # qry, sbj, iden, len, mism, gap, qstart, qend, sstart, ssend, eval, bitsc, qaln, saln
   # 0    1    2     3    4     5    6       7     8       9      10    11     12    13
-  for MATCHFILE in $WORK_DIR/03_mmseqs/*.m8; do
-    base=`basename $MATCHFILE .m8`
-    dir=`dirname $MATCHFILE`
+  for MATCHFILE in "$WORK_DIR"/03_mmseqs/*.m8; do
+    base=$(basename "$MATCHFILE" .m8)
+    dir=$(dirname "$MATCHFILE")
     echo "  Create berkeleydb file for $base.m8"
-    cat $MATCHFILE | 
+    < "$MATCHFILE" \
       perl -lane '($qry, $sbj, $iden, $len, $mism, $gap, $qstart, $qend, $sstart, $ssend, $eval, $bitsc, $qaln, $saln) = @F;
                    if ($qry gt $sbj){ 
                      ($qry, $sbj)      = ($F[1], $F[0]);
@@ -455,7 +455,7 @@ run_ks_calc() {
 
                    print "$qry $sbj";
                    print join(" ", $iden, $len, $mism, $gap, $qstart, $qend, $sstart, $ssend, $eval, $bitsc, $qaln, $saln);
-                 ' | db_load -T -t hash $dir/$base.db &
+                 ' | db_load -T -t hash "$dir"/"$base".db &
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
@@ -464,15 +464,15 @@ run_ks_calc() {
   cat 02_*_cds.fna | fasta_to_berkeleydb.awk | db_load -T -t hash 02_tmp_fasta.db
     
   for DAGFILE in 04_dag/*aligncoords; do
-    base=`basename $DAGFILE _matches.tsv.aligncoords`
+    base=$(basename "$DAGFILE" _matches.tsv.aligncoords)
     echo "  Calculate Ks values for $base"
 
     echo "cat $DAGFILE | calc_ks_from_dag.pl -fasta_db 02_tmp_fasta.db \\ ";
     echo "   -align_method precalc -match_table 03_mmseqs/$base.db \\ ";
     echo "  -report_out 05_kaksout/$base.rptout";
-    cat $DAGFILE | calc_ks_from_dag.pl -fasta_db 02_tmp_fasta.db \
-      -match_table 03_mmseqs/$base.db  -align_method precalc \
-      -report_out 05_kaksout/$base.rptout 2> /dev/null & # discard verbose warnings from LocatableSeq.pm
+    < "$DAGFILE" calc_ks_from_dag.pl -fasta_db 02_tmp_fasta.db \
+      -match_table 03_mmseqs/"$base".db  -align_method precalc \
+      -report_out 05_kaksout/"$base".rptout 2> /dev/null & # discard verbose warnings from LocatableSeq.pm
     echo
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
@@ -487,33 +487,34 @@ run_ks_calc() {
   cat /dev/null > stats/ks_histograms.tsv
   cat /dev/null > stats/ks_histplots.tsv
   for ks_path in 05_kaksout/*.rptout; do
-    filebase=`basename $ks_path .rptout`
-    qry_ann=$(echo $filebase | perl -pe 'BEGIN{$REX=$ENV{"ANN_REX"}}; s/^$REX/$1/')
-    sbj_ann=$(echo $filebase | perl -pe 'BEGIN{$REX=qr($ENV{"ANN_REX"})}; s/.+\.x\.$REX/$1/')
+    filebase=$(basename "$ks_path" .rptout)
+    qry_ann=$(echo "$filebase" | perl -pe 'BEGIN{$REX=$ENV{"ANN_REX"}}; s/^$REX/$1/')
+    sbj_ann=$(echo "$filebase" | perl -pe 'BEGIN{$REX=qr($ENV{"ANN_REX"})}; s/.+\.x\.$REX/$1/')
 
-    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | histogram.pl -z -n -s $ks_binsize |
-      awk -v KSLC=$ks_low_cutoff -v KSHC=$ks_hi_cutoff -v QA=$qry_ann -v SA=$sbj_ann '
+    < "$ks_path" awk 'NF==7 && $7<=3 {print $7}' | histogram.pl -z -n -s "$ks_binsize" |
+      awk -v KSLC="$ks_low_cutoff" -v KSHC="$ks_hi_cutoff" -v QA="$qry_ann" -v SA="$sbj_ann" '
         $1>=KSLC && $1<=KSHC && $2>=maxampl { maxampl=$2; maxbin=$1 } 
         END{ printf("%s\t%s\t%.2f\t%d\n", QA, SA, maxbin, maxampl)}' >> stats/ks_peaks_auto.tsv
 
-    ks_bin=$(cat stats/ks_peaks_auto.tsv | 
-                    awk -v QA=$qry_ann -v SA=$sbj_ann -v OFS="\t" '$1 == QA && $2 == SA {print $3}')
-    export ks_amplitude=$(cat stats/ks_peaks_auto.tsv | 
-                    awk -v QA=$qry_ann -v SA=$sbj_ann -v OFS="\t" '$1 == QA && $2 == SA {print $4}')
+    ks_bin=$(< stats/ks_peaks_auto.tsv awk -v QA="$qry_ann" -v SA="$sbj_ann" -v OFS="\t" \
+                                            '$1 == QA && $2 == SA {print $3}')
+    ks_amplitude=$(< stats/ks_peaks_auto.tsv awk -v QA="$qry_ann" -v SA="$sbj_ann" -v OFS="\t" \
+                                            '$1 == QA && $2 == SA {print $4}')
+    export ks_amplitude
     ks_amplitude_pct=$(perl -e '$KSA=$ENV{ks_amplitude}; {printf("%.2f", $KSA/100)}')
       
-    printf "  Amplitude, ks_peak_bin, qry, sbj:\t$ks_amplitude\t$ks_amplitude_pct\t$qry_ann\t$sbj_ann\n"
+    printf "  Amplitude, ks_peak_bin, qry, sbj:\t%s\t%s\t%s\t%s\n" "$ks_amplitude" "$ks_amplitude_pct" "$qry_ann" "$sbj_ann"
 
-    echo "# $filebase" >> stats/ks_histograms.tsv
-    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | 
-      histogram.pl -z -n -s $ks_binsize >> stats/ks_histograms.tsv
-    echo "" >> stats/ks_histograms.tsv
-
-    echo "# $filebase" >> stats/ks_histplots.tsv
-    echo "# Normalized relative to Ks peak inferred at bin $ks_bin, with amplitude $ks_amplitude_pct" >> stats/ks_histplots.tsv
-    cat $ks_path | awk 'NF==7 && $7<=3 {print $7}' | histogram.pl -z -n -s $ks_binsize | 
-      histplot.pl -d $ks_amplitude_pct >> stats/ks_histplots.tsv
-    echo "" >> stats/ks_histplots.tsv
+    {
+      echo "# $filebase" 
+      awk 'NF==7 && $7<=3 {print $7}' "$ks_path" | histogram.pl -z -n -s "$ks_binsize" 
+      echo "" 
+      echo "# $filebase" 
+      echo "# Normalized relative to Ks peak inferred at bin $ks_bin, with amplitude $ks_amplitude_pct" 
+      awk 'NF==7 && $7<=3 {print $7}' "$ks_path" | histogram.pl -z -n -s "$ks_binsize" | 
+        histplot.pl -d "$ks_amplitude_pct" 
+      echo "" 
+    } >> stats/ks_histplots.tsv
   done
 }
 
@@ -528,22 +529,20 @@ run_ks_filter() {
   if [[ -f ${ks_peaks} ]]; then  # filter based on list of Ks values
     echo "Filtering on quotas from file ${expected_quotas} and ks_pair_cutoff value provided in config file"
     for ks_path in 05_kaksout/*.rptout; do
-      outfilebase=`basename $ks_path .rptout`
+      outfilebase=$(basename "$ks_path" .rptout)
       echo "  Filtering $ks_path based on expected block-median Ks values"
-      cat ${ks_path} | 
-        filter_mmseqs_by_ks.pl -ks_peak $ks_peaks -annot_regex $annot_str_regex -max_pair_ks $max_pair_ks |
-        awk 'NF==7' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
-        cat > 05_kaksout_ks_filtered/${outfilebase}.rptout 
+      < "${ks_path}" filter_mmseqs_by_ks.pl \
+          -ks_peak "$ks_peaks" -annot_regex "$annot_str_regex" -max_pair_ks "$max_pair_ks" |
+        awk 'NF==7' > 05_kaksout_ks_filtered/"${outfilebase}".rptout 
     done
   elif [[ -f stats/ks_peaks_auto.tsv ]]; then  # filter based on list of Ks values determined automatically in step ks_calc above
     echo "Filtering on quotas from file ${expected_quotas} and ks_pair_cutoff value calculated and stored at ks_peaks_auto.tsv"
     for ks_path in 05_kaksout/*.rptout; do
-      outfilebase=`basename $ks_path .rptout`
+      outfilebase=$(basename "$ks_path" .rptout)
       echo "  Filtering $ks_path based on expected block-median Ks values"
-      cat ${ks_path} | 
-        filter_mmseqs_by_ks.pl -ks_peak stats/ks_peaks_auto.tsv -annot_regex $annot_str_regex -max_pair_ks $max_pair_ks |
-        awk 'NF==7' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
-        cat > 05_kaksout_ks_filtered/${outfilebase}.rptout 
+      < "${ks_path}" filter_mmseqs_by_ks.pl \
+          -ks_peak stats/ks_peaks_auto.tsv -annot_regex "$annot_str_regex" -max_pair_ks "$max_pair_ks" |
+        awk 'NF==7' > 05_kaksout_ks_filtered/"${outfilebase}".rptout 
     done
   else   # don't filter, since ks_peaks.tsv file isn't provided
     echo "No ks_peaks.tsv file was provided. It is recommended to review the provisional stats/ks_peaks_auto.tsv file and"
@@ -576,7 +575,7 @@ run_mcl() {
         echo "## Combine the DAGChainer synteny pairs, with additional filtering by pairwise and block Ks thresholds, into a file to be clustered."
         # Combine the synteny pairs into a file to be clustered
         cat 05_kaksout/*.rptout | 
-          awk -v PAIR_CUTOFF=$ks_pair_cutoff -v BLOCK_CUTOFF=$ks_block_wgd_cutoff '
+          awk -v PAIR_CUTOFF="$ks_pair_cutoff" -v BLOCK_CUTOFF="$ks_block_wgd_cutoff" '
               NF>0 && $1!~/^#/ && ($5<=PAIR_CUTOFF || $7<=BLOCK_CUTOFF) {print $1 "\t" $2}' |
             sort -u > 05_filtered_pairs.tsv
       fi
@@ -587,19 +586,19 @@ run_mcl() {
     fi
   fi
 
-  printf "\nDo Markov clustering with inflation parameter $mcl_inflation and ${NPROC} threads\n"
+  printf "\nDo Markov clustering with inflation parameter %f and %d threads\n" "$mcl_inflation" "$NPROC"
   echo "MCL COMMAND: mcl 05_filtered_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv"
-  mcl 05_filtered_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv \
+  mcl 05_filtered_pairs.tsv -I "$mcl_inflation" -te "${NPROC}" --abc -o tmp.syn_pan.clust.tsv \
     1>/dev/null
  
   echo "  Add cluster IDs"
-  awk -v PRE=$consen_prefix '
+  awk -v PRE="$consen_prefix" '
     {padnum=sprintf("%05d", NR); print PRE padnum "\t" $0}' tmp.syn_pan.clust.tsv > 06_syn_pan.clust.tsv
   rm tmp.syn_pan.clust.tsv
 
   echo "  Move singleton and doubleton clusters into a list of leftovers"
-  cat 06_syn_pan.clust.tsv | awk 'NF==2 {print $2} NF==3 {print $2; print $3}' > lists/lis.06_syn_pan_1s_2s
-  cat 06_syn_pan.clust.tsv | awk 'NF>3 {print $0}' > 06_syn_pan_ge3.clust.tsv
+  awk 'NF==2 {print $2} NF==3 {print $2; print $3}' 06_syn_pan.clust.tsv > lists/lis.06_syn_pan_1s_2s
+  awk 'NF>3 {print $0}' 06_syn_pan.clust.tsv > 06_syn_pan_ge3.clust.tsv
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
   perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 06_syn_pan_ge3.clust.tsv > 06_syn_pan_ge3.hsh.tsv
@@ -646,13 +645,13 @@ run_consense() {
                      07_pan_fasta_prot.faa \
                      10_unclust.x.07_pan_fasta.m8 \
                      03_mmseqs_tmp \
-                     --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null 
+                     --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null 
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
   echo "  Use the \"main set\" $clust_iden threshold."
   export FAM_PRE=${consen_prefix}
   top_line.awk 10_unclust.x.07_pan_fasta.m8 | 
-    awk -v IDEN=${clust_iden} '$3>=IDEN {print $2 "\t" $1}' | 
+    awk -v IDEN="${clust_iden}" '$3>=IDEN {print $2 "\t" $1}' | 
     perl -pe '$prefix=$ENV{FAM_PRE}; s/^($prefix\d+)__\S+/$1/' |  # trims gene ID from preceding family ID
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk >  11_syn_pan_leftovers.clust.tsv
 
@@ -683,19 +682,18 @@ run_cluster_rest() {
   MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
   mkdir -p 03_mmseqs_rest
   complmt_self_compare="12_syn_pan_aug_complement.x.12_syn_pan_aug_complement"
-  cat 12_syn_pan_aug_complement.faa |
-    mmseqs easy-cluster stdin 03_mmseqs_rest/$complmt_self_compare $MMTEMP \
-    --min-seq-id $clust_iden -c $clust_cov --cov-mode 0 --cluster-reassign 1>/dev/null
+  < 12_syn_pan_aug_complement.faa \
+    mmseqs easy-cluster stdin 03_mmseqs_rest/$complmt_self_compare "$MMTEMP" \
+    --min-seq-id "$clust_iden" -c "$clust_cov" --cov-mode 0 --cluster-reassign 1>/dev/null
 
   echo "  Cluster the remaining sequences that have matches"
-  mcl 03_mmseqs_rest/${complmt_self_compare}_cluster.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan_aug_complement.clust.tsv
+  mcl 03_mmseqs_rest/${complmt_self_compare}_cluster.tsv -I "$mcl_inflation" -te "${NPROC}" --abc -o tmp.syn_pan_aug_complement.clust.tsv
 
   echo "  Find number of clusters in initial (06) results"
-  clust_count_06=`wc -l 06_syn_pan_ge3.clust.tsv | awk '{print $1}'`
+  clust_count_06=$(wc -l 06_syn_pan_ge3.clust.tsv | awk '{print $1}')
  
   echo "  Add cluster IDs"
-  cat tmp.syn_pan_aug_complement.clust.tsv | 
-    awk -v START=$clust_count_06 -v PRE=$consen_prefix '
+  < tmp.syn_pan_aug_complement.clust.tsv awk -v START="$clust_count_06" -v PRE="$consen_prefix" '
       NF>1 {padnum=sprintf("%05d", NR+START); print PRE padnum "\t" $0}' |
     cat > 12_syn_pan_aug_complement.clust.tsv
   rm tmp.syn_pan_aug_complement.clust.tsv
@@ -732,11 +730,11 @@ run_add_extra() {
     echo "SEQTYPE is: $SEQTYPE"
 
     for filepath in "${protein_files_extra[@]}"; do
-      fasta_file=`basename ${filepath%.*}`
+      fasta_file=$(basename "${filepath%.*}")
       echo "Extra: $fasta_file"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
-      mmseqs easy-search "${filepath}" 13_pan_aug_fasta.faa 13_extra_out_dir/${fasta_file}.x.all_cons.m8 \
-                   $MMTEMP --search-type ${SEQTYPE} --cov-mode 5 -c ${clust_cov} 1>/dev/null & # background
+      mmseqs easy-search "${filepath}" 13_pan_aug_fasta.faa 13_extra_out_dir/"${fasta_file}".x.all_cons.m8 \
+                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null & # background
 
       if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
     done
@@ -746,7 +744,7 @@ run_add_extra() {
     echo "  Use identity threshold extr_iden: $extra_iden."
     export FAM_PRE=${consen_prefix}
     top_line.awk 13_extra_out_dir/*.x.all_cons.m8 |
-      awk -v IDEN=${extra_iden} '$3>=IDEN {print $2 "\t" $1}' | 
+      awk -v IDEN="${extra_iden}" '$3>=IDEN {print $2 "\t" $1}' | 
       perl -pe '$prefix=$ENV{FAM_PRE}; s/^($prefix\d+)__\S+/$1/' |  # trims gene ID from preceding family ID
       sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 14_syn_pan_extra.clust.tsv
   
@@ -765,7 +763,7 @@ run_add_extra() {
       > 18_syn_pan_aug_extra.hsh.tsv
 
     echo "  For each family set, retrieve sequences into a multifasta file."
-    echo "    Fasta file:" "${protein_files[@]} ${protein_files_extra[@]}"
+    printf "    Fasta file: %s %s\n" "${protein_files[@]}" "${protein_files_extra[@]}"
     if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot ; fi
     mkdir -p 19_pan_aug_leftover_merged_prot
     get_fasta_from_family_file.pl "${protein_files[@]}" "${protein_files_extra[@]}" \
@@ -788,11 +786,11 @@ run_tabularize() {
   cd "${WORK_DIR}"
 
   # Get table header
-  pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv -annot_str_regex $ANN_REX > tmp.18_syn_pan_aug_extra.clust.tsv
+  pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv -annot_str_regex "$ANN_REX" > tmp.18_syn_pan_aug_extra.clust.tsv
   head -1 tmp.18_syn_pan_aug_extra.clust.tsv > tmp.table_header
 
   echo "  Sort, putting header row at top, and don't print pangenes that are all NONE"
-    cat tmp.18_syn_pan_aug_extra.clust.tsv | sort -k1,1 | sed '/^$/d; /^#pangene/d' |
+    < tmp.18_syn_pan_aug_extra.clust.tsv sort -k1,1 | sed '/^$/d; /^#pangene/d' |
     perl -lane '$ct=0; for $gn (@F){if ($gn=~/NONE/){$ct++}}; if ($ct<(scalar(@F)-1)){print $_}' |
     cat tmp.table_header - > 18_syn_pan_aug_extra.table.tsv
 
@@ -816,9 +814,9 @@ run_align() {
   echo; echo "== Align the gene families =="
   mkdir -p 20_aligns
   for filepath in 19_pan_aug_leftover_merged_prot/*; do 
-    file=`basename $filepath`;
+    file=$(basename "$filepath");
     echo "  Computing alignment, using program famsa, for file $file"
-    famsa -t 2 19_pan_aug_leftover_merged_prot/$file 20_aligns/$file 1>/dev/null &
+    famsa -t 2 19_pan_aug_leftover_merged_prot/"$file" 20_aligns/"$file" 1>/dev/null &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -830,8 +828,8 @@ run_model_and_trim() {
   cd "${WORK_DIR}"
   mkdir -p 21_hmm
   for filepath in 20_aligns/*; do 
-    file=`basename $filepath`;
-    hmmbuild -n $file 21_hmm/$file $filepath 1>/dev/null &
+    file=$(basename "$filepath");
+    hmmbuild -n "$file" 21_hmm/"$file" "$filepath" 1>/dev/null &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -839,8 +837,8 @@ run_model_and_trim() {
   echo; echo "== Realign to HMMs =="
   mkdir -p 22_hmmalign
   for filepath in 21_hmm/*; do 
-    file=`basename $filepath`;
-    hmmalign --trim --outformat A2M --amino -o 22_hmmalign/$file 21_hmm/$file 19_pan_aug_leftover_merged_prot/$file &
+    file=$(basename "$filepath");
+    hmmalign --trim --outformat A2M --amino -o 22_hmmalign/"$file" 21_hmm/"$file" 19_pan_aug_leftover_merged_prot/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -848,10 +846,9 @@ run_model_and_trim() {
   echo; echo "== Trim HMM alignments to match-states =="
   mkdir -p 23_hmmalign_trim1
   for filepath in 22_hmmalign/*; do 
-    file=`basename $filepath`;
-    cat $filepath | 
-      perl -ne 'if ($_ =~ />/) {print $_} else {$line = $_; $line =~ s/[a-z]//g; print $line}' |
-      sed '/^$/d' > 23_hmmalign_trim1/$file &
+    file=$(basename "$filepath");
+    < "$filepath" perl -ne 'if ($_ =~ />/) {print $_} else {$line = $_; $line =~ s/[a-z]//g; print $line}' |
+      sed '/^$/d' > 23_hmmalign_trim1/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -862,8 +859,8 @@ run_model_and_trim() {
   min_pct_depth=20
   min_pct_aligned=20
   for filepath in 23_hmmalign_trim1/*; do 
-    file=`basename $filepath`
-    filter_align.pl -in $filepath -out 23_hmmalign_trim2/$file -log 23_hmmalign_trim2_log/$file \
+    file=$(basename "$filepath")
+    filter_align.pl -in "$filepath" -out 23_hmmalign_trim2/"$file" -log 23_hmmalign_trim2_log/"$file" \
                     -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
@@ -882,11 +879,11 @@ run_calc_trees() {
   min_seq_count=4
   # Below, "count" is the number of unique sequences in the alignment.
   for filepath in 23_hmmalign_trim2/*; do
-    file=`basename $filepath`
-    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' $filepath | sort -u | wc -l);
+    file=$(basename "$filepath")
+    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
     if [[ $count -lt $min_seq_count ]]; then
       echo "Set aside small or low-entropy family $file";
-      mv $filepath 23_pan_aug_small_or_identical/
+      mv "$filepath" 23_pan_aug_small_or_identical/
     fi;
   done
 
@@ -895,9 +892,9 @@ run_calc_trees() {
   OMP_NUM_THREADS=1
   export OMP_NUM_THREADS
   for filepath in 23_hmmalign_trim2/*; do
-    file=`basename $filepath`
+    file=$(basename "$filepath")
     echo "  Calculating tree for $file"
-    fasttree -quiet $filepath > 24_trees/$file &
+    fasttree -quiet "$filepath" > 24_trees/"$file" &
   done
   wait
 }
@@ -911,11 +908,9 @@ run_summarize() {
   echo "  work_dir: $PWD"
 
   echo "  Calculate matrix of gene counts per orthogroup and annotation set"
-  calc_pan_stats.pl -annot_regex $ANN_REX -pan 18_syn_pan_aug_extra.clust.tsv -out 18_syn_pan_aug_extra.counts.tsv
-  max_annot_ct=$(cat 18_syn_pan_aug_extra.counts.tsv | 
-                       awk '$1!~/^#/ {print $2}' | sort -n | uniq | tail -1)
+  calc_pan_stats.pl -annot_regex "$ANN_REX" -pan 18_syn_pan_aug_extra.clust.tsv -out 18_syn_pan_aug_extra.counts.tsv
  
-  conf_base=`basename $CONF .conf`
+  conf_base=$(basename "$CONF" .conf)
   full_out_dir="${out_dir_base}_$conf_base"
   stats_file=${full_out_dir}/stats.$conf_base.txt
 
@@ -923,15 +918,15 @@ run_summarize() {
 
   if [ ! -d "$full_out_dir" ]; then
       echo "creating output directory \"${full_out_dir}/\""
-      mkdir -p $full_out_dir
+      mkdir -p "$full_out_dir"
   fi
 
   for file in 06_syn_pan.clust.tsv 06_syn_pan_ge3.hsh.tsv \
               12_syn_pan_aug.clust.tsv 12_syn_pan_aug.hsh.tsv \
               18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv \
               18_syn_pan_aug_extra.table.tsv 18_syn_pan_aug_extra.counts.tsv; do
-    if [ -f ${WORK_DIR}/$file ]; then
-      cp ${WORK_DIR}/$file ${full_out_dir}/
+    if [ -f "${WORK_DIR}"/$file ]; then
+      cp "${WORK_DIR}"/$file "${full_out_dir}"/
     else 
       echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
     fi
@@ -939,101 +934,98 @@ run_summarize() {
 
   echo "Copy manifest file into the output directory"
   if [ -f "${submit_dir}/manifests/MANIFEST_output_fam.yml" ]; then
-    cp "${submit_dir}/manifests/MANIFEST_output_fam.yml" $full_out_dir/
+    cp "${submit_dir}/manifests/MANIFEST_output_fam.yml" "$full_out_dir"/
   else
     echo "Couldn't find file manifests/MANIFEST_output_fam.yml"
   fi
 
   for dir in 19_pan_aug_leftover_merged_prot 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
-    if [ -d ${WORK_DIR}/$dir ]; then
+    if [ -d "${WORK_DIR}"/$dir ]; then
       echo "Copying directory $dir to output directory"
-      cp -r ${WORK_DIR}/$dir ${full_out_dir}/
+      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
     else 
       echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
     fi
   done
 
-  printf "Run of program $scriptname, version $version\n" > ${stats_file}
+  printf "Run of program %s, version %s\n" "$scriptname" "$version" > "${stats_file}"
 
-  end_time=`date`
-  cat ${WORK_DIR}/stats/tmp.timing >> ${stats_file}
-  printf "Run ended at:   $end_time\n\n" >> ${stats_file}
+  end_time=$(date)
+  cat "${WORK_DIR}"/stats/tmp.timing >> "${stats_file}"
+  printf "Run ended at:   %s\n\n" "$end_time" >> "${stats_file}"
 
   echo "  Report parameters from config file"
-  printf "Parameter  \tvalue\n" >> ${stats_file}
+  printf "Parameter  \tvalue\n" >> "${stats_file}"
   for key in ${pandagma_conf_params}; do
-    printf '%-15s\t%s\n' ${key} "${!key}" >> ${stats_file}
+    printf '%-15s\t%s\n' "${key}" "${!key}" >> "${stats_file}"
   done
 
-  printf "\nOutput directory for this run:\t${full_out_dir}\n" >> ${stats_file}
+  printf "\nOutput directory for this run:\t%s\n" "$full_out_dir" >> "${stats_file}"
 
   echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
 
   echo "  Print sequence composition statistics for each annotation set"
-  printf "\n== Sequence stats for protein files\n" >> ${stats_file}
-  printf "  Class:  seqs     min max    N50    ave     annotation_name\n" >> ${stats_file} 
-  if [ -f ${WORK_DIR}/stats/tmp.fasta_seqstats ]; then
-    cat ${WORK_DIR}/stats/tmp.fasta_seqstats >> ${stats_file}
+  
+  {
+  printf "\n== Sequence stats for protein files\n" 
+  printf "  Class:  seqs     min max    N50    ave     annotation_name\n"  
+  if [ -f "${WORK_DIR}"/stats/tmp.fasta_seqstats ]; then
+    cat "${WORK_DIR}"/stats/tmp.fasta_seqstats 
 
-  printf "\n  Avg:   " >> ${stats_file} 
-    cat ${WORK_DIR}/stats/tmp.fasta_seqstats | transpose.pl |
+    printf "\n  Avg:   " >> "${stats_file}" 
+    < "${WORK_DIR}"/stats/tmp.fasta_seqstats transpose.pl |
       perl -ane 'BEGIN{use List::Util qw(sum)}; 
                  if ($F[0]=~/^\d+/){
                    $sum=sum @F; $ct=scalar(@F); $avg=$sum/$ct;
                    printf " %4d ", $avg;
                  END{print "   all_annot_sets\n"}
-                 }' >> ${stats_file}
+                 }' 
   fi
+  } >> "${stats_file}"
 
   echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
   #   tmp.gene_count_start was generated during run_ingest
   printf "\n== Proportion of initial genes retained in the \"aug_extra\" set:\n" \
-    >> ${stats_file}
+    >> "${stats_file}"
 
-  cut -f2 ${WORK_DIR}/18_syn_pan_aug_extra.hsh.tsv | 
+  cut -f2 "${WORK_DIR}"/18_syn_pan_aug_extra.hsh.tsv | 
     perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' |
-    sort | uniq -c | awk '{print $2 "\t" $1}' > ${WORK_DIR}/stats/tmp.gene_count_all_end
+    sort | uniq -c | awk '{print $2 "\t" $1}' > "${WORK_DIR}"/stats/tmp.gene_count_all_end
 
-  paste ${WORK_DIR}/stats/tmp.gene_count_start \
-        ${WORK_DIR}/stats/tmp.gene_count_all_end |
+  paste "${WORK_DIR}"/stats/tmp.gene_count_start \
+        "${WORK_DIR}"/stats/tmp.gene_count_all_end |
     awk 'BEGIN{print "  Start\tEnd\tPct_kept\tAnnotation_name"} 
-        { printf "  %i\t%i\t%2.1f\t%s\n", $2, $4, 100*($4/$2), $1 }'  >> ${stats_file}
+        { printf "  %i\t%i\t%2.1f\t%s\n", $2, $4, 100*($4/$2), $1 }'  >> "${stats_file}"
 
   echo "  Print counts per accession"
-  if [ -f ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv ]; then
-    printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" \
-      >> ${stats_file}
-    printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n" \
-      >> ${stats_file}
-    cat ${full_out_dir}/18_syn_pan_aug_extra.counts.tsv | transpose.pl | 
+  if [ -f "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv ]; then
+    printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n"
+    printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n" 
+    transpose.pl "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv | 
       perl -lane 'next if ($.<=3); 
         $ct=0; $sum=0; $nulls=0; $OGs=0;
-        for $i (@F[1..(@F-1)]){
-          $OGs++;
-          if ($i>0){$ct++; $sum+=$i}
-          if ($i==0){$nulls++}
-        }; 
+        for $i (@F[1..(@F-1)]){ $OGs++; if ($i>0){$ct++; $sum+=$i} if ($i==0){$nulls++} }; 
         printf("  %d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
-        >> ${stats_file}
+      >> "${stats_file}"
   fi
 
   echo "  Print histograms"
-  if [ -f ${full_out_dir}/06_syn_pan.clust.tsv ]; then
-    printf "\nCounts of initial clusters by cluster size, file 06_syn_pan.clust.tsv:\n" >> ${stats_file}
-    awk '{print NF-1}' ${full_out_dir}/06_syn_pan.clust.tsv |
-      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
+  if [ -f "${full_out_dir}"/06_syn_pan.clust.tsv ]; then
+    printf "\nCounts of initial clusters by cluster size, file 06_syn_pan.clust.tsv:\n" >> "${stats_file}"
+    awk '{print NF-1}' "${full_out_dir}"/06_syn_pan.clust.tsv |
+      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> "${stats_file}"
   fi
 
-  if [ -f ${full_out_dir}/12_syn_pan_aug.clust.tsv ]; then
-    printf "\nCounts of augmented clusters by cluster size, file 12_syn_pan_aug.clust.tsv:\n" >> ${stats_file}
-    awk '{print NF-1}' ${full_out_dir}/12_syn_pan_aug.clust.tsv |
-      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
+  if [ -f "${full_out_dir}"/12_syn_pan_aug.clust.tsv ]; then
+    printf "\nCounts of augmented clusters by cluster size, file 12_syn_pan_aug.clust.tsv:\n" >> "${stats_file}"
+    awk '{print NF-1}' "${full_out_dir}"/12_syn_pan_aug.clust.tsv |
+      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> "${stats_file}"
   fi
 
-  if [ -f ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv ]; then
-    printf "\nCounts of augmented-extra clusters by cluster size, file 18_syn_pan_aug_extra.clust.tsv:\n" >> ${stats_file}
-    awk '{print NF-1}' ${full_out_dir}/18_syn_pan_aug_extra.clust.tsv |
-      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> ${stats_file}
+  if [ -f "${full_out_dir}"/18_syn_pan_aug_extra.clust.tsv ]; then
+    printf "\nCounts of augmented-extra clusters by cluster size, file 18_syn_pan_aug_extra.clust.tsv:\n" >> "${stats_file}"
+    awk '{print NF-1}' "${full_out_dir}"/18_syn_pan_aug_extra.clust.tsv |
+      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> "${stats_file}"
   fi
 }
 
@@ -1050,40 +1042,40 @@ run_clean() {
   done
   #for file in 10* 11* 14* 20* 21* 23* 24* consen*; do
   for file in 10* 11* 14* 20*; do
-    if [ -f $file ]; then echo "  Removing file $file"; rm $file; 
+    if [ -f "$file" ]; then echo "  Removing file $file"; rm "$file"; 
     fi
   done
   wait
-  cd $OLDPWD
+  cd "$OLDPWD"
 }
 
 ##########
 run_ReallyClean() {
   echo "Doing complete clean-up of files in the working directory (remove all files and directories)"
-  if [ -d ${WORK_DIR} ]; then
+  if [ -d "${WORK_DIR}" ]; then
     cd "${WORK_DIR}"
     echo "  work_dir: $PWD"
     if [ -d 01_posn_hsh ]; then
       echo "Expected directory 01_posn_hsh exists in the work_dir (${WORK_DIR}),"
       echo "so proceeding with complete clean-up from that location."
       for dir in *; do
-        rm -rf $dir &
+        rm -rf "$dir" &
       done
     else 
       echo "Expected directory 01_posn_hsh is not present in the work_dir (${WORK_DIR}),"
       echo "so aborting the -K ReallyClean step. Please do this manually if you wish."
-      cd $OLDPWD
+      cd "$OLDPWD"
       exit 1;
     fi
   fi
   wait
-  cd $OLDPWD
+  cd "$OLDPWD"
 }
 
 ########################################
 # Main program
 
-NPROC=$(command -v nproc > /dev/null && nproc || getconf _NPROCESSORS_ONLN)
+NPROC=$( ( command -v nproc > /dev/null && nproc ) || getconf _NPROCESSORS_ONLN)
 CONFIG="null"
 optarg_work_dir="null"
 step="all"
@@ -1093,11 +1085,11 @@ export NPROC=${NPROC:-1}
 export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
 
 # mmseqs uses significant number of threads on its own. Set a maximum, which may be below NPROC.
-MMSEQSTHREADS=$(( 4 < ${NPROC} ? 4 : ${NPROC} ))
+MMSEQSTHREADS=$(( 4 < NPROC ? 4 : NPROC ))
 
-pandagma_conf_params='clust_iden clust_cov consen_iden extra_iden mcl_inflation strict_synt 
+pandagma_conf_params='clust_iden clust_cov extra_iden mcl_inflation strict_synt 
 ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff max_pair_ks 
-out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex work_dir '
+out_dir_base consen_prefix annot_str_regex work_dir '
 
 ##########
 # Command-line interpreter
@@ -1111,46 +1103,50 @@ do
     n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
     r) retain="yes" ;;
     v) version ;;
-    h) printf >&2 "$HELP_DOC\n" && exit 0 ;;
-    m) printf >&2 "$HELP_DOC\n$MORE_INFO\n" && exit 0 ;;
-    *) printf >&2 "$HELP_DOC\n" && exit 1 ;;
+    h) echo >&2 "$HELP_DOC" && exit 0 ;;
+    m) printf >&2  "%s\n%s\n" "$HELP_DOC" "$MORE_INFO" && exit 0 ;;
+    *) echo >&2 echo "$HELP_DOC" && exit 1 ;;
   esac
 done
 
-if [ $CONFIG == "null" ]; then
+if [ "$CONFIG" == "null" ]; then
   printf "\nPlease provide the path to a config file: -c CONFIG\n" >&2
-  printf "\nRun \"$scriptname -h\" for help.\n\n" >&2
+  printf "\nRun \"%s -h\" for help.\n\n" "$scriptname" >&2
   exit 1;
 else
   export CONF=${CONFIG}
 fi
 
-# Add shell variables from config file
+# shellcheck source=/dev/null
 . "${CONF}"
 
+declare clust_iden clust_cov extra_iden mcl_inflation strict_synt \
+        ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff max_pair_ks \
+        out_dir_base consen_prefix annot_str_regex work_dir \
+
 if [ "$#" -eq 0 ]; then
-  printf >&2 "$HELP_DOC\n" && exit 0;
+  echo >&2 "$HELP_DOC" && exit 0;
 fi
 
-shift $(expr $OPTIND - 1)
+shift $(( OPTIND - 1 ))
 
 ##########
 # Check for existence of work directory.
 # work_dir provided via cli argument takes precedence over the variable specified in the conf file
-if [ $optarg_work_dir == "null" ] && [ -z ${work_dir+x} ]; then
-  echo "\nPlease provide the path to a work directory, for intermediate files," >&2
+if [ "$optarg_work_dir" == "null" ] && [ -z ${work_dir+x} ]; then
+  printf "\nPlease provide the path to a config file: -c CONFIG\n" >&2
   echo "either in the config file (work_dir=) or with option -w" >&2
-  printf "\nRun \"$scriptname -h\" for help.\n\n" >&2
+  printf "\nRun \"%s -h\" for help.\n\n" "$scriptname" >&2
   exit 1;
-elif [ $optarg_work_dir != "null" ] && [ -d $optarg_work_dir ]; then
+elif [ "$optarg_work_dir" != "null" ] && [ -d "$optarg_work_dir" ]; then
   work_dir=$optarg_work_dir
   export WORK_DIR=${work_dir}
-elif [ $optarg_work_dir == "null" ] && [ -d $work_dir ]; then
+elif [ "$optarg_work_dir" == "null" ] && [ -d "$work_dir" ]; then
   export WORK_DIR=${work_dir}
-elif [ ! -d $work_dir ] && [ ! -d $optarg_work_dir ]; then
+elif [ ! -d "$work_dir" ] && [ ! -d "$optarg_work_dir" ]; then
   echo "Neither work directory $work_dir nor $optarg_work_dir was not found. Please specify path in the config file or with option -w." >&2
   exit 1;
-elif [ ! -d $work_dir ]; then
+elif [ ! -d "$work_dir" ]; then
   echo "Work directory $work_dir was not found. Please specify path in the config file or with option -w." >&2
   exit 1;
 else 
@@ -1159,7 +1155,7 @@ else
 fi
 
 if [[ $step == "clean" ]] || [[ $step == "ReallyClean" ]] ; then
-  run_$step
+  run_"$step"
   echo "Command \"$step\" was run for cleanup in the work directory: $WORK_DIR"
   exit 0;
 fi
@@ -1183,7 +1179,7 @@ fi
 # Check that the bin directory is in the PATH
 if ! type hash_into_fasta_id.pl &> /dev/null; then
   printf "\nPlease add the pandagma bin directory to your PATH and try again. Try the following:\n"
-  printf "\n  PATH=$PWD/bin:\$PATH\n\n"
+  printf "\n  PATH=%s/bin:\%s\n\n" "$PWD" "$PATH"
   exit 1; 
 fi
 
@@ -1196,11 +1192,11 @@ commandlist="ingest mmseqs filter dagchainer \
 if [[ $step =~ "all" ]]; then
   for command in $commandlist; do
     echo "RUNNING STEP run_$command"
-    run_$command
+    run_"$command"
     echo
   done
 else
-  run_${step};
+  run_"${step}";
 fi
 
 if [[ $step =~ "all" ]] && [[ $retain == "yes" ]]; then
@@ -1211,4 +1207,3 @@ elif [[ $step =~ "all" ]] && [[ $retain == "no" ]]; then
   echo "Calling the medium cleanup function \"run_clean\" ..."
   run_clean  
 fi
-
