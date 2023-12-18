@@ -5,13 +5,16 @@
 # Authors: Steven Cannon, Hyunoh Lee, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=$(basename "$0")
-version="2023-12-16"
+version="2023-12-17"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
-HELP_DOC=$(
-cat <<'EOS'
+# to help assign a heredoc value to a variable. The internal line return is intentional.
+define(){ o=; while IFS=$'\n' read -r a; do o="$o$a"'
+'; done; eval "$1=\$o"; }
+
+define HELP_DOC <<'EOS'
 Compute pan-gene clusters using a combination of synteny and homology,
 using the programs mmseqs, dagchainer, and mcl, and additional pre- and post-refinement steps.
 
@@ -76,11 +79,10 @@ Subcommands (in order they are usually run):
         ReallyClean - Do complete clean-up of files in the working directory.
                         Use this if you want to start over, OR if you are satisified with the results and
                         don't anticipate adding other annotation sets to this pan-gene set.
+''
 EOS
-) # end main usage string
 
-MORE_INFO=$(
-cat <<'EOS'
+define MORE_INFO <<'EOS'
 Optionally, a file specified in the expected_chr_matches variable can be specified in pandagma.conf,
 which provides anticipated chromosome pairings, e.g.
   01 01
@@ -115,8 +117,8 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         Otherwise, one is selected at random from those with median length.
        order_method - Method to determine consensus panID order. reference or alignment [default reference]
            work_dir - Working directory, for temporary and intermediate files. 
+''
 EOS
-)
 
 ########################################
 # Helper functions begin here
@@ -1153,7 +1155,7 @@ run_summarize() {
 
   end_time=$(date)
   cat "${WORK_DIR}"/stats/tmp.timing >> "${stats_file}"
-  printf "Run ended at:   %f\n\n" "$end_time" >> "${stats_file}"
+  printf "Run ended at:   %s\n\n" "$end_time" >> "${stats_file}"
 
   # Report sequence type 
   if [[ "$SEQTYPE" == 3 ]]; then
@@ -1168,10 +1170,10 @@ run_summarize() {
     printf '%-15s\t%s\n' "${key}" "${!key}" >> "${stats_file}"
   done
 
-  printf "\nOutput directory for this run:\t%f\n" "${full_out_dir}" >> "${stats_file}"
+  printf "\nOutput directory for this run:\t%s\n" "${full_out_dir}" >> "${stats_file}"
 
   echo "  Report threshold for inclusion in \"pctl${pctl_low}\""
-  max_annot_ct=$(awk '$1!~/^#/ {print $2}' "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv sort -n | uniq | tail -1)
+  max_annot_ct=$(awk '$1!~/^#/ {print $2}' "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv | sort -n | uniq | tail -1)
   pctl_low_threshold=$(awk -v MCP="$pctl_low" -v MAC="$max_annot_ct" 'BEGIN{print MCP*MAC/100}')
 
   echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
@@ -1249,10 +1251,10 @@ run_summarize() {
                  }' >> "${stats_file}"
   fi
 
-  printf "\n== Sequence stats for final pangene CDS files -- %f and trimmed\n" "pctl${pctl_low}" >> "${stats_file}"
+  printf "\n== Sequence stats for final pangene CDS files -- pctl%f and trimmed\n" "$pctl_low" >> "${stats_file}"
   printf "  Class:   seqs     min max    N50    ave     annotation_name\n" >> "${stats_file}" 
   annot_name=23_syn_pan_pctl${pctl_low}_posn_cds.fna
-    printf "  %f: " "pctl${pctl_low}" >> "${stats_file}"
+    printf "  pctl%f: " "${pctl_low}" >> "${stats_file}"
     cat_or_zcat "${WORK_DIR}/23_syn_pan_pctl${pctl_low}_posn_cds.fna" | calc_seq_stats >> "${stats_file}"
 
   echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"

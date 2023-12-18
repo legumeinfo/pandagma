@@ -5,13 +5,16 @@
 # Authors: Steven Cannon, Hyunoh Lee, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=$(basename "$0")
-version="2023-12-16"
+version="2023-12-17"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
-HELP_DOC=$(
-cat <<'EOS'
+# to help assign a heredoc value to a variable. The internal line return is intentional.
+define(){ o=; while IFS=$'\n' read -r a; do o="$o$a"'
+'; done; eval "$1=\$o"; }
+
+define HELP_DOC <<'EOS'
 Compute orthogroups using a combination of synteny and homology,
 using the programs mmseqs, dagchainer, and mcl, and additional pre- and post-refinement steps.
 
@@ -74,10 +77,8 @@ Subcommands (in order they are usually run):
                         Use this if you want to start over, OR if you are satisified with the results and
                         don't anticipate adding other annotation sets to this pan-gene set.
 EOS
-)
 
-MORE_INFO=$(
-cat <<'EOS'
+define MORE_INFO <<'EOS'
 Two options are provided for filtering gene homologies based on additional provided information.
 
 1. One option for additional filtering is to provide a file of gene matches for each species. 
@@ -137,7 +138,6 @@ Optional files with quotas or cutoff values
      expected_quotas.tsv
           ks_cutoffs.tsv
 EOS
-)
 
 ########################################
 # Helper functions begin here
