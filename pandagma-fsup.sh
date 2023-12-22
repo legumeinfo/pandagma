@@ -7,7 +7,7 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=$(basename "$0")
-version="2023-11-17"
+version="2023-12-21"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -142,14 +142,16 @@ run_ingest() {
   echo "Note that this is a simpler ingest than for the primary gene family or pangene construction,"
   echo "as the identifiers aren't modified with positional information."
   
+  if [ -d 02_fasta_nuc_sup ]; then rm -rf 02_fasta_nuc_sup; fi
+  if [ -d 02_fasta_prot_sup ]; then rm -rf 02_fasta_prot_sup; fi
   mkdir -p 02_fasta_nuc_sup 02_fasta_prot_sup 
 
-    # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_pctl??_end.
-    # This is captured from the gene IDs using the annot_str_regex set in the config file.
-    cat /dev/null > stats/tmp.gene_count_start_sup
-    cat /dev/null > stats/tmp.fasta_seqstats_sup
-    start_time=$(date)
-    echo "Run started at: $start_time" > stats/tmp.timing
+  # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_sup
+  # This is captured from the gene IDs using the annot_str_regex set in the config file.
+  cat /dev/null > stats/tmp.gene_count_start_sup
+  cat /dev/null > stats/tmp.fasta_seqstats_sup
+  start_time=$(date)
+  echo "Run started at: $start_time" > stats/tmp.timing
 
   export ANN_REX=${annot_str_regex}
 
@@ -175,11 +177,9 @@ run_ingest() {
 
   echo "  Count starting sequences, for later comparisons"
   for file in 02_fasta_prot_sup/*."$faa"; do
-    awk '$0~/UNDEFINED/ {ct++} 
-      END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' "$file"
-    grep '>' "$file" | perl -pe 's/__/\t/g' | cut -f2 | # extracts the GeneName from combined genspchr__GeneName__start__end__orient
+    grep '>' "$file" | perl -pe 's/>(\S+)/$1/; s/^(\S+)\s+.+/$1/' | 
       perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex.+/$1/' |
-      grep -v UNDEFINED | sort | uniq -c | awk '{print $2 "\t" $1}' >> stats/tmp.gene_count_start_sup
+      sort | uniq -c | awk '{print $2 "\t" $1}' >> stats/tmp.gene_count_start_sup
   done
 
   sort -o stats/tmp.gene_count_start_sup stats/tmp.gene_count_start_sup
@@ -301,6 +301,26 @@ run_search_families() {
 }
 
 ##########
+run_tabularize() {
+  echo; echo "== Derive a table-format version of 34_sup_vs_fam_consen.clust.tsv"
+  cd "${WORK_DIR}"
+
+  # Get table header
+  pangene_tabularize.pl -pan 34_sup_vs_fam_consen.clust.tsv -annot_str_regex "$ANN_REX" > tmp.34_sup_vs_fam_consen.clust.tsv
+  head -1 tmp.34_sup_vs_fam_consen.clust.tsv > tmp.table_header
+
+  echo "  Sort, putting header row at top, and don't print pangenes that are all NONE"
+    sort -k1,1 tmp.34_sup_vs_fam_consen.clust.tsv |
+    sed '/^$/d; /^#pangene/d' |
+    perl -lane '$ct=0; for $gn (@F){if ($gn=~/NONE/){$ct++}}; if ($ct<(scalar(@F)-1)){print $_}' |
+    cat tmp.table_header - > 34_sup_vs_fam_consen.table.tsv
+
+    rm tmp.34_sup_vs_fam_consen.clust.tsv
+    rm tmp.table_header
+}
+
+
+##########
 run_realign_and_trim() {
   echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
   cd "${WORK_DIR}"
@@ -383,7 +403,7 @@ run_summarize() {
   echo "  work_dir: $PWD"
 
   echo "  Calculate matrix of gene counts per orthogroup and annotation set"
-  calc_pan_stats.pl -annot_regex "$ANN_REX" -pan 18_syn_pan_aug_extra.clust.tsv -out 18_syn_pan_aug_extra.counts.tsv
+  calc_pan_stats.pl -annot_regex "$ANN_REX" -pan 34_sup_vs_fam_consen.clust.tsv -out 34_sup_vs_fam_consen.counts.tsv
 
   conf_base=$(basename "$CONF" .conf)
   full_out_dir="${out_dir_base}_$conf_base"
@@ -397,24 +417,22 @@ run_summarize() {
       mkdir -p "$full_out_dir"
   fi
 
-  for file in 06_syn_pan.clust.tsv 06_syn_pan_ge3.hsh.tsv \
-              12_syn_pan_aug.clust.tsv 12_syn_pan_aug.hsh.tsv \
-              18_syn_pan_aug_extra.clust.tsv  18_syn_pan_aug_extra.hsh.tsv 18_syn_pan_aug_extra.counts.tsv; do
-    if [ -f "${WORK_DIR}"/$file ]; then
-      cp "${WORK_DIR}"/$file "${full_out_dir}"/
-    else 
-      echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
-    fi
-  done
-
-  for dir in 19_pan_aug_leftover_merged_prot 21_hmm 42_hmmalign 23_hmmalign_trim2 24_trees; do
-    if [ -d "${WORK_DIR}"/$dir ]; then
-      echo "Copying directory $dir to output directory"
-      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
-    else 
-      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
-    fi
-  done
+#  for file in 34_sup_vs_fam_consen.clust.tsv 34_sup_vs_fam_consen.counts.tsv 34_sup_vs_fam_consen.table.tsv; do
+#    if [ -f "${WORK_DIR}"/$file ]; then
+#      cp "${WORK_DIR}"/$file "${full_out_dir}"/
+#    else 
+#      echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
+#    fi
+#  done
+#
+#  for dir in 35_sup_in_fams_prot 43_hmmalign_trim2 44_trees; do
+#    if [ -d "${WORK_DIR}"/$dir ]; then
+#      echo "Copying directory $dir to output directory"
+#      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
+#    else 
+#      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
+#    fi
+#  done
 
   end_time=$(date)
 
@@ -439,11 +457,11 @@ run_summarize() {
     echo "  Print sequence composition statistics for each annotation set"
     printf "\n== Sequence stats for protein files\n" 
     printf "  Class:  seqs     min max    N50    ave     annotation_name\n" 
-    if [ -f "${WORK_DIR}"/stats/tmp.fasta_seqstats ]; then
-      cat "${WORK_DIR}"/stats/tmp.fasta_seqstats 
+    if [ -f "${WORK_DIR}"/stats/tmp.fasta_seqstats_sup ]; then
+      cat "${WORK_DIR}"/stats/tmp.fasta_seqstats_sup 
 
     printf "\n  Avg:   " >> "${stats_file}" 
-      < "${WORK_DIR}"/stats/tmp.fasta_seqstats transpose.pl |
+      < "${WORK_DIR}"/stats/tmp.fasta_seqstats_sup transpose.pl |
         perl -ane 'BEGIN{use List::Util qw(sum)}; 
                  if ($F[0]=~/^\d+/){
                    $sum=sum @F; $ct=scalar(@F); $avg=$sum/$ct;
@@ -458,20 +476,20 @@ run_summarize() {
   printf "\n== Proportion of initial genes retained in the \"aug_extra\" set:\n" \
     >> "${stats_file}"
 
-  cut -f2 "${WORK_DIR}"/18_syn_pan_aug_extra.hsh.tsv | 
-    perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' |
-    sort | uniq -c | awk '{print $2 "\t" $1}' > "${WORK_DIR}"/stats/tmp.gene_count_all_end
+  transpose.pl "${WORK_DIR}"/34_sup_vs_fam_consen.counts.tsv |
+    perl -MList::Util=sum -lane 'if ($.>3){print $F[0], "\t", sum(@F[1..(scalar(@F)-1)]) }' |
+      cat > "${WORK_DIR}"/stats/tmp.gene_count_end_sup
 
-  paste "${WORK_DIR}"/stats/tmp.gene_count_start \
-        "${WORK_DIR}"/stats/tmp.gene_count_all_end |
+  paste "${WORK_DIR}"/stats/tmp.gene_count_start_sup \
+        "${WORK_DIR}"/stats/tmp.gene_count_end_sup |
     awk 'BEGIN{print "  Start\tEnd\tPct_kept\tAnnotation_name"} 
         { printf "  %i\t%i\t%2.1f\t%s\n", $2, $4, 100*($4/$2), $1 }'  >> "${stats_file}"
 
   echo "  Print counts per accession"
-  if [ -f "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv ]; then
+  if [ -f "${WORK_DIR}"/_sup_vs_fam_consen.counts.tsv ]; then
     printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n"
     printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n" 
-    transpose.pl "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv | 
+    transpose.pl "${WORK_DIR}"/34_sup_vs_fam_consen.counts.tsv | 
       perl -lane 'next if ($.<=3); 
         $ct=0; $sum=0; $nulls=0; $OGs=0;
         for $i (@F[1..(@F-1)]){ $OGs++; if ($i>0){$ct++; $sum+=$i} if ($i==0){$nulls++} }; 
@@ -479,67 +497,11 @@ run_summarize() {
       >> "${stats_file}"
   fi
 
-  echo "  Print histograms"
-  if [ -f "${full_out_dir}"/06_syn_pan.clust.tsv ]; then
-    printf "\nCounts of initial clusters by cluster size, file 06_syn_pan.clust.tsv:\n" >> "${stats_file}"
-    awk '{print NF-1}' "${full_out_dir}"/06_syn_pan.clust.tsv |
+  if [ -f "${full_out_dir}"/34_sup_vs_fam_consen.clust.tsv ]; then
+    printf "\nCounts of clusters by cluster size, file 34_sup_vs_fam_consen.clust.tsv:\n" >> "${stats_file}"
+    awk '{print NF-1}' "${WORK_DIR}"/34_sup_vs_fam_consen.clust.tsv |
       sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> "${stats_file}"
   fi
-
-  if [ -f "${full_out_dir}"/12_syn_pan_aug.clust.tsv ]; then
-    printf "\nCounts of augmented clusters by cluster size, file 12_syn_pan_aug.clust.tsv:\n" >> "${stats_file}"
-    awk '{print NF-1}' "${full_out_dir}"/12_syn_pan_aug.clust.tsv |
-      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> "${stats_file}"
-  fi
-
-  if [ -f "${full_out_dir}"/18_syn_pan_aug_extra.clust.tsv ]; then
-    printf "\nCounts of augmented-extra clusters by cluster size, file 18_syn_pan_aug_extra.clust.tsv:\n" >> "${stats_file}"
-    awk '{print NF-1}' "${full_out_dir}"/18_syn_pan_aug_extra.clust.tsv |
-      sort | uniq -c | awk '{print $2 "\t" $1}' | sort -n >> "${stats_file}"
-  fi
-}
-
-##########
-run_clean() {
-  echo "Clean (delete) files in the working directory that are not needed with subsequent add_extra"
-  cd "${WORK_DIR}"
-  echo "  work_dir: $PWD"
-  if [ -d MMTEMP ]; then rm -rf MMTEMP/*; 
-  fi
-  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_pan_aug_leftover_merged_prot; do
-    if [ -d $dir ]; then echo "  Removing directory $dir"; rm -rf $dir &
-    fi
-  done
-  #for file in 10* 11* 14* 20* 21* 23* 24* consen*; do
-  for file in 10* 11* 14* 20*; do
-    if [ -f "$file" ]; then echo "  Removing file $file"; rm "$file"; 
-    fi
-  done
-  wait
-  cd "$OLDPWD"
-}
-
-##########
-run_ReallyClean() {
-  echo "Doing complete clean-up of files in the working directory (remove all files and directories)"
-  if [ -d "${WORK_DIR}" ]; then
-    cd "${WORK_DIR}"
-    echo "  work_dir: $PWD"
-    if [ -d 01_posn_hsh ]; then
-      echo "Expected directory 01_posn_hsh exists in the work_dir (${WORK_DIR}),"
-      echo "so proceeding with complete clean-up from that location."
-      for dir in *; do
-        rm -rf "$dir" &
-      done
-    else 
-      echo "Expected directory 01_posn_hsh is not present in the work_dir (${WORK_DIR}),"
-      echo "so aborting the -K ReallyClean step. Please do this manually if you wish."
-      cd "$OLDPWD"
-      exit 1;
-    fi
-  fi
-  wait
-  cd "$OLDPWD"
 }
 
 ########################################
@@ -552,7 +514,7 @@ step="all"
 
 export NPROC=${NPROC:-1}
 
-pandagma_conf_params='consen_iden out_dir_base pctl_low pctl_med pctl_hi consen_prefix annot_str_regex work_dir'
+pandagma_conf_params='consen_iden clust_cov consen_method out_dir_base annot_str_regex work_dir'
 
 ##########
 # Command-line interpreter
