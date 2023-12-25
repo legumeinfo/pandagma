@@ -43,18 +43,13 @@ echo
 
 ##########
 # Run individual steps; equivalent to pandagma-fsup.sh -c $CONFIG
-pandagma-fsup.sh -c $CONFIG -s ingest
+#pandagma-fsup.sh -c $CONFIG -s ingest
 #pandagma-fsup.sh -c $CONFIG -s fam_consen
 #pandagma-fsup.sh -c $CONFIG -s search_families
 #pandagma-fsup.sh -c $CONFIG -s tabularize
 #pandagma-fsup.sh -c $CONFIG -s realign_and_trim
 #pandagma-fsup.sh -c $CONFIG -s calc_trees
 pandagma-fsup.sh -c $CONFIG -s summarize
-
-##########
-# Optional work-directory cleanup steps
-#pandagma-fsup.sh -c $CONFIG -s clean
-#pandagma-fsup.sh -c $CONFIG -s ReallyClean
 
 date   # print timestamp
 
