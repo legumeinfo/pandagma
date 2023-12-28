@@ -1,24 +1,26 @@
 Bootstrap: docker
-From: ubuntu:22.04
+From: debian:bookworm-slim
 Stage: deps
 
 %post
     apt update
     apt install -y --no-install-recommends ca-certificates curl g++ make
-    readonly DAGCHAINER_VERSION=r111120
+    readonly DAGCHAINER_VERSION=r111120 FAMSA_VERSION=2.2.2
     curl -L https://github.com/kullrich/dagchainer/archive/refs/tags/${DAGCHAINER_VERSION}.tar.gz | tar -xzf -
     cd dagchainer-${DAGCHAINER_VERSION}
     make -j $(nproc) PREFIX=/usr/local/dagchainer
     rm -rf dagchainer-${DAGCHAINER_VERSION}
 
-    curl -Lo /usr/local/bin/famsa https://github.com/refresh-bio/FAMSA/releases/download/v2.1.2/famsa$([ $(uname -m) = aarch64 ] && echo '-arm8')
+    curl -L https://github.com/refresh-bio/FAMSA/archive/refs/tags/v${FAMSA_VERSION}.tar.gz | tar -xzf -
+    cd FAMSA-${FAMSA_VERSION}
+    make -j $(nproc)
+    mv famsa /usr/local/bin
      
 
 Bootstrap: docker
-From: ubuntu:22.04
+From: debian:bookworm-slim
 
 %files
-    *.sh /usr/local/bin
     ./bin /usr/local/
 
 %files from deps
@@ -33,9 +35,10 @@ From: ubuntu:22.04
     apt update
     apt install -y --no-install-recommends libbio-perl-perl libbio-perl-run-perl libbio-tools-phylo-paml-perl \
       libbio-tools-run-alignment-clustalw-perl libparallel-forkmanager-perl \
-      liblist-moreutils-perl mcl mmseqs2 emboss hmmer fasttree clustalw mafft
+      liblist-moreutils-perl mcl mmseqs2 emboss hmmer fasttree clustalw mafft \
+      ca-certificates curl db-util
     rm -rf /var/lib/apt/lists/*
     chmod +x /usr/local/bin/*
 
 %runscript
-    exec /usr/local/bin/pandagma.sh "$@"
+    exec pandagma "$@"

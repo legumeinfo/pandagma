@@ -1,0 +1,19 @@
+name: pandagma
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - dagchainer
+  - emboss
+  - famsa
+  - fasttree
+  - hmmer
+  - libdb
+  - mcl
+  - mmseqs2
+  - perl-bioperl-core
+  - perl-bioperl-run
+  - perl-bio-tools-phylo-paml
+  - perl-bio-tools-run-alignment-clustalw
+  - perl-list-moreutils
+  - perl-parallel-forkmanager

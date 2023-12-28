@@ -20,7 +20,7 @@ Place annotation sets (CDS and protein) into pangene or gene family sets, using 
 to compare the indicated annotations against HMMs calculated in a prior run of pandagma-pan or pandagma-fam.
 
 Usage:
-  ./$scriptname -c CONFIG_FILE [options]
+  $scriptname -c CONFIG_FILE [options]
 
   Required:
            -c (path to the config file)
@@ -72,11 +72,6 @@ EOS
 ########################################
 # Helper functions begin here
 
-version() {
-  echo "$scriptname" "$version"
-}
-
-##########
 canonicalize_paths() {
   echo "Entering canonicalize_paths."
 
@@ -89,46 +84,6 @@ canonicalize_paths() {
   faa="${prot_file##*.}"
 
   export ANN_REX=${annot_str_regex}
-}
-
-##########
-cat_or_zcat() {
-  case ${1} in
-    *.gz) gzip -dc "$@" ;;
-       *) cat "$@" ;;
-  esac
-}
-
-##########
-check_seq_type () {
-  someseq=${1}
-  proportion_nuc=$(echo "$someseq" | fold -w1 | 
-    awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
-  export proportion_nuc
-  perl -le '$PN=$ENV{"proportion_nuc"}; if ($PN>0.9){print 3} else {print 1}'
-}
-
-##########
-calc_seq_stats () {
-  # Given fasta file on STDIN and an environment variable "annot_name", report:
-  # seqs  min  max  N50  ave  annotation_set
-  awk 'BEGIN { ORS="" } 
-       /^>/ && NR==1 { print $0"\n" } 
-       /^>/ && NR!=1 { print "\n"$0"\n" } 
-       /^[^>]/ { print } 
-       END { print "\n" }' |
-  awk '/^[^>]/ {print length($1); tot_bp+=length($1) } END { print "bases: " tot_bp "\n" }' \
-   | sort -n \
-   | awk -v ANN="$annot_name" 'BEGIN { min=999999999 }
-          /bases:/ { N50_ct = $2/2; bases=$2 } 
-          /^[0-9]/ { 
-             ct++; sum+=$1; if ( sum >= N50_ct && !printed ) { N50=$1; printed = 1 } 
-             min = (min < $1) ? min : $1
-          } 
-          END { 
-            ave=sum/ct;
-            printf(" %4d  %4d  %4d  %4d  %7.1f  %4s\n", ct, min, $1, N50, ave, ANN);
-          }'
 }
 
 ########################################
