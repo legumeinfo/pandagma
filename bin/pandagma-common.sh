@@ -97,7 +97,6 @@ main_pan_fam() {
   NPROC=$( ( command -v nproc > /dev/null && nproc ) || getconf _NPROCESSORS_ONLN)
   TIMEFORMAT=$'\nreal\t%3lR\nuser\t%3lU\nsys\t%3lS\ncpu\t%P%%' # add % cpu
   CONFIG="null"
-  optarg_work_dir="null"
   step="all"
   retain="no"
   
