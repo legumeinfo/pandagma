@@ -7,7 +7,8 @@
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=$(basename "$0")
-version="2023-12-21"
+version="2023-12-25"
+
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -372,22 +373,22 @@ run_summarize() {
       mkdir -p "$full_out_dir"
   fi
 
-#  for file in 34_sup_vs_fam_consen.clust.tsv 34_sup_vs_fam_consen.counts.tsv 34_sup_vs_fam_consen.table.tsv; do
-#    if [ -f "${WORK_DIR}"/$file ]; then
-#      cp "${WORK_DIR}"/$file "${full_out_dir}"/
-#    else 
-#      echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
-#    fi
-#  done
-#
-#  for dir in 35_sup_in_fams_prot 43_hmmalign_trim2 44_trees; do
-#    if [ -d "${WORK_DIR}"/$dir ]; then
-#      echo "Copying directory $dir to output directory"
-#      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
-#    else 
-#      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
-#    fi
-#  done
+  for file in 34_sup_vs_fam_consen.clust.tsv 34_sup_vs_fam_consen.counts.tsv 34_sup_vs_fam_consen.table.tsv; do
+    if [ -f "${WORK_DIR}"/$file ]; then
+      cp "${WORK_DIR}"/$file "${full_out_dir}"/
+    else 
+      echo "Warning: couldn't find file ${WORK_DIR}/$file; skipping"
+    fi
+  done
+
+  for dir in 35_sup_in_fams_prot 43_hmmalign_trim2 44_trees; do
+    if [ -d "${WORK_DIR}"/$dir ]; then
+      echo "Copying directory $dir to output directory"
+      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
+    else 
+      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
+    fi
+  done
 
   end_time=$(date)
 
