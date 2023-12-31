@@ -2,7 +2,8 @@ Bootstrap: docker
 From: debian:bookworm-slim
 Stage: deps
 
-%post
+%post -c /bin/bash
+    set -o errexit -o nounset -o pipefail
     apt update
     apt install -y --no-install-recommends ca-certificates curl g++ make
     readonly DAGCHAINER_VERSION=r111120 FAMSA_VERSION=2.2.2
@@ -21,7 +22,7 @@ Bootstrap: docker
 From: debian:bookworm-slim
 
 %files
-    ./bin /usr/local/
+    . /usr/local/pandagma
 
 %files from deps
     /usr/local/dagchainer
@@ -29,7 +30,8 @@ From: debian:bookworm-slim
 
 %environment
     export LC_ALL=C
-    export PATH=/usr/lib/emboss:/usr/local/dagchainer/bin:/usr/local/dagchainer/bin/accessory_bin:${PATH}
+    export PANDAGMA_ROOT=/usr/local/pandagma
+    export PATH=/usr/local/pandagma/bin:/usr/lib/emboss:/usr/local/dagchainer/bin:/usr/local/dagchainer/bin/accessory_bin:${PATH}
 
 %post
     apt update
@@ -37,8 +39,7 @@ From: debian:bookworm-slim
       libbio-tools-run-alignment-clustalw-perl libparallel-forkmanager-perl \
       liblist-moreutils-perl mcl mmseqs2 emboss hmmer fasttree clustalw mafft \
       ca-certificates curl db-util
-    rm -rf /var/lib/apt/lists/*
-    chmod +x /usr/local/bin/*
+    rm -rf /var/lib/apt/lists/* /usr/local/pandagma/.git*
 
 %runscript
     exec pandagma "$@"
