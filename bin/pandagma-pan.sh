@@ -573,7 +573,7 @@ run_add_extra() {
       echo "A top hit with chromosome match trumps a top hit on the wrong chromosome."
       echo "The placement with chromosome match is prefixed with 1 and that without is prefixed with 2;"
       echo "then the first (top) gene is selected - i.e., 1 geneA before 2 geneA."
-      if [[ -v cds_files_extra_free ]]; then
+      if [[ -v cds_files_extra_constr ]]; then
         for m8file in 13_extra_out_constr_dir/*.m8; do
           base=$(basename "$m8file" .m8)
           echo "  Processing file $m8file"
