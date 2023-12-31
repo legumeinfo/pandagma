@@ -121,12 +121,12 @@ canonicalize_paths() {
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
   mapfile -t annotation_files < <(realpath --canonicalize-existing "${annotation_files[@]}")
   mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
-  if (( ${#cds_files_extra_constr[@]} > 0 ))
+  if [[ -v cds_files_extra_constr ]]
   then
     mapfile -t cds_files_extra_constr < <(realpath --canonicalize-existing "${cds_files_extra_constr[@]}")
     mapfile -t annotation_files_extra_constr < <(realpath --canonicalize-existing "${annotation_files_extra_constr[@]}")
   fi
-  if (( ${#cds_files_extra_free[@]} > 0 ))
+  if [[ -v cds_files_extra_free ]]
   then
     mapfile -t cds_files_extra_free < <(realpath --canonicalize-existing "${cds_files_extra_free[@]}")
     mapfile -t annotation_files_extra_free < <(realpath --canonicalize-existing "${annotation_files_extra_free[@]}")
@@ -178,7 +178,7 @@ run_ingest() {
   echo "  Get position information from the extra annotation sets, if any,"
   echo "  for the annotations that will be added chromosome constraints (_constr)"
   cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
-  if (( ${#cds_files_extra_constr[@]} > 0 ))
+  if [[ cds_files_extra_constr ]]
   then
     for (( file_num = 0; file_num < ${#cds_files_extra_constr[@]} ; file_num++ )); do
       file_base=$(basename "${cds_files_extra_constr[file_num]%.*}")
@@ -199,7 +199,7 @@ run_ingest() {
 
   echo "  Get position information from the extra annotation sets, if any,"
   echo "  for the annotations that will be added without chromosome constraints (_free)"
-  if (( ${#cds_files_extra_free[@]} > 0 ))
+  if [[ -v cds_files_extra_free ]]
   then
     for (( file_num = 0; file_num < ${#cds_files_extra_free[@]} ; file_num++ )); do
       file_base=$(basename "${cds_files_extra_free[file_num]%.*}")
@@ -232,7 +232,7 @@ run_ingest() {
   done
 
   echo "  Also get protein files"
-  if (( ${#protein_files[@]} > 0 ))
+  if [[ -v protein_files ]]
   then
     for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
       echo "  Copying protein file ${protein_files[file_num]}"
@@ -537,7 +537,7 @@ run_add_extra() {
                         -hash 01_combined_posn.hsh \
                         -out 13_pan_aug_fasta_posn.fna
 
-  if (( ${#cds_files_extra_constr[@]} > 0 )) || (( ${#cds_files_extra_free[@]} > 0 ))
+  if [[ -v cds_files_extra_constr ]] || [[ -v cds_files_extra_free ]]
   then # handle the "extra" annotation files
     echo "  Search non-clustered genes against pan-gene consensus sequences"
     # Check sequence type (in case this run function is called separately from the usually-prior ones)
@@ -573,7 +573,7 @@ run_add_extra() {
       echo "A top hit with chromosome match trumps a top hit on the wrong chromosome."
       echo "The placement with chromosome match is prefixed with 1 and that without is prefixed with 2;"
       echo "then the first (top) gene is selected - i.e., 1 geneA before 2 geneA."
-      if (( ${#cds_files_extra_free[@]} > 0 )); then
+      if [[ -v cds_files_extra_free ]]; then
         for m8file in 13_extra_out_constr_dir/*.m8; do
           base=$(basename "$m8file" .m8)
           echo "  Processing file $m8file"
@@ -592,7 +592,7 @@ run_add_extra() {
       exit 1;
     fi
 
-    if (( ${#cds_files_extra_free[@]} > 0 )); then
+    if [[ -v cds_files_extra_free ]]; then
       for m8file in 13_extra_out_free_dir/*.m8; do
         base=$(basename "$m8file" .m8)
         echo "  Processing file $m8file"

@@ -140,12 +140,12 @@ canonicalize_paths() {
   mapfile -t annotation_files < <(realpath --canonicalize-existing "${annotation_files[@]}")
   mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
 
-  if (( ${#protein_files_extra[@]} > 0 ))
+  if [[ -v protein_files_extra ]]
   then
     mapfile -t protein_files_extra < <(realpath --canonicalize-existing "${protein_files_extra[@]}")
   fi
 
-  if (( ${#cds_files_extra[@]} > 0 ))
+  if [[ -v cds_files_extra ]]
   then
     mapfile -t cds_files_extra < <(realpath --canonicalize-existing "${cds_files_extra[@]}")
     mapfile -t annotation_files_extra < <(realpath --canonicalize-existing "${annotation_files_extra[@]}")
@@ -213,7 +213,7 @@ run_ingest() {
   done
 
   echo "  Get position information from the extra annotation sets (protein), if any."
-  if (( ${#protein_files_extra[@]} > 0 ))
+  if [[ -v protein_files_extra ]]
   then
     cat /dev/null > 02_all_extra_protein.faa # Collect all starting sequences, for later comparisons
     for (( file_num = 0; file_num < ${#protein_files_extra[@]} ; file_num++ )); do
@@ -233,7 +233,7 @@ run_ingest() {
   fi
 
   echo "  Get position information from the extra annotation sets (cds), if any."
-  if (( ${#cds_files_extra[@]} > 0 ))
+  if [[ -v cds_files_extra ]]
   then
     cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
     for (( file_num = 0; file_num < ${#cds_files_extra[@]} ; file_num++ )); do
@@ -672,7 +672,7 @@ run_add_extra() {
   echo "Merge fasta files in 13_pan_aug_fasta, prefixing IDs with panID__"
   merge_files_to_pan_fasta.awk 13_pan_aug_fasta/* > 13_pan_aug_fasta.faa
 
-  if (( ${#protein_files_extra[@]} > 0 ))
+  if [[ -v protein_files_extra ]]
   then # handle the "extra" annotation files
     echo "  Search non-clustered genes against pan-gene consensus sequences"
     # Check sequence type (in case this run function is called separately from the usually-prior ones)
