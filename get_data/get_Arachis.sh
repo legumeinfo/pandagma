@@ -49,7 +49,7 @@ zcat aradu.V14167.gnm1.ann1.cxSM.gene_models_main.bed.gz araip.K30076.gnm1.ann1.
             s/^araip.K30076.gnm1.Araip.B1(\d)/araduip.V14167K30076.gnm1.chrB2$1/;
             s/aradu.V14167.gnm1/araduip.V14167K30076.gnm1/;
             s/araip.K30076.gnm1/araduip.V14167K30076.gnm1/' |
-  cat > ../data/araduip.V14167K30076.gnm1.ann1.cxSMJ37m.cds.bed
+  cat > ../data/araduip.V14167K30076.gnm1.ann1.cxSMJ37m.gene_models_main.bed
 
 # Copy the arahy bed files
   for file in arahy*bed.gz; do 
