@@ -23,13 +23,13 @@ curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.
 curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann2.PVFB/arahy.Tifrunner.gnm2.ann2.PVFB.cds.fna.gz
 curl -O $url_base/ipaensis/annotations/K30076.gnm1.ann1.J37m/araip.K30076.gnm1.ann1.J37m.cds.fna.gz
 
-curl -O $url_base/duranensis/annotations/V14167.gnm1.ann1.cxSM/aradu.V14167.gnm1.ann1.cxSM.cds.bed.gz
-curl -O $url_base/hypogaea/annotations/BaileyII.gnm1.ann1.PQM7/arahy.BaileyII.gnm1.ann1.PQM7.cds.bed.gz
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm1.ann1.CCJH/arahy.Tifrunner.gnm1.ann1.CCJH.cds.bed.gz
-curl -O https://data.legumeinfo.org/annex/Arachis/hypogaea/annotations/Tifrunner.gnm1.ann2.TN8K/arahy.Tifrunner.gnm1.ann2.TN8K.cds.bed.gz
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.gnm2.ann1.4K0L.cds.bed.gz
+curl -O $url_base/duranensis/annotations/V14167.gnm1.ann1.cxSM/aradu.V14167.gnm1.ann1.cxSM.gene_models_main.bed.gz
+curl -O $url_base/hypogaea/annotations/BaileyII.gnm1.ann1.PQM7/arahy.BaileyII.gnm1.ann1.PQM7.gene_models_main.bed.gz
+curl -O $url_base/hypogaea/annotations/Tifrunner.gnm1.ann1.CCJH/arahy.Tifrunner.gnm1.ann1.CCJH.gene_models_main.bed.gz
+curl -O https://data.legumeinfo.org/annex/Arachis/hypogaea/annotations/Tifrunner.gnm1.ann2.TN8K/arahy.Tifrunner.gnm1.ann2.TN8K.gene_models_main.bed.gz
+curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.gnm2.ann1.4K0L.gene_models_main.bed.gz
 curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann2.PVFB/arahy.Tifrunner.gnm2.ann2.PVFB.gene_models_main.bed.gz
-curl -O $url_base/ipaensis/annotations/K30076.gnm1.ann1.J37m/araip.K30076.gnm1.ann1.J37m.cds.bed.gz
+curl -O $url_base/ipaensis/annotations/K30076.gnm1.ann1.J37m/araip.K30076.gnm1.ann1.J37m.gene_models_main.bed.gz
 
 curl -O $url_base/duranensis/annotations/V14167.gnm1.ann1.cxSM/aradu.V14167.gnm1.ann1.cxSM.protein.faa.gz
 curl -O $url_base/hypogaea/annotations/BaileyII.gnm1.ann1.PQM7/arahy.BaileyII.gnm1.ann1.PQM7.protein_primary.faa.gz
@@ -41,7 +41,7 @@ curl -O $url_base/ipaensis/annotations/K30076.gnm1.ann1.J37m/araip.K30076.gnm1.a
 
 
 # Merge duranensis and ipaensis to give a pseudo-allotetraploid that can be compared with A. hypogaea
-zcat aradu.V14167.gnm1.ann1.cxSM.cds.bed.gz araip.K30076.gnm1.ann1.J37m.cds.bed.gz |
+zcat aradu.V14167.gnm1.ann1.cxSM.gene_models_main.bed.gz araip.K30076.gnm1.ann1.J37m.gene_models_main.bed.gz |
   perl -pe 's/aradu.V14167.gnm1.Adur/araduip.V14167K30076.gnm1.scaffA_/; 
             s/araip.K30076.gnm1.Aipa/araduip.V14167K30076.gnm1.scaffB_/; 
             s/aradu.V14167.gnm1.Aradu.A/araduip.V14167K30076.gnm1.chrA/;
@@ -110,6 +110,8 @@ cd $base_dir/data/
 
 for file in *; do gzip $file &
 done
+
+wait
 
 cat <<DATA > expected_chr_matches.tsv
 # Expected chromosome matches for Arachis

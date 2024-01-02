@@ -82,7 +82,7 @@ curl -O $url_base/max/annotations/FengDiHuang.gnm1.ann1.P6HL/glyma.FengDiHuang.g
 curl -O $url_base/max/annotations/FiskebyIII.gnm1.ann1.SS25/glyma.FiskebyIII.gnm1.ann1.SS25.gene_models_main.bed.gz
 curl -O $url_base/max/annotations/HanDouNo_5.gnm1.ann1.ZS7M/glyma.HanDouNo_5.gnm1.ann1.ZS7M.gene_models_main.bed.gz
 curl -O $url_base/max/annotations/HeiHeNo_43.gnm1.ann1.PDXG/glyma.HeiHeNo_43.gnm1.ann1.PDXG.gene_models_main.bed.gz
-curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/JD17.gnm1.ann1.CLFP/glyma.JD17.gnm1.ann1.CLFP.cds.bed.gz
+curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/JD17.gnm1.ann1.CLFP/glyma.JD17.gnm1.ann1.CLFP.gene_models_main.bed.gz
 curl -O $url_base/max/annotations/JiDouNo_17.gnm1.ann1.X5PX/glyma.JiDouNo_17.gnm1.ann1.X5PX.gene_models_main.bed.gz
 curl -O $url_base/max/annotations/JinDouNo_23.gnm1.ann1.SGJW/glyma.JinDouNo_23.gnm1.ann1.SGJW.gene_models_main.bed.gz
 curl -O $url_base/max/annotations/JuXuanNo_23.gnm1.ann1.H8PW/glyma.JuXuanNo_23.gnm1.ann1.H8PW.gene_models_main.bed.gz
@@ -129,8 +129,8 @@ curl -O $url_base/soja/annotations/F_IGA1003.gnm1.ann1.G61B/glyso.F_IGA1003.gnm1
 curl -O $url_base/soja/annotations/PI483463.gnm1.ann1.3Q3Q/glyso.PI483463.gnm1.ann1.3Q3Q.gene_models_main.bed.gz
 curl -O $url_base/stenophita/annotations/G1974.gnm1.ann1.F257/glyst.G1974.gnm1.ann1.F257.gene_models_main.bed.gz
 curl -O $url_base/syndetika/annotations/G1300.gnm1.ann1.RRK6/glysy.G1300.gnm1.ann1.RRK6.gene_models_main.bed.gz
-curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/Lee.gnm3.ann1.ZYY3/glyma.Lee.gnm3.ann1.ZYY3.cds.bed.gz
-curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/Wm82.gnm5.ann1.J7HW/glyma.Wm82.gnm5.ann1.J7HW.cds.bed.gz
+curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/Lee.gnm3.ann1.ZYY3/glyma.Lee.gnm3.ann1.ZYY3.gene_models_main.bed.gz
+curl -O https://data.legumeinfo.org/annex/Glycine/max/annotations/Wm82.gnm5.ann1.J7HW/glyma.Wm82.gnm5.ann1.J7HW.gene_models_main.bed.gz
 
 # Protein
 curl -O $url_base/max/annotations/58-161.gnm1.ann1.HJ1K/glyma.58-161.gnm1.ann1.HJ1K.protein_primary.faa.gz

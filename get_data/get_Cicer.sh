@@ -16,12 +16,12 @@ url_base="https://data.legumeinfo.org/Cicer"
 base_dir=$PWD
 cd $base_dir/data/
 
-curl -O $url_base/arietinum/annotations/CDCFrontier.gnm1.ann1.nRhs/cicar.CDCFrontier.gnm1.ann1.nRhs.cds.bed.gz
-curl -O $url_base/arietinum/annotations/CDCFrontier.gnm2.ann1.9M1L/cicar.CDCFrontier.gnm2.ann1.9M1L.cds.bed.gz
-curl -O $url_base/arietinum/annotations/CDCFrontier.gnm3.ann1.NPD7/cicar.CDCFrontier.gnm3.ann1.NPD7.cds.bed.gz
-curl -O $url_base/arietinum/annotations/ICC4958.gnm2.ann1.LCVX/cicar.ICC4958.gnm2.ann1.LCVX.cds.bed.gz
-curl -O $url_base/echinospermum/annotations/S2Drd065.gnm1.ann1.YZ9H/cicec.S2Drd065.gnm1.ann1.YZ9H.cds.bed.gz
-curl -O $url_base/reticulatum/annotations/Besev079.gnm1.ann1.F01Z/cicre.Besev079.gnm1.ann1.F01Z.cds.bed.gz
+curl -O $url_base/arietinum/annotations/CDCFrontier.gnm1.ann1.nRhs/cicar.CDCFrontier.gnm1.ann1.nRhs.gene_models_main.bed.gz
+curl -O $url_base/arietinum/annotations/CDCFrontier.gnm2.ann1.9M1L/cicar.CDCFrontier.gnm2.ann1.9M1L.gene_models_main.bed.gz
+curl -O $url_base/arietinum/annotations/CDCFrontier.gnm3.ann1.NPD7/cicar.CDCFrontier.gnm3.ann1.NPD7.gene_models_main.bed.gz
+curl -O $url_base/arietinum/annotations/ICC4958.gnm2.ann1.LCVX/cicar.ICC4958.gnm2.ann1.LCVX.gene_models_main.bed.gz
+curl -O $url_base/echinospermum/annotations/S2Drd065.gnm1.ann1.YZ9H/cicec.S2Drd065.gnm1.ann1.YZ9H.gene_models_main.bed.gz
+curl -O $url_base/reticulatum/annotations/Besev079.gnm1.ann1.F01Z/cicre.Besev079.gnm1.ann1.F01Z.gene_models_main.bed.gz
 
 curl -O $url_base/arietinum/annotations/CDCFrontier.gnm1.ann1.nRhs/cicar.CDCFrontier.gnm1.ann1.nRhs.cds.fna.gz
 curl -O $url_base/arietinum/annotations/CDCFrontier.gnm2.ann1.9M1L/cicar.CDCFrontier.gnm2.ann1.9M1L.cds_primary.fna.gz
