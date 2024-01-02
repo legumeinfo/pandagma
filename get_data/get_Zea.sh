@@ -114,7 +114,7 @@ echo "  For GRAMENE-4.0_Zm00001d, also remove 178 GRMZM5 gene models"
     perl -pe 's/_T(\d+) ?/\tT$1\t/' |
     awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
     sort -k1,1 -k2nr,2nr | top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
-    cat | gzip -c  > Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.canonical.cds.fa.gz
+    cat | gzip -c  > ../data/Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.canonical.cds.fa.gz
 
   zcat Zm-W22-REFERENCE-NRGENE-2.0_Zm00004b.1.cds.fa.gz | fasta_to_table.awk |
     perl -pe 's/_T(\d+) ?/\tT$1\t/' |
@@ -126,7 +126,7 @@ echo "  For GRAMENE-4.0_Zm00001d, also remove 178 GRMZM5 gene models"
     perl -pe 's/_T(\d+) ?/\tT$1\t/' |
     awk -v FS="\t" -v OFS="\t" '$0!~/provisional/ {print $1, length($4), $2, $3, $4}' |
     sort -k1,1 -k2nr,2nr | top_line.awk | awk -v FS="\t" '{print ">" $1 "_" $3 " " $4; print $5}' |
-    cat | gzip -c  > Zm-CML69-REFERENCE-NAM-1.0_Zm00020ab.1.canonical.cds.fa.gz
+    cat | gzip -c  > ../data/Zm-CML69-REFERENCE-NAM-1.0_Zm00020ab.1.canonical.cds.fa.gz
 
   zcat Zm-PH207-REFERENCE_NS-UIUC_UMN-1.0_Zm00008a.1.cds.fa.gz | fasta_to_table.awk |
     perl -pe 's/_T(\d+) ?/\tT$1\t/' |
@@ -168,12 +168,7 @@ echo "Change chromosome strings in Zm-B73-REFERENCE-GRAMENE-4.0"
   rm tmp.bed
 
 echo "Re-compress files"
-  for file in *.fa *.gff3; do
-    gzip $file &
-  done
-  wait
-
-  for file in ../data/*fa ../data/*bed; do
+  for file in *.gff3; do
     gzip $file &
   done
   wait

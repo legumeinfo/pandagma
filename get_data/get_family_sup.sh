@@ -22,25 +22,31 @@ curl -O $url_base/Medicago/GENUS/pangenes/Medicago.pan2.451K/Medicago.pan2.451K.
 curl -O $url_base/Phaseolus/GENUS/pangenes/Phaseolus.pan2.G5HV/Phaseolus.pan2.G5HV.pctl25_named_protein.faa.gz
 curl -O $url_base/Phaseolus/GENUS/pangenes/Phaseolus.pan2.G5HV/Phaseolus.pan2.G5HV.pctl25_named_cds.fna.gz
 
+curl -O $url_base/Cajanus/cajan/annotations/ICPL87119.gnm2.ann1.L3ZH/cajca.ICPL87119.gnm2.ann1.L3ZH.cds_primary.fna.gz
+curl -O $url_base/Cajanus/cajan/annotations/ICPL87119.gnm2.ann1.L3ZH/cajca.ICPL87119.gnm2.ann1.L3ZH.protein_primary.faa.gz
+
 curl -O $url_base/Cercis/canadensis/annotations/ISC453364.gnm3.ann1.3N1M/cerca.ISC453364.gnm3.ann1.3N1M.protein_primary.faa.gz
 curl -O $url_base/Cercis/canadensis/annotations/ISC453364.gnm3.ann1.3N1M/cerca.ISC453364.gnm3.ann1.3N1M.cds_primary.fna.gz
-curl -O $url_base/Cercis/canadensis/annotations/ISC453364.gnm3.ann1.3N1M/cerca.ISC453364.gnm3.ann1.3N1M.cds.bed.gz
+curl -O $url_base/Cercis/canadensis/annotations/ISC453364.gnm3.ann1.3N1M/cerca.ISC453364.gnm3.ann1.3N1M.gene_models_main.bed.gz
+
+curl -O $url_base/Trifolium/pratense/annotations/MilvusB.gnm2.ann1.DFgp/tripr.MilvusB.gnm2.ann1.DFgp.cds_primary.fna.gz
+curl -O $url_base/Trifolium/pratense/annotations/MilvusB.gnm2.ann1.DFgp/tripr.MilvusB.gnm2.ann1.DFgp.protein_primary.faa.gz
 
 curl -O $url_base/annex/Arabidopsis/thaliana/annotations/Col0.gnm9.ann11.KH24/arath.Col0.gnm9.ann11.KH24.protein_primary.faa.gz
 curl -O $url_base/annex/Arabidopsis/thaliana/annotations/Col0.gnm9.ann11.KH24/arath.Col0.gnm9.ann11.KH24.cds_primary.fna.gz
-curl -O $url_base/annex/Arabidopsis/thaliana/annotations/Col0.gnm9.ann11.KH24/arath.Col0.gnm9.ann11.KH24.cds.bed.gz
+curl -O $url_base/annex/Arabidopsis/thaliana/annotations/Col0.gnm9.ann11.KH24/arath.Col0.gnm9.ann11.KH24.gene_models_main.bed.gz
 
 curl -O $url_base/annex/Prunus/persica/annotations/Lovell.gnm2.ann1.S2ZZ/prupe.Lovell.gnm2.ann1.S2ZZ.protein_primary.faa.gz
 curl -O $url_base/annex/Prunus/persica/annotations/Lovell.gnm2.ann1.S2ZZ/prupe.Lovell.gnm2.ann1.S2ZZ.cds_primary.fna.gz
-curl -O $url_base/annex/Prunus/persica/annotations/Lovell.gnm2.ann1.S2ZZ/prupe.Lovell.gnm2.ann1.S2ZZ.cds.bed.gz
+curl -O $url_base/annex/Prunus/persica/annotations/Lovell.gnm2.ann1.S2ZZ/prupe.Lovell.gnm2.ann1.S2ZZ.gene_models_main.bed.gz
 
 curl -O $url_base/annex/Vitis/vinifera/annotations/PN40024.gnm2.ann1.V31M/vitvi.PN40024.gnm2.ann1.V31M.protein_primary.faa.gz
 curl -O $url_base/annex/Vitis/vinifera/annotations/PN40024.gnm2.ann1.V31M/vitvi.PN40024.gnm2.ann1.V31M.cds_primary.fna.gz
-curl -O $url_base/annex/Vitis/vinifera/annotations/PN40024.gnm2.ann1.V31M/vitvi.PN40024.gnm2.ann1.V31M.cds.bed.gz
+curl -O $url_base/annex/Vitis/vinifera/annotations/PN40024.gnm2.ann1.V31M/vitvi.PN40024.gnm2.ann1.V31M.gene_models_main.bed.gz
 
 curl -O $url_base/annex/Quillaja/saponaria/annotations/S10.gnm1.ann1.RQ4J/quisa.S10.gnm1.ann1.RQ4J.protein_primary.faa.gz
 curl -O $url_base/annex/Quillaja/saponaria/annotations/S10.gnm1.ann1.RQ4J/quisa.S10.gnm1.ann1.RQ4J.cds_primary.fna.gz
-curl -O $url_base/annex/Quillaja/saponaria/annotations/S10.gnm1.ann1.RQ4J/quisa.S10.gnm1.ann1.RQ4J.cds.bed.gz
+curl -O $url_base/annex/Quillaja/saponaria/annotations/S10.gnm1.ann1.RQ4J/quisa.S10.gnm1.ann1.RQ4J.gene_models_main.bed.gz
 
 curl -O $url_base/annex/Senna/tora/annotations/Myeongyun.gnm1.ann1.5WXB/sento.Myeongyun.gnm1.ann1.protein.faa.gz
 curl -O $url_base/annex/Senna/tora/annotations/Myeongyun.gnm1.ann1.5WXB/sento.Myeongyun.gnm1.ann1.cds.fna.gz
