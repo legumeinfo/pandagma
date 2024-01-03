@@ -13,11 +13,10 @@ Compute orthogroups using a combination of synteny and homology,
 using the programs mmseqs, dagchainer, and mcl, and additional pre- and post-refinement steps.
 
 Usage:
-  $scriptname -c CONFIG_FILE [options] OUT_DIR
+  $scriptname -c CONFIG_FILE [options]
 
   Required:
            -c (path to the config file)
-           OUT_DIR - path to output directory [default: './out']. Will be created if it doesn't exist.
 
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
            -w (working directory, for temporary and intermediate files [default: './pandagma_work'].)
@@ -157,8 +156,6 @@ canonicalize_paths() {
 
   fasta_file=$(basename "${protein_files[0]}" .gz)
   fa="${fasta_file##*.}"
-
-  export ANN_REX=${annot_str_regex}
 }
 
 ########################################

@@ -2,6 +2,7 @@
 
 version="2023-12-21"
 set -o errexit -o errtrace -o nounset -o pipefail
+shopt -s inherit_errexit
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 
@@ -52,24 +53,25 @@ calc_seq_stats () {
 
 run_calc_trees() {
   case $scriptname in
-    'pandagma pan') fasttree_opts='-nt' ;;
-    'pandagma fam') fasttree_opts=''
+    'pandagma pan') fasttree_opts='-nt'; dir_prefix=2 ;;
+    'pandagma fam') fasttree_opts=''; dir_prefix=2 ;;
+    'pandagma fsup') fasttree_opts=''; dir_prefix=4
   esac
   echo; echo "== Calculate trees =="
   cd "${WORK_DIR}"
 
-  mkdir -p 24_trees
+  mkdir -p ${dir_prefix}4_trees
 
   echo; echo "== Move small (<4) and very low-entropy families (sequences are all identical) to the side =="
-  mkdir -p 23_pan_aug_small_or_identical
+  mkdir -p ${dir_prefix}3_pan_aug_small_or_identical
   min_seq_count=4
   # Below, "count" is the number of unique sequences in the alignment.
-  for filepath in 23_hmmalign_trim2/*; do
+  for filepath in ${dir_prefix}3_hmmalign_trim2/*; do
     file=$(basename "$filepath")
     count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
     if [[ $count -lt $min_seq_count ]]; then
       echo "Set aside small or low-entropy family $file";
-      mv "$filepath" 23_pan_aug_small_or_identical/
+      mv "$filepath" ${dir_prefix}3_pan_aug_small_or_identical/
     fi;
   done
 
@@ -77,10 +79,10 @@ run_calc_trees() {
   # It is more efficient to run more jobs on one core each by setting an environment variable.
   OMP_NUM_THREADS=1
   export OMP_NUM_THREADS
-  for filepath in 23_hmmalign_trim2/*; do
+  for filepath in ${dir_prefix}3_hmmalign_trim2/*; do
     file=$(basename "$filepath")
     echo "  Calculating tree for $file"
-    fasttree ${fasttree_opts} -quiet "$filepath" > 24_trees/"$file" &
+    fasttree ${fasttree_opts} -quiet "$filepath" > ${dir_prefix}4_trees/"$file" &
     # allow to execute up to $NPROC concurrent asynchronous processes
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
@@ -109,7 +111,7 @@ main_pan_fam() {
   ##########
   # Command-line interpreter
   
-  while getopts "c:w:s:n:O:o:rvhm" opt
+  while getopts "c:w:s:n:O:o:f:rvhm" opt
   do
     case $opt in
       c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
@@ -118,6 +120,7 @@ main_pan_fam() {
       n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
       O) optarg_order_method=$OPTARG; echo "order method: $optarg_order_method" ;;
       o) out_dir=$OPTARG; echo "out_dir: $out_dir" ;;
+      f) fam_dir=$(realpath --canonicalize-existing $OPTARG) ;;
       r) retain="yes" ;;
       v) version ;;
       h) echo >&2 "$HELP_DOC" && exit 0 ;;
@@ -147,7 +150,7 @@ main_pan_fam() {
   . "${CONF}"
   
   export ANN_REX=${annot_str_regex}
-  
+
   shift $(( OPTIND - 1 ))
   
   if [ "${scriptname}" != 'pandagma pan' ] && [ "${order_method:-}${optarg_order_method:-}" != "null" ]; then
@@ -206,9 +209,11 @@ main_pan_fam() {
     run_"${step}";
   fi
   
-  if [[ $step =~ "all" ]] && [[ $retain == "yes" ]]; then
+  if ! command -v run_clean; then
+    exit # run_clean not defined for this workflow
+  elif [[ $step =~ "all" ]] && [[ $retain == "yes" ]]; then
     echo "Flag -r (retain) was set, so skipping clean-up of the work directory."
-    echo "If you wish to do a cleanupt separately, you can call "
+    echo "If you wish to do a cleanup separately, you can call "
     echo "  ${scriptname} -c $CONF -s clean";
   elif [[ $step =~ "all" ]] && [[ $retain == "no" ]]; then
     echo "Calling the medium cleanup function \"run_clean\" ..."
