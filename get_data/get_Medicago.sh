@@ -14,65 +14,65 @@ url_base="https://data.legumeinfo.org/Medicago"
 ## data
 base_dir=$PWD
 cd $base_dir/data
-curl -O $url_base/sativa/annotations/XinJiangDaYe.gnm1.ann1.RKB9/medsa.XinJiangDaYe.gnm1.ann1.RKB9.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/A17_HM341.gnm4.ann2.G3ZY/medtr.A17_HM341.gnm4.ann2.G3ZY.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/A17.gnm5.ann1_6.L2RX/medtr.A17.gnm5.ann1_6.L2RX.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM004.gnm1.ann1.2XTB/medtr.HM004.gnm1.ann1.2XTB.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM010.gnm1.ann1.WV9J/medtr.HM010.gnm1.ann1.WV9J.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM022.gnm1.ann1.6C8N/medtr.HM022.gnm1.ann1.6C8N.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM023.gnm1.ann1.WZN8/medtr.HM023.gnm1.ann1.WZN8.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM034.gnm1.ann1.YR6S/medtr.HM034.gnm1.ann1.YR6S.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM050.gnm1.ann1.GWRX/medtr.HM050.gnm1.ann1.GWRX.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM056.gnm1.ann1.CHP6/medtr.HM056.gnm1.ann1.CHP6.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM058.gnm1.ann1.LXPZ/medtr.HM058.gnm1.ann1.LXPZ.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM060.gnm1.ann1.H41P/medtr.HM060.gnm1.ann1.H41P.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM095.gnm1.ann1.55W4/medtr.HM095.gnm1.ann1.55W4.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM125.gnm1.ann1.KY5W/medtr.HM125.gnm1.ann1.KY5W.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM129.gnm1.ann1.7FTD/medtr.HM129.gnm1.ann1.7FTD.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM185.gnm1.ann1.GB3D/medtr.HM185.gnm1.ann1.GB3D.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/HM324.gnm1.ann1.SQH2/medtr.HM324.gnm1.ann1.SQH2.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/R108_HM340.gnm1.ann1.85YW/medtr.R108_HM340.gnm1.ann1.85YW.gene_models_main.bed.gz
-curl -O $url_base/truncatula/annotations/R108.gnmHiC_1.ann1.Y8NH/medtr.R108.gnmHiC_1.ann1.Y8NH.gene_models_main.bed.gz
+curl -f -O $url_base/sativa/annotations/XinJiangDaYe.gnm1.ann1.RKB9/medsa.XinJiangDaYe.gnm1.ann1.RKB9.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/A17_HM341.gnm4.ann2.G3ZY/medtr.A17_HM341.gnm4.ann2.G3ZY.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/A17.gnm5.ann1_6.L2RX/medtr.A17.gnm5.ann1_6.L2RX.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM004.gnm1.ann1.2XTB/medtr.HM004.gnm1.ann1.2XTB.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM010.gnm1.ann1.WV9J/medtr.HM010.gnm1.ann1.WV9J.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM022.gnm1.ann1.6C8N/medtr.HM022.gnm1.ann1.6C8N.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM023.gnm1.ann1.WZN8/medtr.HM023.gnm1.ann1.WZN8.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM034.gnm1.ann1.YR6S/medtr.HM034.gnm1.ann1.YR6S.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM050.gnm1.ann1.GWRX/medtr.HM050.gnm1.ann1.GWRX.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM056.gnm1.ann1.CHP6/medtr.HM056.gnm1.ann1.CHP6.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM058.gnm1.ann1.LXPZ/medtr.HM058.gnm1.ann1.LXPZ.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM060.gnm1.ann1.H41P/medtr.HM060.gnm1.ann1.H41P.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM095.gnm1.ann1.55W4/medtr.HM095.gnm1.ann1.55W4.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM125.gnm1.ann1.KY5W/medtr.HM125.gnm1.ann1.KY5W.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM129.gnm1.ann1.7FTD/medtr.HM129.gnm1.ann1.7FTD.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM185.gnm1.ann1.GB3D/medtr.HM185.gnm1.ann1.GB3D.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/HM324.gnm1.ann1.SQH2/medtr.HM324.gnm1.ann1.SQH2.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/R108_HM340.gnm1.ann1.85YW/medtr.R108_HM340.gnm1.ann1.85YW.gene_models_main.bed.gz
+curl -f -O $url_base/truncatula/annotations/R108.gnmHiC_1.ann1.Y8NH/medtr.R108.gnmHiC_1.ann1.Y8NH.gene_models_main.bed.gz
 
-curl -O $url_base/sativa/annotations/XinJiangDaYe.gnm1.ann1.RKB9/medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna.gz
-curl -O $url_base/truncatula/annotations/A17_HM341.gnm4.ann2.G3ZY/medtr.A17_HM341.gnm4.ann2.G3ZY.cds_primary.fna.gz
-curl -O $url_base/truncatula/annotations/A17.gnm5.ann1_6.L2RX/medtr.A17.gnm5.ann1_6.L2RX.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM004.gnm1.ann1.2XTB/medtr.HM004.gnm1.ann1.2XTB.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM010.gnm1.ann1.WV9J/medtr.HM010.gnm1.ann1.WV9J.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM022.gnm1.ann1.6C8N/medtr.HM022.gnm1.ann1.6C8N.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM023.gnm1.ann1.WZN8/medtr.HM023.gnm1.ann1.WZN8.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM034.gnm1.ann1.YR6S/medtr.HM034.gnm1.ann1.YR6S.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM050.gnm1.ann1.GWRX/medtr.HM050.gnm1.ann1.GWRX.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM056.gnm1.ann1.CHP6/medtr.HM056.gnm1.ann1.CHP6.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM058.gnm1.ann1.LXPZ/medtr.HM058.gnm1.ann1.LXPZ.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM060.gnm1.ann1.H41P/medtr.HM060.gnm1.ann1.H41P.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM095.gnm1.ann1.55W4/medtr.HM095.gnm1.ann1.55W4.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM125.gnm1.ann1.KY5W/medtr.HM125.gnm1.ann1.KY5W.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM129.gnm1.ann1.7FTD/medtr.HM129.gnm1.ann1.7FTD.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM185.gnm1.ann1.GB3D/medtr.HM185.gnm1.ann1.GB3D.cds.fna.gz
-curl -O $url_base/truncatula/annotations/HM324.gnm1.ann1.SQH2/medtr.HM324.gnm1.ann1.SQH2.cds.fna.gz
-curl -O $url_base/truncatula/annotations/R108_HM340.gnm1.ann1.85YW/medtr.R108_HM340.gnm1.ann1.85YW.cds_primary.fna.gz
-curl -O $url_base/truncatula/annotations/R108.gnmHiC_1.ann1.Y8NH/medtr.R108.gnmHiC_1.ann1.Y8NH.cds.fna.gz
+curl -f -O $url_base/sativa/annotations/XinJiangDaYe.gnm1.ann1.RKB9/medsa.XinJiangDaYe.gnm1.ann1.RKB9.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/A17_HM341.gnm4.ann2.G3ZY/medtr.A17_HM341.gnm4.ann2.G3ZY.cds_primary.fna.gz
+curl -f -O $url_base/truncatula/annotations/A17.gnm5.ann1_6.L2RX/medtr.A17.gnm5.ann1_6.L2RX.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM004.gnm1.ann1.2XTB/medtr.HM004.gnm1.ann1.2XTB.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM010.gnm1.ann1.WV9J/medtr.HM010.gnm1.ann1.WV9J.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM022.gnm1.ann1.6C8N/medtr.HM022.gnm1.ann1.6C8N.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM023.gnm1.ann1.WZN8/medtr.HM023.gnm1.ann1.WZN8.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM034.gnm1.ann1.YR6S/medtr.HM034.gnm1.ann1.YR6S.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM050.gnm1.ann1.GWRX/medtr.HM050.gnm1.ann1.GWRX.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM056.gnm1.ann1.CHP6/medtr.HM056.gnm1.ann1.CHP6.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM058.gnm1.ann1.LXPZ/medtr.HM058.gnm1.ann1.LXPZ.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM060.gnm1.ann1.H41P/medtr.HM060.gnm1.ann1.H41P.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM095.gnm1.ann1.55W4/medtr.HM095.gnm1.ann1.55W4.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM125.gnm1.ann1.KY5W/medtr.HM125.gnm1.ann1.KY5W.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM129.gnm1.ann1.7FTD/medtr.HM129.gnm1.ann1.7FTD.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM185.gnm1.ann1.GB3D/medtr.HM185.gnm1.ann1.GB3D.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/HM324.gnm1.ann1.SQH2/medtr.HM324.gnm1.ann1.SQH2.cds.fna.gz
+curl -f -O $url_base/truncatula/annotations/R108_HM340.gnm1.ann1.85YW/medtr.R108_HM340.gnm1.ann1.85YW.cds_primary.fna.gz
+curl -f -O $url_base/truncatula/annotations/R108.gnmHiC_1.ann1.Y8NH/medtr.R108.gnmHiC_1.ann1.Y8NH.cds.fna.gz
 
-curl -O $url_base/sativa/annotations/XinJiangDaYe.gnm1.ann1.RKB9/medsa.XinJiangDaYe.gnm1.ann1.RKB9.protein.faa.gz
-curl -O $url_base/truncatula/annotations/A17_HM341.gnm4.ann2.G3ZY/medtr.A17_HM341.gnm4.ann2.G3ZY.protein_primary.faa.gz
-curl -O $url_base/truncatula/annotations/A17.gnm5.ann1_6.L2RX/medtr.A17.gnm5.ann1_6.L2RX.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM004.gnm1.ann1.2XTB/medtr.HM004.gnm1.ann1.2XTB.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM010.gnm1.ann1.WV9J/medtr.HM010.gnm1.ann1.WV9J.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM022.gnm1.ann1.6C8N/medtr.HM022.gnm1.ann1.6C8N.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM023.gnm1.ann1.WZN8/medtr.HM023.gnm1.ann1.WZN8.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM034.gnm1.ann1.YR6S/medtr.HM034.gnm1.ann1.YR6S.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM050.gnm1.ann1.GWRX/medtr.HM050.gnm1.ann1.GWRX.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM056.gnm1.ann1.CHP6/medtr.HM056.gnm1.ann1.CHP6.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM058.gnm1.ann1.LXPZ/medtr.HM058.gnm1.ann1.LXPZ.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM060.gnm1.ann1.H41P/medtr.HM060.gnm1.ann1.H41P.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM095.gnm1.ann1.55W4/medtr.HM095.gnm1.ann1.55W4.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM125.gnm1.ann1.KY5W/medtr.HM125.gnm1.ann1.KY5W.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM129.gnm1.ann1.7FTD/medtr.HM129.gnm1.ann1.7FTD.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM185.gnm1.ann1.GB3D/medtr.HM185.gnm1.ann1.GB3D.protein.faa.gz
-curl -O $url_base/truncatula/annotations/HM324.gnm1.ann1.SQH2/medtr.HM324.gnm1.ann1.SQH2.protein.faa.gz
-curl -O $url_base/truncatula/annotations/R108_HM340.gnm1.ann1.85YW/medtr.R108_HM340.gnm1.ann1.85YW.protein_primary.faa.gz
-curl -O $url_base/truncatula/annotations/R108.gnmHiC_1.ann1.Y8NH/medtr.R108.gnmHiC_1.ann1.Y8NH.protein.faa.gz
+curl -f -O $url_base/sativa/annotations/XinJiangDaYe.gnm1.ann1.RKB9/medsa.XinJiangDaYe.gnm1.ann1.RKB9.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/A17_HM341.gnm4.ann2.G3ZY/medtr.A17_HM341.gnm4.ann2.G3ZY.protein_primary.faa.gz
+curl -f -O $url_base/truncatula/annotations/A17.gnm5.ann1_6.L2RX/medtr.A17.gnm5.ann1_6.L2RX.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM004.gnm1.ann1.2XTB/medtr.HM004.gnm1.ann1.2XTB.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM010.gnm1.ann1.WV9J/medtr.HM010.gnm1.ann1.WV9J.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM022.gnm1.ann1.6C8N/medtr.HM022.gnm1.ann1.6C8N.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM023.gnm1.ann1.WZN8/medtr.HM023.gnm1.ann1.WZN8.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM034.gnm1.ann1.YR6S/medtr.HM034.gnm1.ann1.YR6S.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM050.gnm1.ann1.GWRX/medtr.HM050.gnm1.ann1.GWRX.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM056.gnm1.ann1.CHP6/medtr.HM056.gnm1.ann1.CHP6.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM058.gnm1.ann1.LXPZ/medtr.HM058.gnm1.ann1.LXPZ.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM060.gnm1.ann1.H41P/medtr.HM060.gnm1.ann1.H41P.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM095.gnm1.ann1.55W4/medtr.HM095.gnm1.ann1.55W4.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM125.gnm1.ann1.KY5W/medtr.HM125.gnm1.ann1.KY5W.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM129.gnm1.ann1.7FTD/medtr.HM129.gnm1.ann1.7FTD.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM185.gnm1.ann1.GB3D/medtr.HM185.gnm1.ann1.GB3D.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/HM324.gnm1.ann1.SQH2/medtr.HM324.gnm1.ann1.SQH2.protein.faa.gz
+curl -f -O $url_base/truncatula/annotations/R108_HM340.gnm1.ann1.85YW/medtr.R108_HM340.gnm1.ann1.85YW.protein_primary.faa.gz
+curl -f -O $url_base/truncatula/annotations/R108.gnmHiC_1.ann1.Y8NH/medtr.R108.gnmHiC_1.ann1.Y8NH.protein.faa.gz
 
 
 echo "Change chromosome names for some of the files, to allow later filtering by chromosome correspondence"
