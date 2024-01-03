@@ -781,7 +781,7 @@ run_order_and_name() {
     for filepath in 23_encoded_chroms_aligned/*; do 
       base=$(basename "$filepath")
       cons -sequence "$filepath" -outseq 23_encoded_chroms_filt1/"$base" -name "$base" &
-      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+      if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
     done
     wait
   
