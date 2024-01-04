@@ -15,33 +15,33 @@ url_base="https://data.legumeinfo.org/Arachis"
 ## data
 base_dir=$PWD
 cd $base_dir/data_orig/
-curl -O $url_base/duranensis/annotations/V14167.gnm1.ann1.cxSM/aradu.V14167.gnm1.ann1.cxSM.cds.fna.gz
-curl -O $url_base/hypogaea/annotations/BaileyII.gnm1.ann1.PQM7/arahy.BaileyII.gnm1.ann1.PQM7.cds_primary.fna.gz
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm1.ann1.CCJH/arahy.Tifrunner.gnm1.ann1.CCJH.cds_primary.fna.gz
-curl -O https://data.legumeinfo.org/annex/Arachis/hypogaea/annotations/Tifrunner.gnm1.ann2.TN8K/arahy.Tifrunner.gnm1.ann2.TN8K.cds_primary.fna.gz
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.gnm2.ann1.4K0L.cds_primary.fna.gz
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann2.PVFB/arahy.Tifrunner.gnm2.ann2.PVFB.cds.fna.gz
-curl -O $url_base/ipaensis/annotations/K30076.gnm1.ann1.J37m/araip.K30076.gnm1.ann1.J37m.cds.fna.gz
+curl -f -O $url_base/duranensis/annotations/V14167.gnm1.ann1.cxSM/aradu.V14167.gnm1.ann1.cxSM.cds.fna.gz
+curl -f -O $url_base/hypogaea/annotations/BaileyII.gnm1.ann1.PQM7/arahy.BaileyII.gnm1.ann1.PQM7.cds_primary.fna.gz
+curl -f -O $url_base/hypogaea/annotations/Tifrunner.gnm1.ann1.CCJH/arahy.Tifrunner.gnm1.ann1.CCJH.cds_primary.fna.gz
+curl -f -O https://data.legumeinfo.org/annex/Arachis/hypogaea/annotations/Tifrunner.gnm1.ann2.TN8K/arahy.Tifrunner.gnm1.ann2.TN8K.cds_primary.fna.gz
+curl -f -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.gnm2.ann1.4K0L.cds_primary.fna.gz
+curl -f -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann2.PVFB/arahy.Tifrunner.gnm2.ann2.PVFB.cds.fna.gz
+curl -f -O $url_base/ipaensis/annotations/K30076.gnm1.ann1.J37m/araip.K30076.gnm1.ann1.J37m.cds.fna.gz
 
-curl -O $url_base/duranensis/annotations/V14167.gnm1.ann1.cxSM/aradu.V14167.gnm1.ann1.cxSM.cds.bed.gz
-curl -O $url_base/hypogaea/annotations/BaileyII.gnm1.ann1.PQM7/arahy.BaileyII.gnm1.ann1.PQM7.cds.bed.gz
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm1.ann1.CCJH/arahy.Tifrunner.gnm1.ann1.CCJH.cds.bed.gz
-curl -O https://data.legumeinfo.org/annex/Arachis/hypogaea/annotations/Tifrunner.gnm1.ann2.TN8K/arahy.Tifrunner.gnm1.ann2.TN8K.cds.bed.gz
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.gnm2.ann1.4K0L.cds.bed.gz
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann2.PVFB/arahy.Tifrunner.gnm2.ann2.PVFB.gene_models_main.bed.gz
-curl -O $url_base/ipaensis/annotations/K30076.gnm1.ann1.J37m/araip.K30076.gnm1.ann1.J37m.cds.bed.gz
+curl -f -O $url_base/duranensis/annotations/V14167.gnm1.ann1.cxSM/aradu.V14167.gnm1.ann1.cxSM.gene_models_main.bed.gz
+curl -f -O $url_base/hypogaea/annotations/BaileyII.gnm1.ann1.PQM7/arahy.BaileyII.gnm1.ann1.PQM7.gene_models_main.bed.gz
+curl -f -O $url_base/hypogaea/annotations/Tifrunner.gnm1.ann1.CCJH/arahy.Tifrunner.gnm1.ann1.CCJH.gene_models_main.bed.gz
+curl -f -O https://data.legumeinfo.org/annex/Arachis/hypogaea/annotations/Tifrunner.gnm1.ann2.TN8K/arahy.Tifrunner.gnm1.ann2.TN8K.gene_models_main.bed.gz
+curl -f -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.gnm2.ann1.4K0L.gene_models_main.bed.gz
+curl -f -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann2.PVFB/arahy.Tifrunner.gnm2.ann2.PVFB.gene_models_main.bed.gz
+curl -f -O $url_base/ipaensis/annotations/K30076.gnm1.ann1.J37m/araip.K30076.gnm1.ann1.J37m.gene_models_main.bed.gz
 
-curl -O $url_base/duranensis/annotations/V14167.gnm1.ann1.cxSM/aradu.V14167.gnm1.ann1.cxSM.protein.faa.gz
-curl -O $url_base/hypogaea/annotations/BaileyII.gnm1.ann1.PQM7/arahy.BaileyII.gnm1.ann1.PQM7.protein_primary.faa.gz
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm1.ann1.CCJH/arahy.Tifrunner.gnm1.ann1.CCJH.protein_primary.faa.gz
-curl -O https://data.legumeinfo.org/annex/Arachis/hypogaea/annotations/Tifrunner.gnm1.ann2.TN8K/arahy.Tifrunner.gnm1.ann2.TN8K.protein_primary.faa.gz
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.gnm2.ann1.4K0L.protein_primary.faa.gz
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann2.PVFB/arahy.Tifrunner.gnm2.ann2.PVFB.protein.faa.gz
-curl -O $url_base/ipaensis/annotations/K30076.gnm1.ann1.J37m/araip.K30076.gnm1.ann1.J37m.protein.faa.gz
+curl -f -O $url_base/duranensis/annotations/V14167.gnm1.ann1.cxSM/aradu.V14167.gnm1.ann1.cxSM.protein.faa.gz
+curl -f -O $url_base/hypogaea/annotations/BaileyII.gnm1.ann1.PQM7/arahy.BaileyII.gnm1.ann1.PQM7.protein_primary.faa.gz
+curl -f -O $url_base/hypogaea/annotations/Tifrunner.gnm1.ann1.CCJH/arahy.Tifrunner.gnm1.ann1.CCJH.protein_primary.faa.gz
+curl -f -O https://data.legumeinfo.org/annex/Arachis/hypogaea/annotations/Tifrunner.gnm1.ann2.TN8K/arahy.Tifrunner.gnm1.ann2.TN8K.protein_primary.faa.gz
+curl -f -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.gnm2.ann1.4K0L.protein_primary.faa.gz
+curl -f -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann2.PVFB/arahy.Tifrunner.gnm2.ann2.PVFB.protein.faa.gz
+curl -f -O $url_base/ipaensis/annotations/K30076.gnm1.ann1.J37m/araip.K30076.gnm1.ann1.J37m.protein.faa.gz
 
 
 # Merge duranensis and ipaensis to give a pseudo-allotetraploid that can be compared with A. hypogaea
-zcat aradu.V14167.gnm1.ann1.cxSM.cds.bed.gz araip.K30076.gnm1.ann1.J37m.cds.bed.gz |
+zcat aradu.V14167.gnm1.ann1.cxSM.gene_models_main.bed.gz araip.K30076.gnm1.ann1.J37m.gene_models_main.bed.gz |
   perl -pe 's/aradu.V14167.gnm1.Adur/araduip.V14167K30076.gnm1.scaffA_/; 
             s/araip.K30076.gnm1.Aipa/araduip.V14167K30076.gnm1.scaffB_/; 
             s/aradu.V14167.gnm1.Aradu.A/araduip.V14167K30076.gnm1.chrA/;
@@ -49,7 +49,7 @@ zcat aradu.V14167.gnm1.ann1.cxSM.cds.bed.gz araip.K30076.gnm1.ann1.J37m.cds.bed.
             s/^araip.K30076.gnm1.Araip.B1(\d)/araduip.V14167K30076.gnm1.chrB2$1/;
             s/aradu.V14167.gnm1/araduip.V14167K30076.gnm1/;
             s/araip.K30076.gnm1/araduip.V14167K30076.gnm1/' |
-  cat > ../data/araduip.V14167K30076.gnm1.ann1.cxSMJ37m.cds.bed
+  cat > ../data/araduip.V14167K30076.gnm1.ann1.cxSMJ37m.gene_models_main.bed
 
 # Copy the arahy bed files
   for file in arahy*bed.gz; do 
@@ -92,7 +92,7 @@ zcat aradu.V14167.gnm1.ann1.cxSM.cds.bed.gz araip.K30076.gnm1.ann1.J37m.cds.bed.
 
 # Exclude 145 models that weren't mapped from Tifrunner.gnm1.ann1 to Tifrunner.gnm2.ann1:
 url_base="https://data.legumeinfo.org/Arachis"
-curl -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.gnm2.ann1.4K0L.info_unmapped_models.txt.gz
+curl -f -O $url_base/hypogaea/annotations/Tifrunner.gnm2.ann1.4K0L/arahy.Tifrunner.gnm2.ann1.4K0L.info_unmapped_models.txt.gz
 
   zcat arahy.Tifrunner.gnm2.ann1.4K0L.info_unmapped_models.txt.gz | awk '$1!~/^#/ {print $1}' |
     perl -pe 's/arahy.Tifrunner.gnm1.ann1/arahy.Tifrunner.gnm2.ann1/' > lis.exclude_from_arahy.Tifrunner.gnm2.ann1
@@ -110,6 +110,8 @@ cd $base_dir/data/
 
 for file in *; do gzip $file &
 done
+
+wait
 
 cat <<DATA > expected_chr_matches.tsv
 # Expected chromosome matches for Arachis
