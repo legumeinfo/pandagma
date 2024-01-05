@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Hyunoh Lee, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=$(basename "$0")
-version="2023-12-17"
+version="2023-19-05"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -627,7 +627,7 @@ run_add_extra() {
       echo "A top hit with chromosome match trumps a top hit on the wrong chromosome."
       echo "The placement with chromosome match is prefixed with 1 and that without is prefixed with 2;"
       echo "then the first (top) gene is selected - i.e., 1 geneA before 2 geneA."
-      if (( ${#cds_files_extra_free[@]} > 0 )); then
+      if (( ${#cds_files_extra_constr[@]} > 0 )); then
         for m8file in 13_extra_out_constr_dir/*.m8; do
           base=$(basename "$m8file" .m8)
           echo "  Processing file $m8file"
@@ -986,7 +986,7 @@ run_model_and_trim() {
   mkdir -p 22_hmmalign
   for filepath in 21_hmm/*; do
     file=$(basename "$filepath");
-    printf "%f " "$file"
+    printf "%s " "$file"
     hmmalign --trim --outformat A2M -o 22_hmmalign/"$file" 21_hmm/"$file" 19_pan_aug_leftover_merged_cds/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
@@ -1012,7 +1012,7 @@ run_model_and_trim() {
   min_pct_aligned=20
   for filepath in 23_hmmalign_trim1/*; do
     file=$(basename "$filepath")
-    printf "%f " "$file"
+    printf "%s " "$file"
     filter_align.pl -in "$filepath" -out 23_hmmalign_trim2/"$file" -log 23_hmmalign_trim2_log/"$file" \
                     -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
