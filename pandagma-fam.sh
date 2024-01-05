@@ -5,7 +5,7 @@
 # Authors: Steven Cannon, Hyunoh Lee, Joel Berendzen, Nathan Weeks, 2020-2023
 #
 scriptname=$(basename "$0")
-version="2023-12-17"
+version="2024-01-03"
 set -o errexit -o errtrace -o nounset -o pipefail
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -513,6 +513,9 @@ run_ks_calc() {
       echo "# $filebase" 
       awk 'NF==7 && $7<=3 {print $7}' "$ks_path" | histogram.pl -z -n -s "$ks_binsize" 
       echo "" 
+    } >> stats/ks_histograms.tsv
+
+    {
       echo "# $filebase" 
       echo "# Normalized relative to Ks peak inferred at bin $ks_bin, with amplitude $ks_amplitude_pct" 
       awk 'NF==7 && $7<=3 {print $7}' "$ks_path" | histogram.pl -z -n -s "$ks_binsize" | 
