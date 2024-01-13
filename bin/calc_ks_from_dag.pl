@@ -285,18 +285,15 @@ while (my $thisline = <>) {
     warn $@ if $@;
     
     ## Calculate and report Ka and Ks
-    local $SIG{ALRM} = sub {
-      die;
-    };
     eval {
+      local $SIG{ALRM} = sub {
+        die "ABORTED from calculating ka & ks for $idA and $idB due to timeout";
+      };
       $count++;
       if ($verbose) { say "CALCULATING KA & KS for $idA and $idB"; }
       alarm 2;
       ($out_KaKs_aryref_all, $out_KaKsSum_hshref, $out_Ka_aryref, $out_Ks_aryref, $out_KaKs_aryref, $count) = 
         KaKs_report($dna_aln, $nuc_objA, $nuc_objB, $count);
-      if ($@) {
-        say "ABORTED from calculating ka & ks for $idA and $idB";
-      }
       alarm 0;
 
     }; 
