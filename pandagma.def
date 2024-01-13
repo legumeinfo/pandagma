@@ -38,7 +38,7 @@ From: debian:bookworm-slim
     apt install -y --no-install-recommends libbio-perl-perl libbio-perl-run-perl libbio-tools-phylo-paml-perl \
       libbio-tools-run-alignment-clustalw-perl libparallel-forkmanager-perl \
       liblist-moreutils-perl mcl mmseqs2 emboss hmmer fasttree clustalw mafft \
-      ca-certificates curl db-util
+      ca-certificates curl db-util make
     rm -rf /var/lib/apt/lists/* /usr/local/pandagma/.git*
 
 %runscript

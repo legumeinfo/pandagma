@@ -133,6 +133,7 @@ EOS
 # Helper functions begin here
 
 canonicalize_paths() {
+  cd "${DATA_DIR}"
   echo "Entering canonicalize_paths. Annotation files: " "${annotation_files[@]}"
 
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
@@ -152,6 +153,7 @@ canonicalize_paths() {
 
   readonly expected_quotas=${expected_quotas:+$(realpath "${expected_quotas}")}
   readonly ks_peaks=${ks_peaks:+$(realpath "${ks_peaks}")}
+  cd "${OLDPWD}"
   readonly submit_dir=${PWD}
 
   fasta_file=$(basename "${protein_files[0]}" .gz)
@@ -408,19 +410,19 @@ run_ks_calc() {
   done
   wait
 
-  echo "  Create berkeleydb file for fasta file(s) 02_*_cds.fna"
-  cat 02_*_cds.fna | fasta_to_berkeleydb.awk | db_load -T -t hash 02_tmp_fasta.db
+  echo "  Create berkeleydb index file (directory.index) for fasta file(s) 02_*_cds.fna"
+  perl -MBio::DB::Fasta -e 'Bio::DB::Fasta->new(".", -glob=>"02_*_cds.fna")'
     
   for DAGFILE in 04_dag/*aligncoords; do
     base=$(basename "$DAGFILE" _matches.tsv.aligncoords)
     echo "  Calculate Ks values for $base"
 
-    echo "cat $DAGFILE | calc_ks_from_dag.pl -fasta_db 02_tmp_fasta.db \\ ";
+    echo "cat $DAGFILE | calc_ks_from_dag.pl -fasta_db . \\ ";
     echo "   -align_method precalc -match_table 03_mmseqs/$base.db \\ ";
     echo "  -report_out 05_kaksout/$base.rptout";
-    < "$DAGFILE" calc_ks_from_dag.pl -fasta_db 02_tmp_fasta.db \
+    < "$DAGFILE" calc_ks_from_dag.pl -fasta_db . \
       -match_table 03_mmseqs/"$base".db  -align_method precalc \
-      -report_out 05_kaksout/"$base".rptout 2> /dev/null & # discard verbose warnings from LocatableSeq.pm
+      -report_out 05_kaksout/"$base".rptout & #2> /dev/null & # discard verbose warnings from LocatableSeq.pm
     echo
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
@@ -428,7 +430,7 @@ run_ks_calc() {
 
   echo "  Delete large Berkeleydb files (they derive from the .m8 files in 03_mmseqs and 02_*_cds.fna)"
   rm 03_mmseqs/*.db
-  rm 02_tmp_fasta.db
+  rm -f directory.index # Bio::DB::Fasta index
 
   echo "Determine provisional Ks peaks (Ks values and amplitudes) and generate Ks plots."
   cat /dev/null > stats/ks_peaks_auto.tsv

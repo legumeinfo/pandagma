@@ -59,7 +59,7 @@ Subcommands (in order they are usually run):
    filter_to_pctile - Calculate orthogroup composition and filter fasta files by selected percentiles.
          tabularize - Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv
      order_and_name - Assign pan-gene names with consensus chromosomes and ordinal positions.
-     calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
+     calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches
           summarize - Copy results into output directory, and report summary statistics.
 
   Run the following subcommands separately if you wish:
@@ -75,17 +75,22 @@ Subcommands (in order they are usually run):
 EOS
 
 define MORE_INFO <<'EOS'
-Optionally, a file specified in the expected_chr_matches variable can be specified in pandagma.conf,
+Optionally, an expected_chr_matches array variable can be specified in the config file,
 which provides anticipated chromosome pairings, e.g.
+
+expected_chr_matches=(
   01 01
   02 02
   ...
-  11 13  # allows for translocation between 11 and 13
+# allows for translocation between 11 and 13
+  11 13 
   12 12
+)
+
 These pairings are used in a regular expression to identify terminal portions of molecule IDs, e.g.
   glyma.Wm82.gnm2.Gm01  glyso.PI483463.gnm1.Gs01
   glyma.Wm82.gnm2.Gm13  glyso.W05.gnm1.Chr11
-If an expected_chr_matches file is not provided, then no such filtering will be done.
+If an expected_chr_matches variable is not defined in the pandagma config file, then no such filtering will be done.
 
 Variables in pandagma config file (Set the config with the CONF environment variable)
          clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
@@ -93,7 +98,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
          extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [90]
       mcl_inflation - Inflation parameter, for Markov clustering [1.6]
         strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs [1]
-                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches.tsv
+                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches
       consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
        out_dir_base - Base name for the output directory [default: './out']
            pctl_low - Lower percentile bin size cutoff relative to modal count (usu. the count of annots) [25]
@@ -118,6 +123,8 @@ canonicalize_paths() {
   echo "Entering canonicalize_paths. Fasta files: "
   echo "${cds_files[@]}"
 
+  cd "${DATA_DIR}"
+
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
   mapfile -t annotation_files < <(realpath --canonicalize-existing "${annotation_files[@]}")
   mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
@@ -131,12 +138,12 @@ canonicalize_paths() {
     mapfile -t cds_files_extra_free < <(realpath --canonicalize-existing "${cds_files_extra_free[@]}")
     mapfile -t annotation_files_extra_free < <(realpath --canonicalize-existing "${annotation_files_extra_free[@]}")
   fi
-  readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
+
+  cd "${OLDPWD}"
   readonly submit_dir=${PWD}
 
   fasta_file=$(basename "${cds_files[0]}" .gz)
   fa="${fasta_file##*.}"
-
 }
 
 ########################################
@@ -178,7 +185,7 @@ run_ingest() {
   echo "  Get position information from the extra annotation sets, if any,"
   echo "  for the annotations that will be added chromosome constraints (_constr)"
   cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
-  if [[ cds_files_extra_constr ]]
+  if [[ -v cds_files_extra_constr ]]
   then
     for (( file_num = 0; file_num < ${#cds_files_extra_constr[@]} ; file_num++ )); do
       file_base=$(basename "${cds_files_extra_constr[file_num]%.*}")
@@ -274,12 +281,12 @@ run_filter() {
   echo; echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
   cd "${WORK_DIR}"
   mkdir -p 04_dag
-  if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
-    echo "Filtering on chromosome patterns from file ${chr_match_list}"
+  if [[ -v expected_chr_matches ]]; then  # filter based on list of expected chromosome pairings if provided
+    echo "Filtering on chromosome patterns defined in expected_chr_matches"
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=$(basename "$mmseqs_path" _cluster.tsv)
       echo "  $outfilebase"
-      filter_mmseqs_by_chroms.pl -chr_pat "${chr_match_list}" < "${mmseqs_path}" |
+      filter_mmseqs_by_chroms.pl -chr_pat <(printf '%s %s\n' "${expected_chr_matches[@]}") < "${mmseqs_path}" |
         awk 'NF==8' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
         cat > 04_dag/"${outfilebase}"_matches.tsv &
 
@@ -288,7 +295,7 @@ run_filter() {
     done
     wait # wait for last jobs to finish
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
-    echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
+    echo "No expected_chr_matches variable was defined in the config file, so proceeding without chromosome-pair filtering."
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=$(basename "$mmseqs_path" _cluster.tsv)
       perl -pe 's/__/\t/g; s/\t[\+-]//g' "${mmseqs_path}" |
@@ -424,14 +431,14 @@ run_consense() {
     cat > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv
 
   echo; echo "  Filter based on list of expected chromosome pairings if provided"
-  if [[ -f ${chr_match_list} ]]; then  
-    echo "Filtering on chromosome patterns from file ${chr_match_list}"
+  if [[ -v expected_chr_matches ]]; then  
+    echo "Filtering on chromosome patterns defined in expected_chr_matches"
     < 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv \
-      filter_mmseqs_by_chroms.pl -chr_pat "${chr_match_list}" |
+      filter_mmseqs_by_chroms.pl -chr_pat <(printf '%s %s\n' "${expected_chr_matches[@]}") |
       awk 'NF==9' |  # matches for genes with coordinates. The case of <9 can happen for seqs with UNDEF position.
       cat > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv 
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
-    echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
+    echo "No expected_chr_matches variable was defined in the config file, so proceeding without chromosome-pair filtering."
     perl -pe 's/__/\t/g; s/\t[\+-]//g' < 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv |
       awk 'NF==9' |  # matches for genes with coordinates. The case of <9 can happen for seqs with UNDEF position.
       cat > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv
@@ -479,12 +486,12 @@ run_cluster_rest() {
   hash_into_table_2cols.pl 01_posn_hsh/*hsh -idx1 0 -idx2 1 -table 03_mmseqs/${complmt_self_compare}_cluster.tsv |
     cat > 03_mmseqs/${complmt_self_compare}_cluster_posn.tsv
 
-  if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
-    echo "Filtering on chromosome patterns from file ${chr_match_list}"
+  if [[ -v expected_chr_matches ]]; then  # filter based on list of expected chromosome pairings if provided
+    echo "Filtering on chromosome patterns defined in expected_chr_matches"
     < 03_mmseqs/${complmt_self_compare}_cluster_posn.tsv filter_mmseqs_by_chroms.pl \
-      -chr_pat "${chr_match_list}" > 04_dag/${complmt_self_compare}_matches.tsv
+      -chr_pat <(printf '%s %s\n' "${expected_chr_matches[@]}") > 04_dag/${complmt_self_compare}_matches.tsv
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
-    echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
+    echo "No expected_chr_matches was defined in the config file, so proceeding without chromosome-pair filtering."
     cat 03_mmseqs/${complmt_self_compare}_cluster.tsv |
       perl -pe 's/__/\t/g; s/\t[\+-]$//' > 04_dag/${complmt_self_compare}_matches.tsv 
   fi
@@ -567,8 +574,8 @@ run_add_extra() {
     done
     wait # wait for jobs to finish
 
-    if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
-      echo "Filtering on chromosome patterns from file ${chr_match_list} and by identity and top match."
+    if [[ -v expected_chr_matches ]]; then  # filter based on list of expected chromosome pairings if provided
+      echo "Filtering on chromosome patterns defined in expected_chr_matches and by identity and top match."
       echo "First find top match without respect to chromosome match, then with chromosome matches."
       echo "A top hit with chromosome match trumps a top hit on the wrong chromosome."
       echo "The placement with chromosome match is prefixed with 1 and that without is prefixed with 2;"
@@ -579,7 +586,7 @@ run_add_extra() {
           echo "  Processing file $m8file"
           top_line.awk "$m8file" | awk -v IDEN="${extra_iden}" '$3>=IDEN {print $1 "\t" $2}' |
               perl -pe 's/^\S+__(\S+)__\d+__\d\S*\t\S+__(\S+)__\d+__\d\S+$/2\t$1\t$2/' > 13_extra_out_constr_dir/"$base".top_2nd
-          filter_mmseqs_by_chroms.pl -chr_pat "${chr_match_list}" < "$m8file" |
+          filter_mmseqs_by_chroms.pl -chr_pat <(printf '%s %s\n' "${expected_chr_matches[@]}") < "$m8file" |
               top_line.awk | awk -v IDEN="${extra_iden}" '$3>=IDEN {print $1 "\t" $2}' | 
               perl -pe 's/^\S+__(\S+)__\d+__\d+\t\S+__(\S+)__\d+__\d+$/1\t$1\t$2/' > 13_extra_out_constr_dir/"$base".top_1st
         done

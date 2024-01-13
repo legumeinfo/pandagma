@@ -66,7 +66,7 @@ These need to be installed and available in the script's environment. Once those
 the program can be called directly with its options. (see Usage below).
 
 Installing the dependencies is up to you. They can be installed via a suitable package manager. For example, 
-using conda (or mamba), create an environment called `pandagma` from the environment.yml in this repository: 
+using conda (or mamba/micromamba), create an environment called `pandagma` from the environment.yml in this repository: 
 
     conda env create
 
@@ -85,10 +85,8 @@ To build a [SingularityCE](https://sylabs.io/singularity/) ([Apptainer](https://
 SingularityCE/Apptainer [definition file](https://apptainer.org/docs/user/latest/definition_files.html) (`pandagma.def`), 
 after cloning this repository:
 ```
-  singularity build [--remote] pandagma.sif singularity.def
+  singularity build pandagma.sif singularity.def
 ```
-Where the `--remote` option is used if building the image as an unprivileged user using
-SingularityCE with the [Sylabs Cloud Remote Builder](https://cloud.sylabs.io/builder).
 
 To run pandamga using singularity, use `singularity exec --cleanenv pandagma.sif [options]`, e.g.:
 ```
@@ -143,17 +141,23 @@ primary coding sequence in the reference:
 
   molecule, feature-start, feature-end, mRNA-ID, score(0), strand, gene-ID
 
-Optionally, a file specified in the expected_chr_matches variable can be specified in GENUS.conf,
+Optionally, an expected_chr_matches array variable can be specified in GENUS.conf,
 which provides anticipated chromosome pairings, e.g.
+
+expected_chr_matches=(
   01 01
   02 02
   ...
-  11 13  # allows for translocation between 11 and 13
-  13 11  # allows for translocation between 13 and 11
+# allows for translocation between 11 and 13
+  11 13
+# allows for translocation between 13 and 11
+  13 11
+)
+
 These pairings are used in a regular expression to identify terminal portions of molecule IDs, e.g.
   glyma.Wm82.gnm2.Gm01  glyso.PI483463.gnm1.Gs01
   glyma.Wm82.gnm2.Gm13  glyso.W05.gnm1.Chr11
-If an expected_chr_matches file is not provided, then no such filtering will be done.
+If an expected_chr_matches array variable is not defined, then no such filtering will be done.
 
 At the end of the process, remaining genes will be added to initial clusters, based on homology.
 Remaining genes may be those falling on unanchored scaffolds, or on chromosomes by not part of
@@ -177,7 +181,7 @@ Subcommands for the **pangene** workflow, `pandagma pan`, in order they are usua
      pick_exemplars - Pick representative sequence for each pangene
      filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
      order_and_name - Assign pangene names with consensus chromosomes and ordinal positions.
-     calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
+     calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches
           summarize - Move results into output directory, and report summary statistics.
 ```
 
@@ -225,7 +229,7 @@ Variables in the config file for the **pangene workflow**, `pandagma pan`:
          extra_iden - Minimum identity threshold for mmseqs addition of "extra" annotations [80]
       mcl_inflation - Inflation parameter, for Markov clustering [default: 2]
         strict_synt - For clustering of the "main" annotations, use only syntenic pairs (1)
-                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches.tsv
+                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches
       consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
                         "([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+" 
@@ -271,16 +275,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
       cd pandagma
 ```
 
-2. Make a work directory. A good practice is to name the directory with an indication of the 
-   type of workflow (family or pan) and the number of "main" and "extra" annotations to be included.
-   In this case, there are 7 annotations designated "main", 3 designated as "extra_constr"
-   (constrained to match the consensus chromosome of the pangene to which it will be placed),
-   and 2 designated as "extra_free" (not constrained by chromosome match).
-```
-       mkdir ../work_pan_7_3_2
-```
-
-3. Get into a suitable work environment (computation node), and load dependencies.
+2. Get into a suitable work environment (computation node), and load dependencies.
 
     These can be loaded using a package manager such as conda, or
     via a SingularityCE/Apptainer image. 
@@ -293,15 +288,16 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
          # Here, `pandagma` is the name of the conda environment where the dependencies are installed.
 ```
 
-4. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
+3. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
     needed. You can do this with a simple shell script that executes curl commands and then 
     applies some transformations. See the files in get_data/ for examples. There are \"get_data\" 
-    scripts for Glycine, Medicago, Phaseolus, Vigna, and Zea.
+    shell scripts and Makefiles.
 ```
-       $PANDAGMA_ROOT/get_data/get_Glycine_7_3_2.sh
-         # This puts the data into data_pan/, 
+       mkdir data
+       make -C data -j 2 -f $PANDAGMA_ROOT/get_data/Glycine_7_3_2.mk
+         # This puts the data into data/
 ```
-5. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
+4. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
     The config file sets nine program parameters, and then lists annotation files and fasta files.
     The annotation and fasta files need to be listed in corresponding order.
     The nth listed GFF file corresponds to the nth listed FASTA file. Also note that 
@@ -324,20 +320,21 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
         cds_files_extra_free -- optional extra annotations, not constrained by chromosome match
 ```
 
-6. Start the run. The examples below assume a run using `$PANDAGMA_ROOT/config/Glycine_7_3.conf`
+5. Start the run. The examples below assume a run using `$PANDAGMA_ROOT/config/Glycine_7_3.conf`
        
    This workflow is best run in an HPC environment. If your environment uses job scheduling such as slurm, 
    then you will modify a batch submission script to submit and control the job. Examples are provided for
    calling the pandagma workflows using singularity and conda.
 
-7. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
+6. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
     Output will go into a directory specified by the `-o OUT_DIR` option (default "./pandagma.out").
 
     The summary of the run is given in the file stats.txt . Look at the modal values
     in the histograms, the report of proportion of each assembly with matches, etc.
     One of the output files that may be of use in a subsequent run is observed_chr_pairs.tsv .
     This can indicate possible translocations among genomes in the input data. These values can be 
-    used to constrain matches in a subsequent run, via the file data/expected_chr_matches.tsv
+    used to constrain matches in a subsequent run, via an array variable expected_chr_matches
+    defined in the pandagma config file.
     For example, in Zea, the values
     for one run are:
 ```
@@ -365,14 +362,8 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
        cd pandagma
 ```
 
-2. Make a work directory. A good practice is to name the directory with an indication of the 
-   type of workflow (family or pan) and the number of "main" and "extra" annotations to be included:
-```
-       cd $WORK_DIR
-       mkdir work_family_7_3`
-```
 
-3. Get into a suitable work environment (computation node), and load dependencies.
+2. Get into a suitable work environment (computation node), and load dependencies.
 
     These can be loaded using a package manager such as conda, or
     via a SingularityCE/Apptainer image. 
@@ -385,13 +376,14 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
          # Here, `pandagma` is the name of the conda environment where the dependencies are installed.
 ```
 
-4. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
+3. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
    needed. You can do this with a simple shell script that executes curl commands and then applies some 
    transformations. See the files in get_data/ for examples. There are \"get_data\" scripts for Glycine, 
    Medicago, Phaseolus, Vigna, and Zea.
     
-          ${PANDAGMA_ROOT}/get_data/get_family_7_3.sh
-            # This puts the data into data_fam/
+          mkdir data
+          make -C data -j 2 -f ${PANDAGMA_ROOT}/get_data/family_7_3.mk
+            # This puts the data into data/
     
 5. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
     The config file sets nine program parameters, and then lists annotation files and fasta files.

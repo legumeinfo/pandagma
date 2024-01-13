@@ -111,10 +111,11 @@ main_pan_fam() {
   ##########
   # Command-line interpreter
   
-  while getopts "c:w:s:n:O:o:f:rvhm" opt
+  while getopts "c:d:w:s:n:O:o:f:rvhm" opt
   do
     case $opt in
       c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
+      d) optarg_data_dir=$OPTARG; echo "Data dir: $optarg_data_dir" ;;
       w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
       s) step=$OPTARG; echo "step(s): $step" ;;
       n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
@@ -163,6 +164,8 @@ main_pan_fam() {
   fi
   
   ##########
+  # Set the DATA_DIR, defaulting to ./data if -d DATA_DIR option not specified
+  export DATA_DIR=${optarg_data_dir:-${PWD}/data}
   # Set the work_dir, defaulting to ./pandagma_work if -w WORK_DIR option not specified
   export WORK_DIR=${optarg_work_dir:-${PWD}/pandagma_work}
   

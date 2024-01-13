@@ -3,12 +3,15 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
+  - bash
+  - curl
   - dagchainer
   - emboss
   - famsa
   - fasttree
   - hmmer
   - libdb
+  - make
   - mcl
   - mmseqs2
   - perl-bioperl-core
