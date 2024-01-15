@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2023-12-21"
+version="2023-01-15"
 set -o errexit -o errtrace -o nounset -o pipefail
 shopt -s inherit_errexit
 
