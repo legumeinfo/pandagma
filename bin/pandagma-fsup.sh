@@ -287,7 +287,7 @@ run_realign_and_trim() {
   mkdir -p 42_hmmalign
   for filepath in 35_sup_in_fams_prot/*; do 
     file=$(basename "$filepath");
-    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/"$file" 21_hmm/"$file" 35_sup_in_fams_prot/"$file" &
+    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/"$file" "{fam_dir}/21_hmm/$file" 35_sup_in_fams_prot/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
