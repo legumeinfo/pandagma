@@ -45,6 +45,14 @@ arahy.Tifrunner.gnm2.ann1.4K0L.protein_primary.faa.gz:
 lupal.Amiga.gnm1.ann1.3GKS.%.gz:
 	fetch-datastore.sh $@ | gzip -d | sed 's/mRNA:/mRNA_/' | gzip > $@
 
+
+
+# Patch glyso.W05.gnm1.ann1 annotations: the CDS and protein files have Glysoja.10G027808, but the BED does not.
+glyso.W05.gnm1.ann1.T47J.cds_primary.fna.gz \
+glyso.W05.gnm1.ann1.T47J.protein_primary.faa.gz:
+	fetch-datastore.sh $@ | gzip -d | awk '/^>/ {keep = !index($$1, "Glysoja.10G027808")} keep' | gzip > $@
+
+
 # fix unusual scaffold naming
 medtr.A17.gnm5.ann1_6.L2RX.gene_models_main.bed.gz:
 	fetch-datastore.sh $@ | gzip -d | sed -e 's/MtrunA17Chr0c/scaff_/' | gzip > $@

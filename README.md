@@ -249,7 +249,7 @@ Variables in the config file for the **family workflow**, `pandagma fam`:
          extra_iden - Minimum identity threshold for mmseqs addition of "extra" annotations [0.30]
       mcl_inflation - Inflation parameter, for Markov clustering [1.6]
         strict_synt - For clustering of the "main" annotations, use only syntenic pairs [1]
-                        The alternative (0) is to use all homologous pairs that satisfy expected_quotas.tsv
+                        The alternative (0) is to use all homologous pairs that satisfy expected_quotas
       ks_low_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values less than this. [0.5]
        ks_hi_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values greater than this. [2.0]
          ks_binsize - For calculating and displaying histograms. [0.05]
@@ -327,7 +327,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
    calling the pandagma workflows using singularity and conda.
 
 6. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
-    Output will go into a directory specified by the `-o OUT_DIR` option (default "./pandagma.out").
+    Output will go into a directory specified by the `-o OUT_DIR` option (default "./pandagma_out").
 
     The summary of the run is given in the file stats.txt . Look at the modal values
     in the histograms, the report of proportion of each assembly with matches, etc.
@@ -424,7 +424,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
     then run the steps `ks_filter` through `summarize`. In step 8 here, we run that last set of steps.
 
 9. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
-    Output will go into a directory specified by the `-o OUT_DIR` option (default "./pandagma.out").
+    Output will go into a directory specified by the `-o OUT_DIR` option (default "./pandagma_out").
 
     The summary of the run is given in the file stats.[parameters].txt .
     Look at the modal values in the histograms, the report of proportion of each assembly 

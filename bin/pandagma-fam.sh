@@ -20,7 +20,7 @@ Usage:
 
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
            -w (working directory, for temporary and intermediate files [default: './pandagma_work'].)
-           -o OUTPUT_DIR (name for the output directory [default: './pandagma.out'].
+           -o OUTPUT_DIR (name for the output directory [default: './pandagma_out'].
                 Applicable only to "all", "summarize", and "xfr_aligns_trees" steps.)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
            -r (retain. Don't do subcommand \"clean\" after running \"all\".)
@@ -74,15 +74,18 @@ define MORE_INFO <<'EOS'
 Two options are provided for filtering gene homologies based on additional provided information.
 
 1. One option for additional filtering is to provide a file of gene matches for each species. 
-In this workflow, this set of values is termed \"expected_quotas\", and can be provided as a file
-indicated in the family conf file, e.g. expected_quotas=data/expected_quotas.tsv
+In this workflow, this set of values is termed \"expected_quotas\", and can be provided
+in the family conf file.
 This indicates the number of expected paralogs for a species in a gene family at the desired evolutionary depth,
 considering a known history of whole-genome duplications that affect the included species. For example,
 for the legume family, originating ~70 mya:
+
+expected_quotas=(
   Arachis     4
   Cercis      1
   Glycine     4
   Phaseolus   2
+)
 
 These quotas are used in a regular expression to identify the initial portion of the prefixed seqIDs,
 for example, \"Cicer\" and \"cerca\" matching the genus and \"gensp\" matching prefixes for these seqIDs:
@@ -100,7 +103,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
          extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [0.30]
       mcl_inflation - Inflation parameter, for Markov clustering [1.6]
         strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs [1]
-                        The alternative (0) is to use all homologous pairs that satisfy expected_quotas.tsv
+                        The alternative (0) is to use all homologous pairs that satisfy expected_quotas
       ks_low_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values less than this. [0.5]
        ks_hi_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values greater than this. [2.0]
          ks_binsize - For calculating and displaying histograms. [0.05]
@@ -116,6 +119,9 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
                         This is used for picking representative IDs+sequence from an orthogroup, when
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
+    expected_quotas - (Optional) array of seqid prefixes & expected number of
+                        paralogs for the species identified by the prefix; e.g.:
+                        expected_quotas=(glyma 4 medtr 2)
 
 File sets (arrays):
    annotation_files
@@ -124,8 +130,7 @@ File sets (arrays):
 annotation_files_extra
    protein_files_extra
 
-Optional files with quotas or cutoff values
-     expected_quotas.tsv
+Optional files with cutoff values
           ks_cutoffs.tsv
 EOS
 
@@ -151,7 +156,6 @@ canonicalize_paths() {
     mapfile -t annotation_files_extra < <(realpath --canonicalize-existing "${annotation_files_extra[@]}")
   fi
 
-  readonly expected_quotas=${expected_quotas:+$(realpath "${expected_quotas}")}
   readonly ks_peaks=${ks_peaks:+$(realpath "${ks_peaks}")}
   cd "${OLDPWD}"
   readonly submit_dir=${PWD}
@@ -299,12 +303,12 @@ run_filter() {
   cd "${WORK_DIR}"
   if [ -d 04_dag ]; then rm -rf 04_dag ; fi
   mkdir -p 04_dag
-  if [[ -f ${expected_quotas} ]]; then  # filter based on list of match quotas if provided
-    echo "Filtering on quotas from file ${expected_quotas}"
+  if [[ -v expected_quotas ]]; then  # filter based on list of match quotas if provided
+    echo "Filtering on quotas from expected_quotas"
     for mmseqs_path in 03_mmseqs/*.m8; do
       outfilebase=$(basename "$mmseqs_path" .m8)
       echo "  Filtering $outfilebase based on expected quotas"
-      filter_mmseqs_by_quotas.pl -quotas "${expected_quotas}" < "${mmseqs_path}" |
+      filter_mmseqs_by_quotas.pl -quotas <(printf '%s %s\n' "${expected_quotas[@]}") < "${mmseqs_path}" |
         perl -pe 's/\t[\+-]//g' |  # strip orientation, which isn't used by DAGChainer 
         cat | # Next: for self-comparisons, suppress same chromosome && different gene ID (local dups)
         perl -lane 'print $_ unless($F[0] eq $F[4] && $F[1] ne $F[5])' |
@@ -316,7 +320,7 @@ run_filter() {
     done
     wait # wait for last jobs to finish
   else   # don't filter, since quotas file isn't provided; just remove orientation, which isn't used by DAGChainer
-    echo "No expected_quotas.tsv file was provided, so proceeding without quota (expected gene-count) filtering."
+    echo "No expected_quotas provided, so proceeding without quota (expected gene-count) filtering."
     for mmseqs_path in 03_mmseqs/*.m8; do
       outfilebase=$(basename "$mmseqs_path" .m8)
       cut -f1,2 "${mmseqs_path}" | 
@@ -477,7 +481,7 @@ run_ks_filter() {
   if [ -d 05_kaksout_ks_filtered ]; then rm -rf 05_kaksout_ks_filtered ; fi
   mkdir -p 05_kaksout_ks_filtered
   if [[ -f ${ks_peaks} ]]; then  # filter based on list of Ks values
-    echo "Filtering on quotas from file ${expected_quotas} and ks_pair_cutoff value provided in config file"
+    echo "Filtering on quotas from expected_quotas and ks_pair_cutoff values provided in config file"
     for ks_path in 05_kaksout/*.rptout; do
       outfilebase=$(basename "$ks_path" .rptout)
       echo "  Filtering $ks_path based on expected block-median Ks values"
@@ -486,7 +490,7 @@ run_ks_filter() {
         awk 'NF==7' > 05_kaksout_ks_filtered/"${outfilebase}".rptout 
     done
   elif [[ -f stats/ks_peaks_auto.tsv ]]; then  # filter based on list of Ks values determined automatically in step ks_calc above
-    echo "Filtering on quotas from file ${expected_quotas} and ks_pair_cutoff value calculated and stored at ks_peaks_auto.tsv"
+    echo "Filtering on quotas from expected_quotas and ks_pair_cutoff value calculated and stored at ks_peaks_auto.tsv"
     for ks_path in 05_kaksout/*.rptout; do
       outfilebase=$(basename "$ks_path" .rptout)
       echo "  Filtering $ks_path based on expected block-median Ks values"

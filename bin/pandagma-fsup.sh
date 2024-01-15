@@ -23,7 +23,7 @@ Usage:
 
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
            -w (working directory, for temporary and intermediate files [default: './pandagma_work'].)
-           -o OUTPUT_DIR (name for the output directory [default: './pandagma.out'].
+           -o OUTPUT_DIR (name for the output directory [default: './pandagma_out'].
                 Applicable only to "all" and "summarize" steps.)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
            -v (version)
@@ -75,9 +75,12 @@ canonicalize_paths() {
     exit 1
   fi
 
+  cd "${DATA_DIR}"
+
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
   mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
 
+  cd "${OLDPWD}"
   readonly submit_dir=${PWD}
 
   prot_file=$(basename "${protein_files[0]}" .gz)
