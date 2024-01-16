@@ -44,53 +44,39 @@ data and thresholds provided by the user.
 
 ## Installation methods <a name="installation"></a>
 
-### Installation method 1: installation of scripts and dependencies with a package manager
+First, clone this repository and change your working directory:
 
-These dependencies are required: 
+    git clone https://github.com/legumeinfo/pandagma.git
+    cd pandagma
 
-* bioperl
-* bioperl-run
-* Bio::Tools::Run::Phylo::PAML
-* Bio::Tools::Run::Alignment::Clustalw
-* perl-parallel-forkmanager
-* perl-list-moreutils 
-* mmseqs
-* dagchainer
-* mcl
-* EMBOSS
-* famsa
-* fasttree
-* hmmer
+Next, proceed to follow one of the two supported installation paths (conda or Apptainer/SingularityCE).
 
-These need to be installed and available in the script's environment. Once those are available on your PATH, 
-the program can be called directly with its options. (see Usage below).
+### Installation method 1: installation of scripts and dependencies with conda
 
-Installing the dependencies is up to you. They can be installed via a suitable package manager. For example, 
-using conda (or mamba/micromamba), create an environment called `pandagma` from the environment.yml in this repository: 
+Create a conda environment called `pandagma` from the environment.yml in this repository: 
 
     conda env create
 
-Then, depending on your computing environment, activate the conda environment:
+Set a shell variable (e.g., PANDAGMA_ROOT) that contains the path to the pandagma git repository, add the pandagma/bin directory to your PATH, and activate the conda environment:
 ```
-  conda activate pandagama
-```
-or
-```
-  source activate pandagma
+    export PANDAGMA_ROOT=/path/to/repo/pandagma
+    export PATH=$PANDAGMA_ROOT/pandagma/bin:$PATH
+    conda activate pandagma
 ```
 
-### Installation method 2: by creating a SingularityCE/Apptainer container image
 
-To build a [SingularityCE](https://sylabs.io/singularity/) ([Apptainer](https://apptainer.org/)) container image from the provided 
-SingularityCE/Apptainer [definition file](https://apptainer.org/docs/user/latest/definition_files.html) (`pandagma.def`), 
+### Installation method 2: create a SingularityCE/Apptainer container image
+
+To build a [SingularityCE](https://sylabs.io/singularity/) / [Apptainer](https://apptainer.org/) container image from the provided 
+[definition file](https://apptainer.org/docs/user/latest/definition_files.html) (`pandagma.def`):
 after cloning this repository:
 ```
   singularity build pandagma.sif singularity.def
 ```
 
-To run pandamga using singularity, use `singularity exec --cleanenv pandagma.sif [options]`, e.g.:
+To run pandamga using singularity, use `singularity exec --cleanenv pandagma.sif <command> [options]`, e.g.:
 ```
-  singularity exec --cleanenv pandagma.sif pandagma <command> -c CONFIG_FILE <options>
+  singularity exec --cleanenv pandagma.sif pandagma <subcommand> -c CONFIG_FILE <options>
 ```
 
 ## Usage for the main `pandagma pan` <a name="usage_pan"></a>
@@ -269,35 +255,18 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
 
 ## Example run for the pangene workflow <a name="pangene_example"></a>
 
-1. Clone the program and associated files from github and cd into it:
-```
-      git clone https://github.com/legumeinfo/pandagma
-      cd pandagma
-```
-
-2. Get into a suitable work environment (computation node), and load dependencies.
-
-    These can be loaded using a package manager such as conda, or
-    via a SingularityCE/Apptainer image. 
-```
-       pandagma_img=$YOURPATH/pandagma.sif
-
-        # OR with a package manager such as conda:
-
-       source activate pandagma    
-         # Here, `pandagma` is the name of the conda environment where the dependencies are installed.
-```
-
-3. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
+1. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
     needed. You can do this with a simple shell script that executes curl commands and then 
     applies some transformations. See the files in get_data/ for examples. There are \"get_data\" 
     shell scripts and Makefiles.
 ```
        mkdir data
+       # using a conda environment
        make -C data -j 2 -f $PANDAGMA_ROOT/get_data/Glycine_7_3_2.mk
-         # This puts the data into data/
+       # using SingularityCE/Apptainer
+       singularity exec pandagma.sif make -C data -j 2 -f /usr/local/pandagma/get_data/Glycine_7_3_2.mk
 ```
-4. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
+2. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
     The config file sets nine program parameters, and then lists annotation files and fasta files.
     The annotation and fasta files need to be listed in corresponding order.
     The nth listed GFF file corresponds to the nth listed FASTA file. Also note that 
@@ -320,13 +289,13 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
         cds_files_extra_free -- optional extra annotations, not constrained by chromosome match
 ```
 
-5. Start the run. The examples below assume a run using `$PANDAGMA_ROOT/config/Glycine_7_3.conf`
+3. Start the run. The examples below assume a run using `$PANDAGMA_ROOT/config/Glycine_7_3.conf`
        
    This workflow is best run in an HPC environment. If your environment uses job scheduling such as slurm, 
    then you will modify a batch submission script to submit and control the job. Examples are provided for
    calling the pandagma workflows using singularity and conda.
 
-6. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
+4. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
     Output will go into a directory specified by the `-o OUT_DIR` option (default "./pandagma_out").
 
     The summary of the run is given in the file stats.txt . Look at the modal values
@@ -355,37 +324,18 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
 
 ## Example run for the family workflow <a name="family_example"></a>
 
-1. Clone the program and associated files from github and cd into it. 
-   (You can use the same instance as for the pangene run above if you wish).
-```
-       clone https://github.com/legumeinfo/pandagma
-       cd pandagma
-```
-
-
-2. Get into a suitable work environment (computation node), and load dependencies.
-
-    These can be loaded using a package manager such as conda, or
-    via a SingularityCE/Apptainer image. 
-```
-        pandagma_img=$YOURPATH/pandagma.sif
-    
-        OR:
-
-        source activate pandagma    
-         # Here, `pandagma` is the name of the conda environment where the dependencies are installed.
-```
-
-3. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
+1. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
    needed. You can do this with a simple shell script that executes curl commands and then applies some 
    transformations. See the files in get_data/ for examples. There are \"get_data\" scripts for Glycine, 
    Medicago, Phaseolus, Vigna, and Zea.
     
-          mkdir data
-          make -C data -j 2 -f ${PANDAGMA_ROOT}/get_data/family_7_3.mk
-            # This puts the data into data/
+       mkdir data
+       # using a conda environment
+       make -C data -j 2 -f $PANDAGMA_ROOT/get_data/family_7_3.mk
+       # using SingularityCE/Apptainer
+       singularity exec pandagma.sif make -C data -j 2 -f /usr/local/pandagma/get_data/family_7_3.mk
     
-5. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
+2. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
     The config file sets nine program parameters, and then lists annotation files and fasta files.
     The annotation and fasta files need to be listed in corresponding order.
     The nth listed GFF file corresponds to the nth listed FASTA file.
@@ -397,13 +347,13 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
     Annotations in the extra set are placed into clusters from the main set, using 
     only homology information. 
 
-6. Start the run. The examples below assume a run using `config/family_7_3.conf`
+3. Start the run. The examples below assume a run using `config/family_7_3.conf`
        
    This workflow is best run in an HPC environment. If your environment uses job scheduling such as slurm, 
    then you will modify a batch submission script to submit and control the job. Examples are provided for 
    calling the pandagma workflows using singularity and conda.
 
-7. The typical usage for the family workflow is to run all steps from `ingest` through `ks_calc`; 
+3. The typical usage for the family workflow is to run all steps from `ingest` through `ks_calc`; 
    then evalute the Ks peaks and add a `ks_peaks.tsv` file to the data_fam directory; and then run the  
    remaining steps (see **8** below).
 
@@ -416,21 +366,21 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
     -- editing it if necessary to reflect known or suspected WGD histories. See the example in 
     get_data/get_family_7_3.sh.
 
-8. Run steps `ks_filter` through `summarize`.
+4. Run steps `ks_filter` through `summarize`.
     The family workflow can be run straight through, without providing a `ks_peaks.tsv` file; 
     but the file does permit fine-grained control of Ks thresholds, appropriate for each species pair. 
     The typical usage for the family workflow is to run all steps from `ingest` through `ks_calc`; 
     then evalute the Ks peaks and add a `ks_peaks.tsv` file to the data_fam directory; 
     then run the steps `ks_filter` through `summarize`. In step 8 here, we run that last set of steps.
 
-9. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
+5. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
     Output will go into a directory specified by the `-o OUT_DIR` option (default "./pandagma_out").
 
     The summary of the run is given in the file stats.[parameters].txt .
     Look at the modal values in the histograms, the report of proportion of each assembly 
     with matches, etc.
 
-10. Optionally (for both the pangene and family workflows), run steps `align`, `model_and_trim`, 
+6. Optionally (for both the pangene and family workflows), run steps `align`, `model_and_trim`, 
     and `calc_trees`.
     These steps align all families (or pangenes), then calculate HMMs of each alignment; 
     then realign to the HMMs and trim out the non-match-state characters, and then calculate 
