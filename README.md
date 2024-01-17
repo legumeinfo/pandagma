@@ -1,12 +1,12 @@
 # pandagma
 Pandagma is a collection of tools for calculating pangene sets and gene families. 
-There are two main workflows: pandagma-pan.sh for pangene sets, and pandagma-fam.sh for gene families.
+There are two main workflows: `pandagma pan` for pangene sets, and `pandagma fam` for gene families.
 The pangene workflow is designed to operate primarily on CDS sequences, at the level of a species or genus.
 The family workflow is designed to operate on protein sequences, at the level of an organismal family or order.
 
 Authors: Steven Cannon, Hyunoh Lee, Nathan Weeks, Joel Berendzen, 2020-2023.
 
-The pangene workflow (pandagma-pan.sh) is essentially as follows:
+The pangene workflow (`pandagma pan`) is essentially as follows:
 * Add positional information to the gene IDs
 * Find gene homologies among pairs of annotation sets, using mmseqs2
 * Filter by synteny (DAGChainer) -- and, optionally, by a list of allowed chromosome pairings.
@@ -20,7 +20,7 @@ The pangene workflow (pandagma-pan.sh) is essentially as follows:
 
 Optionally, alignments and trees can also be calculated.
 
-The gene family workflow (pandagma-fam.sh) is similar to the pangene workflow, but
+The gene family workflow (`pandagma fam`) is similar to the pangene workflow, but
 operates on proteins rather than CDS, and uses an optional "quotas" file to determine the
 initial expected gene duplication relationships between species, considering known or
 suspected whole-genome duplication histories at the evolutionary depth of interest. The
@@ -44,81 +44,61 @@ data and thresholds provided by the user.
 
 ## Installation methods <a name="installation"></a>
 
-### Installation method 1: installation of scripts and dependencies with a package manager
+First, clone this repository and change your working directory:
 
-These dependencies are required: 
+    git clone https://github.com/legumeinfo/pandagma.git
+    cd pandagma
 
-* bioperl
-* bioperl-run
-* Bio::Tools::Run::Phylo::PAML
-* Bio::Tools::Run::Alignment::Clustalw
-* perl-parallel-forkmanager
-* perl-list-moreutils 
-* mmseqs
-* dagchainer
-* mcl
-* EMBOSS
-* famsa
-* fasttree
-* hmmer
+Next, proceed to follow one of the two supported installation paths (conda or Apptainer/SingularityCE).
 
-These need to be installed and available in the script's environment. Once those are available on your PATH, 
-the program can be called directly with its options. (see Usage below).
+### Installation method 1: installation of scripts and dependencies with conda
 
-Installing the dependencies is up to you. They can be installed via a suitable package manager. For example, 
-using conda, creating an environment called `pandagma`: 
+Create a conda environment called `pandagma` from the environment.yml in this repository: 
+
+    conda env create
+
+Set a shell variable (e.g., PANDAGMA_ROOT) that contains the path to the pandagma git repository, add the pandagma/bin directory to your PATH, and activate the conda environment:
 ```
-  conda create -n pandagma
-  conda install -n pandagma -c conda-forge -c bioconda perl-bioperl-core perl-bioperl-run \
-    perl-bio-tools-phylo-paml perl-bio-tools-run-alignment-clustalw \
-    perl-parallel-forkmanager perl-list-moreutils \
-    dagchainer mcl mmseqs2 emboss famsa fasttree hmmer
+    export PANDAGMA_ROOT=/path/to/repo/pandagma
+    export PATH=$PANDAGMA_ROOT/pandagma/bin:$PATH
+    conda activate pandagma
 ```
 
-Then, depending on your computing environment, activate the conda environment:
-```
-  conda activate pandagama
-```
-or
-```
-  module load miniconda
-  source activate pandagma
-```
 
-### Installation method 2: by creating a Singularity container image
+### Installation method 2: create a SingularityCE/Apptainer container image
 
-To build a [Singularity](https://singularity.hpcng.org/) container image from the provided 
-[Singularity definition file](https://singularity.hpcng.org/user-docs/master/definition_files.html) (`singularity.def`), 
+To build a [SingularityCE](https://sylabs.io/singularity/) / [Apptainer](https://apptainer.org/) container image from the provided 
+[definition file](https://apptainer.org/docs/user/latest/definition_files.html) (`pandagma.def`):
 after cloning this repository:
 ```
-  singularity build [--remote] pandagma.sif singularity.def
-```
-Where the `--remote` option is used if building the image as an unprivileged user using (by default) 
-the [Sylabs Cloud Remote Builder](https://cloud.sylabs.io/builder).
-
-To run pandamga using singularity, use `singularity run --cleanenv pandagma.sif [options]`, e.g.:
-```
-  singularity run --cleanenv pandagma.sif -c CONFIG_FILE
+  singularity build pandagma.sif singularity.def
 ```
 
-## Usage for the main pandagma-pan.sh <a name="usage_pan"></a>
+To run pandamga using singularity, use `singularity exec --cleanenv pandagma.sif <command> [options]`, e.g.:
+```
+  singularity exec --cleanenv pandagma.sif pandagma <subcommand> -c CONFIG_FILE <options>
+```
+
+## Usage for the main `pandagma pan` <a name="usage_pan"></a>
 
 ```
 Usage: 
-       nohup ./pandagma-pan.sh -c CONFIG_FILE [options] &
+       pandagma pan -c CONFIG_FILE [options]
    or
-       nohup ./pandagma-pan.sh -c CONFIG_FILE -s SUBCOMMAND [options] &
-
-   ... or using a suitable job submission script if using a workload manager such as slurm.
+       pandagma pan -c CONFIG_FILE -s SUBCOMMAND [options]
 
   Required:
            -c (path to the config file)
 
-  Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
-           -w (working directory, for temporary and intermediate files.
-                Must be specified in config file if not specified here.)
+  Options: -s (subcommand to run. If "all" or omitted, all steps will be run; otherwise, run specified step)
+           -w (working directory, for temporary and intermediate files [default: './pandagma_work'].)
+           -o OUTPUT_DIR (name for the output directory [default: './pandagma_out'].
+                Applicable only to "all" and "summarize" steps.)
+           -O (ordering method, for placing pan-genes. Options: 
+                "reference" (default; uses preferred_annot to order, then gap-filling for missing panIDs.)
+                "alignment" (uses whole-chromosome alignment of ordered panIDs from all annotations)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
-           -r (retain. Don't do subcommand \"clean\" after running \"all\".)
+           -r (retain. Don't do subcommand "clean" after running "all".)
            -v (version)
            -h (help)
            -m (more information)
@@ -147,25 +127,31 @@ primary coding sequence in the reference:
 
   molecule, feature-start, feature-end, mRNA-ID, score(0), strand, gene-ID
 
-Optionally, a file specified in the expected_chr_matches variable can be specified in GENUS.conf,
+Optionally, an expected_chr_matches array variable can be specified in GENUS.conf,
 which provides anticipated chromosome pairings, e.g.
+
+expected_chr_matches=(
   01 01
   02 02
   ...
-  11 13  # allows for translocation between 11 and 13
-  13 11  # allows for translocation between 13 and 11
+# allows for translocation between 11 and 13
+  11 13
+# allows for translocation between 13 and 11
+  13 11
+)
+
 These pairings are used in a regular expression to identify terminal portions of molecule IDs, e.g.
   glyma.Wm82.gnm2.Gm01  glyso.PI483463.gnm1.Gs01
   glyma.Wm82.gnm2.Gm13  glyso.W05.gnm1.Chr11
-If an expected_chr_matches file is not provided, then no such filtering will be done.
+If an expected_chr_matches array variable is not defined, then no such filtering will be done.
 
 At the end of the process, remaining genes will be added to initial clusters, based on homology.
 Remaining genes may be those falling on unanchored scaffolds, or on chromosomes by not part of
 synteny blocks and so not making it into the synteny-based clusters.
 ```
-Subcommands for the **pangene** workflow, pandagma-pan.sh, in order they are usually run:
+Subcommands for the **pangene** workflow, `pandagma pan`, in order they are usually run:
 ```
-                all - All of the steps below, except for clean and ReallyClean
+                all - All of the steps below, except for clean
                         (Or equivalently: omit the -s flag; "all" is default)
              ingest - Prepare the assembly and annotation files for analysis
              mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
@@ -181,15 +167,15 @@ Subcommands for the **pangene** workflow, pandagma-pan.sh, in order they are usu
      pick_exemplars - Pick representative sequence for each pangene
      filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.
      order_and_name - Assign pangene names with consensus chromosomes and ordinal positions.
-     calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
+     calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches
           summarize - Move results into output directory, and report summary statistics.
 ```
 
-Subcommands for the **gene family** workflow, pandagma-fam.sh, in order they are usually run:
+Subcommands for the **gene family** workflow, `pandagma fam`, in order they are usually run:
 
 ```
   Run these first (if using ks_calc)
-                all - All of the steps below, except for ks_filter, clean and ReallyClean
+                all - All of the steps below, except for ks_filter and clean
                         (Or equivalently: omit the -s flag; \"all\" is default).
              ingest - Prepare the assembly and annotation files for analysis.
              mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies.
@@ -217,13 +203,10 @@ Subcommands for the **gene family** workflow, pandagma-fam.sh, in order they are
   For both pandagma-pan and pandagma-fam, run either of the following subcommands separately if you wish:
               clean - Clean (delete) files in the working directory that are not needed
                         for later addition of data using add_extra and subsequent run commands.
-                        By default, \"clean\" is run as part of \"all\" unless the -r flag is set.
-        ReallyClean - Do complete clean-up of files in the working directory.
-                        Use this if you want to start over, OR if you are satisified with the results and
-                        don't anticipate adding other annotation sets to this pangene set.
+                        By default, "clean" is run as part of "all" unless the -r flag is set.
 ```
 
-Variables in the config file for the **pangene workflow**, pandagma-pan.sh:
+Variables in the config file for the **pangene workflow**, `pandagma pan`:
 
 ```
          clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
@@ -231,10 +214,9 @@ Variables in the config file for the **pangene workflow**, pandagma-pan.sh:
         consen_iden - Minimum identity threshold for consensus generation [0.80]
          extra_iden - Minimum identity threshold for mmseqs addition of "extra" annotations [80]
       mcl_inflation - Inflation parameter, for Markov clustering [default: 2]
-        strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs (1)
-                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches.tsv
+        strict_synt - For clustering of the "main" annotations, use only syntenic pairs (1)
+                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches
       consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
-       out_dir_base - Base name for the output directory [default: './out']
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
                         "([^.]+\.[^.]+\.[^.]+\.[^.]+)\..+" 
                           for four dot-separated fields, e.g. vigan.Shumari.gnm1.ann1
@@ -243,18 +225,17 @@ Variables in the config file for the **pangene workflow**, pandagma-pan.sh:
                         This is used for picking representative IDs+sequence from an orthogroup, when
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
-           work_dir - Working directory, for temporary and intermediate files. 
 ```
 
-Variables in the config file for the **family workflow**, pandagma-fam.sh:
+Variables in the config file for the **family workflow**, `pandagma fam`:
 ```
          clust_iden - Minimum identity threshold for mmseqs clustering [0.40]
           clust_cov - Minimum coverage for mmseqs clustering [0.40]
         consen_iden - Minimum identity threshold for consensus generation [0.30]
-         extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [0.30]
+         extra_iden - Minimum identity threshold for mmseqs addition of "extra" annotations [0.30]
       mcl_inflation - Inflation parameter, for Markov clustering [1.6]
-        strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs [1]
-                        The alternative (0) is to use all homologous pairs that satisfy expected_quotas.tsv
+        strict_synt - For clustering of the "main" annotations, use only syntenic pairs [1]
+                        The alternative (0) is to use all homologous pairs that satisfy expected_quotas
       ks_low_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values less than this. [0.5]
        ks_hi_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values greater than this. [2.0]
          ks_binsize - For calculating and displaying histograms. [0.05]
@@ -262,7 +243,6 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
         max_pair_ks - Fallback value for excluding gene pairs, if a ks_cutoffs file is not provided. [4.0]
 
       consen_prefix - Prefix to use in orthogroup names
-       out_dir_base - Base name for the output directory [default: './out']
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g.
                         \"([^.]+\.[^.]+)\..+\"
                           for two dot-separated fields, e.g. vigan.Shumari
@@ -271,50 +251,22 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
                         This is used for picking representative IDs+sequence from an orthogroup, when
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
-           work_dir - Working directory, for temporary and intermediate files.
 ```
 
 ## Example run for the pangene workflow <a name="pangene_example"></a>
 
-1. Clone the program and associated files from github and cd into it:
-```
-      git clone https://github.com/legumeinfo/pandagma
-      cd pandagma
-```
-
-2. Make a work directory. A good practice is to name the directory with an indication of the 
-   type of workflow (family or pan) and the number of "main" and "extra" annotations to be included.
-   In this case, there are 7 annotations designated "main", 3 designated as "extra_constr"
-   (constrained to match the consensus chromosome of the pangene to which it will be placed),
-   and 2 designated as "extra_free" (not constrained by chromosome match).
-```
-       mkdir ../work_pan_7_3_2
-```
-
-3. Get into a suitable work environment (computation node), and load dependencies.
-
-    These can be loaded using a module-loading system, or with a package manager such as conda, or
-    via a Singularity image. 
-```
-       pandagma_sing_img=$YOURPATH/pandagma.sif
-```
-
-    OR with a package manager such as conda:
-```
-       module load miniconda
-       source activate pandagma    
-         # Here, `pandagma` is the name of the conda environment where the dependencies are installed.
-```
-
-4. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
+1. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
     needed. You can do this with a simple shell script that executes curl commands and then 
     applies some transformations. See the files in get_data/ for examples. There are \"get_data\" 
-    scripts for Glycine, Medicago, Phaseolus, Vigna, and Zea.
+    shell scripts and Makefiles.
 ```
-       ./get_data/get_Glycine_7_3.sh
-         # This puts the data into data_pan/, 
+       mkdir data
+       # using a conda environment
+       make -C data -j 2 -f $PANDAGMA_ROOT/get_data/Glycine_7_3_2.mk
+       # using SingularityCE/Apptainer
+       singularity exec pandagma.sif make -C data -j 2 -f /usr/local/pandagma/get_data/Glycine_7_3_2.mk
 ```
-5. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
+2. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
     The config file sets nine program parameters, and then lists annotation files and fasta files.
     The annotation and fasta files need to be listed in corresponding order.
     The nth listed GFF file corresponds to the nth listed FASTA file. Also note that 
@@ -337,23 +289,21 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
         cds_files_extra_free -- optional extra annotations, not constrained by chromosome match
 ```
 
-6. Start the run. The examples below assume a run using `config/Glycine_7_3.conf`
+3. Start the run. The examples below assume a run using `$PANDAGMA_ROOT/config/Glycine_7_3.conf`
        
    This workflow is best run in an HPC environment. If your environment uses job scheduling such as slurm, 
    then you will modify a batch submission script to submit and control the job. Examples are provided for
    calling the pandagma workflows using singularity and conda.
 
-7. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
-    Output will go into a directory composed from a provided prefix name (default "out") and
-    information about key parameter values, e.g.
+4. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
+    Output will go into a directory specified by the `-o OUT_DIR` option (default "./pandagma_out").
 
-       out_Glycine_7_3_2
-
-    The summary of the run is given in the file stats.[parameters].txt . Look at the modal values
+    The summary of the run is given in the file stats.txt . Look at the modal values
     in the histograms, the report of proportion of each assembly with matches, etc.
     One of the output files that may be of use in a subsequent run is observed_chr_pairs.tsv .
     This can indicate possible translocations among genomes in the input data. These values can be 
-    used to constrain matches in a subsequent run, via the file data/expected_chr_matches.tsv
+    used to constrain matches in a subsequent run, via an array variable expected_chr_matches
+    defined in the pandagma config file.
     For example, in Zea, the values
     for one run are:
 ```
@@ -374,42 +324,18 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
 
 ## Example run for the family workflow <a name="family_example"></a>
 
-1. Clone the program and associated files from github and cd into it. 
-   (You can use the same instance as for the pangene run above if you wish).
-```
-       clone https://github.com/legumeinfo/pandagma
-       cd pandagma
-```
-
-2. Make a work directory. A good practice is to name the directory with an indication of the 
-   type of workflow (family or pan) and the number of "main" and "extra" annotations to be included:
-```
-       mkdir ../work_family_7_3`
-```
-
-3. Get into a suitable work environment (computation node), and load dependencies.
-
-    These can be loaded using a module-loading system, or with a package manager such as conda, or
-    via a Singularity image. 
-```
-        pandagma_sing_img=$YOURPATH/pandagma.sif
-    
-        OR:
-
-        module load miniconda
-        source activate pandagma    
-         # Here, `pandagma` is the name of the conda environment where the dependencies are installed.
-```
-
-4. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
+1. Download the annotation data from a remote source (CDS, protein, and GFF or BED), and transform if 
    needed. You can do this with a simple shell script that executes curl commands and then applies some 
    transformations. See the files in get_data/ for examples. There are \"get_data\" scripts for Glycine, 
    Medicago, Phaseolus, Vigna, and Zea.
     
-          ./get_data/get_family_7_3.sh
-            # This puts the data into data_fam/
+       mkdir data
+       # using a conda environment
+       make -C data -j 2 -f $PANDAGMA_ROOT/get_data/family_7_3.mk
+       # using SingularityCE/Apptainer
+       singularity exec pandagma.sif make -C data -j 2 -f /usr/local/pandagma/get_data/family_7_3.mk
     
-5. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
+2. Create a config file to provide program parameters and indicate sequence and coordinate files to be analyzed.
     The config file sets nine program parameters, and then lists annotation files and fasta files.
     The annotation and fasta files need to be listed in corresponding order.
     The nth listed GFF file corresponds to the nth listed FASTA file.
@@ -421,18 +347,18 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
     Annotations in the extra set are placed into clusters from the main set, using 
     only homology information. 
 
-6. Start the run. The examples below assume a run using `config/family_7_3.conf`
+3. Start the run. The examples below assume a run using `config/family_7_3.conf`
        
    This workflow is best run in an HPC environment. If your environment uses job scheduling such as slurm, 
    then you will modify a batch submission script to submit and control the job. Examples are provided for 
    calling the pandagma workflows using singularity and conda.
 
-7. The typical usage for the family workflow is to run all steps from `ingest` through `ks_calc`; 
+3. The typical usage for the family workflow is to run all steps from `ingest` through `ks_calc`; 
    then evalute the Ks peaks and add a `ks_peaks.tsv` file to the data_fam directory; and then run the  
    remaining steps (see **8** below).
 
     An intermediate output file, `ks_peaks_auto.tsv`, is located in the work directory, stats 
-    subdirectory: `out_family_7_3/stats`.
+    subdirectory: `out/stats`.
     This should be examined for biological plausibility, along with the other 
     Ks results (histograms) in that subdirectory.
     The `ks_peaks_auto.tsv` file can be copied to the data directory (data_fam in this case) 
@@ -440,24 +366,21 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
     -- editing it if necessary to reflect known or suspected WGD histories. See the example in 
     get_data/get_family_7_3.sh.
 
-8. Run steps `ks_filter` through `summarize`.
+4. Run steps `ks_filter` through `summarize`.
     The family workflow can be run straight through, without providing a `ks_peaks.tsv` file; 
     but the file does permit fine-grained control of Ks thresholds, appropriate for each species pair. 
     The typical usage for the family workflow is to run all steps from `ingest` through `ks_calc`; 
     then evalute the Ks peaks and add a `ks_peaks.tsv` file to the data_fam directory; 
     then run the steps `ks_filter` through `summarize`. In step 8 here, we run that last set of steps.
 
-9. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
-    Output will go into a directory composed from a provided prefix name (default "out") and
-    information about key parameter values, e.g.
-
-          out_family_7_3
+5. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
+    Output will go into a directory specified by the `-o OUT_DIR` option (default "./pandagma_out").
 
     The summary of the run is given in the file stats.[parameters].txt .
     Look at the modal values in the histograms, the report of proportion of each assembly 
     with matches, etc.
 
-10. Optionally (for both the pangene and family workflows), run steps `align`, `model_and_trim`, 
+6. Optionally (for both the pangene and family workflows), run steps `align`, `model_and_trim`, 
     and `calc_trees`.
     These steps align all families (or pangenes), then calculate HMMs of each alignment; 
     then realign to the HMMs and trim out the non-match-state characters, and then calculate 

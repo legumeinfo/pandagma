@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -o nounset -o errexit
+
+usage() {
+   cat <<'END'
+Usage:
+  pandagma <command> <options>...
+
+Available Commands:
+  fam      calculate gene family sets
+  fsup     add annotation to existing gene family set
+  pan      calculate pangene sets
+  pupdate  add annotation to existing pangene set
+    
+For help with a specific <command>, run:
+  pandagma <command> -h
+END
+}
+
+[ $# -eq 0 ] && set -- help
+
+subcommand=${1}
+shift
+
+case ${subcommand} in
+  fam) pandagma-fam.sh "$@" ;;
+  fsup) pandagma-fsup.sh "$@" ;;
+  pan) pandagma-pan.sh "$@" ;;
+  pupdate) pandagma-pupdate.sh "$@" ;;
+  -h|help) usage; exit 0 ;;
+  *) usage 1>&2; exit 1 ;;
+esac

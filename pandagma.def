@@ -1,0 +1,45 @@
+Bootstrap: docker
+From: debian:bookworm-slim
+Stage: deps
+
+%post -c /bin/bash
+    set -o errexit -o nounset -o pipefail
+    apt update
+    apt install -y --no-install-recommends ca-certificates curl g++ make
+    readonly DAGCHAINER_VERSION=r111120 FAMSA_VERSION=2.2.2
+    curl -L https://github.com/kullrich/dagchainer/archive/refs/tags/${DAGCHAINER_VERSION}.tar.gz | tar -xzf -
+    cd dagchainer-${DAGCHAINER_VERSION}
+    make -j $(nproc) PREFIX=/usr/local/dagchainer
+    rm -rf dagchainer-${DAGCHAINER_VERSION}
+
+    curl -L https://github.com/refresh-bio/FAMSA/archive/refs/tags/v${FAMSA_VERSION}.tar.gz | tar -xzf -
+    cd FAMSA-${FAMSA_VERSION}
+    make -j $(nproc)
+    mv famsa /usr/local/bin
+     
+
+Bootstrap: docker
+From: debian:bookworm-slim
+
+%files
+    . /usr/local/pandagma
+
+%files from deps
+    /usr/local/dagchainer
+    /usr/local/bin/famsa
+
+%environment
+    export LC_ALL=C
+    export PANDAGMA_ROOT=/usr/local/pandagma
+    export PATH=/usr/local/pandagma/bin:/usr/lib/emboss:/usr/local/dagchainer/bin:/usr/local/dagchainer/bin/accessory_bin:${PATH}
+
+%post
+    apt update
+    apt install -y --no-install-recommends libbio-perl-perl libbio-perl-run-perl libbio-tools-phylo-paml-perl \
+      libbio-tools-run-alignment-clustalw-perl libparallel-forkmanager-perl \
+      liblist-moreutils-perl mcl mmseqs2 emboss hmmer fasttree clustalw mafft \
+      ca-certificates curl db-util make
+    rm -rf /var/lib/apt/lists/* /usr/local/pandagma/.git*
+
+%runscript
+    exec pandagma "$@"

@@ -6,29 +6,25 @@
 # a collection of HMMs calculated as part of a prior full run of pandagma-fam.sh.
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
 #
-scriptname=$(basename "$0")
-version="2023-12-25"
+scriptname='pandagma fsup'
 
-set -o errexit -o errtrace -o nounset -o pipefail
-
-trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
-
-define(){ o=; while IFS=$'\n' read -r a; do o="$o$a"'
-'; done; eval "$1=\$o"; }
+. pandagma-common.sh
 
 define HELP_DOC <<'EOS'
 Place annotation sets (CDS and protein) into pangene or gene family sets, using hmmsearch 
 to compare the indicated annotations against HMMs calculated in a prior run of pandagma-pan or pandagma-fam.
 
 Usage:
-  ./$scriptname -c CONFIG_FILE [options]
+  $scriptname -c CONFIG_FILE [options]
 
   Required:
            -c (path to the config file)
+           -f FAM_DIR (path to directory from previous \"pandagma fam\ -o FAM_DIR\" run)
 
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
-           -w (working directory, for temporary and intermediate files. 
-                Must be specified in config file if not specified here.)
+           -w (working directory, for temporary and intermediate files [default: './pandagma_work'].)
+           -o OUTPUT_DIR (name for the output directory [default: './pandagma_out'].
+                Applicable only to "all" and "summarize" steps.)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
            -v (version)
            -h (help)
@@ -58,12 +54,10 @@ Variables in pandagma config file (Set the config with the CONF environment vari
           clust_cov - Minimum alignment coverage [0.40]
       consen_method - Method for placing sequences into pangenes. One of:
                         hmmemit cons align_sample [align_sample]
-       out_dir_base - Base name for the output directory [default: './out']
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
                         \"([^.]+\.[^.]+)\..+\"
                           for two dot-separated fields, e.g. vigan.Shumari
                         or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
-           work_dir - Working directory, for temporary and intermediate files. 
 
 File sets (arrays):
       protein_files
@@ -73,63 +67,24 @@ EOS
 ########################################
 # Helper functions begin here
 
-version() {
-  echo "$scriptname" "$version"
-}
-
-##########
 canonicalize_paths() {
   echo "Entering canonicalize_paths."
+
+  if ! [[ -v fam_dir ]]; then
+    echo "pandagma fsup -f FAM_DIR not specified" >&2
+    exit 1
+  fi
+
+  cd "${DATA_DIR}"
 
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
   mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
 
+  cd "${OLDPWD}"
   readonly submit_dir=${PWD}
 
   prot_file=$(basename "${protein_files[0]}" .gz)
   faa="${prot_file##*.}"
-
-  export ANN_REX=${annot_str_regex}
-}
-
-##########
-cat_or_zcat() {
-  case ${1} in
-    *.gz) gzip -dc "$@" ;;
-       *) cat "$@" ;;
-  esac
-}
-
-##########
-check_seq_type () {
-  someseq=${1}
-  proportion_nuc=$(echo "$someseq" | fold -w1 | 
-    awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
-  export proportion_nuc
-  perl -le '$PN=$ENV{"proportion_nuc"}; if ($PN>0.9){print 3} else {print 1}'
-}
-
-##########
-calc_seq_stats () {
-  # Given fasta file on STDIN and an environment variable "annot_name", report:
-  # seqs  min  max  N50  ave  annotation_set
-  awk 'BEGIN { ORS="" } 
-       /^>/ && NR==1 { print $0"\n" } 
-       /^>/ && NR!=1 { print "\n"$0"\n" } 
-       /^[^>]/ { print } 
-       END { print "\n" }' |
-  awk '/^[^>]/ {print length($1); tot_bp+=length($1) } END { print "bases: " tot_bp "\n" }' \
-   | sort -n \
-   | awk -v ANN="$annot_name" 'BEGIN { min=999999999 }
-          /bases:/ { N50_ct = $2/2; bases=$2 } 
-          /^[0-9]/ { 
-             ct++; sum+=$1; if ( sum >= N50_ct && !printed ) { N50=$1; printed = 1 } 
-             min = (min < $1) ? min : $1
-          } 
-          END { 
-            ave=sum/ct;
-            printf(" %4d  %4d  %4d  %4d  %7.1f  %4s\n", ct, min, $1, N50, ave, ANN);
-          }'
 }
 
 ########################################
@@ -145,7 +100,7 @@ run_ingest() {
   
   if [ -d 02_fasta_nuc_sup ]; then rm -rf 02_fasta_nuc_sup; fi
   if [ -d 02_fasta_prot_sup ]; then rm -rf 02_fasta_prot_sup; fi
-  mkdir -p 02_fasta_nuc_sup 02_fasta_prot_sup 
+  mkdir -p 02_fasta_nuc_sup 02_fasta_prot_sup stats
 
   # Prepare the tmp.gene_count_start to be joined, in run_summarize, with tmp.gene_count_end_sup
   # This is captured from the gene IDs using the annot_str_regex set in the config file.
@@ -153,8 +108,6 @@ run_ingest() {
   cat /dev/null > stats/tmp.fasta_seqstats_sup
   start_time=$(date)
   echo "Run started at: $start_time" > stats/tmp.timing
-
-  export ANN_REX=${annot_str_regex}
 
   echo "  Pull the protein files locally"
   cat /dev/null > 02_all_main_prot_sup.faa # Collect all starting protein sequences, for later comparisons
@@ -197,7 +150,7 @@ run_fam_consen() {
   
     MINL=0.25 # show consensus as 'any' (X/N) unless >= this fraction
     MINU=0.5  # show consensus as upper case if >= this fraction
-    for filepath in 21_hmm/* ; do
+    for filepath in "${fam_dir}"/21_hmm/* ; do
       base=$(basename "$filepath")
       hmmemit -C --minl $MINL --minu $MINU -o 21_hmmemit/"$base" "$filepath" &
       if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
@@ -210,7 +163,7 @@ run_fam_consen() {
     if [ -d 30_hmmalign_cons ]; then rm -rf 30_hmmalign_cons; fi
     mkdir -p 30_hmmalign_cons
   
-    for filepath in 23_hmmalign_trim2/* ; do
+    for filepath in "${fam_dir}"/23_hmmalign_trim2/* ; do
       base=$(basename "$filepath")
       cons -sequence "$filepath" -outseq 30_hmmalign_cons/"$base" -name "$base" &
       if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
@@ -227,7 +180,7 @@ run_fam_consen() {
 
     cat /dev/null > 23_hmmalign_trim2.fam_ID.faa
 
-    for filepath in 23_hmmalign_trim2/*; do
+    for filepath in "${fam_dir}"/23_hmmalign_trim2/*; do
       base=$(basename "$filepath")
       fasta_to_table.awk "$filepath" | shuf |
         awk -v FAM="$base" -v MAX=$enough_seqs 'ct<MAX {print ">" FAM "__" $1; print $2; ct++}' >> 23_hmmalign_trim2.fam_ID.faa
@@ -236,7 +189,7 @@ run_fam_consen() {
   else 
     echo "Unrecognized consen_method: $consen_method."
     echo "Expected values are \"hmmemit\", \"cons\", or \"align_sample\"."
-    exit
+    exit 1
   fi
 }
 
@@ -291,7 +244,7 @@ run_search_families() {
   else
     echo "Unrecognized consen_method: $consen_method."
     echo "Expected values are \"hmmemit\" or \"cons\"."
-    exit
+    exit 1
   fi
 
   echo "== Place sequences into families based on top mmsearch hits, using the consen_iden threshold of $consen_iden."
@@ -334,7 +287,7 @@ run_realign_and_trim() {
   mkdir -p 42_hmmalign
   for filepath in 35_sup_in_fams_prot/*; do 
     file=$(basename "$filepath");
-    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/"$file" 21_hmm/"$file" 35_sup_in_fams_prot/"$file" &
+    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/"$file" "{fam_dir}/21_hmm/$file" 35_sup_in_fams_prot/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -364,52 +317,17 @@ run_realign_and_trim() {
 }
 
 ##########
-run_calc_trees() {
-  echo; echo "== Calculate trees =="
-  cd "${WORK_DIR}"
-  
-  mkdir -p 44_trees
-
-  echo; echo "== Move small (<4) and very low-entropy families (sequences are all identical) to the side =="
-  mkdir -p 43_pan_aug_small_or_identical
-  min_seq_count=4
-  # Below, "count" is the number of unique sequences in the alignment.
-  for filepath in 43_hmmalign_trim2/*; do
-    file=$(basename "$filepath")
-    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
-    if [[ $count -lt $min_seq_count ]]; then
-      echo "Set aside small or low-entropy family $file";
-      mv "$filepath" 43_pan_aug_small_or_identical/
-    fi;
-  done
-
-  # By default, FastTreeMP uses all available threads.
-  # It is more efficient to run more jobs on one core each by setting an environment variable.
-  OMP_NUM_THREADS=1
-  export OMP_NUM_THREADS
-  for filepath in 43_hmmalign_trim2/*; do
-    file=$(basename "$filepath")
-    echo "  Calculating tree for $file"
-    fasttree -quiet "$filepath" > 44_trees/"$file" &
-  done
-  wait
-}
-
-##########
 run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
 
-  WORK_DIR=$work_dir
   cd "${WORK_DIR}"
   echo "  work_dir: $PWD"
 
   echo "  Calculate matrix of gene counts per orthogroup and annotation set"
   calc_pan_stats.pl -annot_regex "$ANN_REX" -pan 34_sup_vs_fam_consen.clust.tsv -out 34_sup_vs_fam_consen.counts.tsv
 
-  conf_base=$(basename "$CONF" .conf)
-  full_out_dir="${out_dir_base}_$conf_base"
-  stats_file=${full_out_dir}/stats.$conf_base.txt
-  export ANN_REX=${annot_str_regex}
+  full_out_dir="${out_dir}"
+  stats_file=${full_out_dir}/stats.txt
 
   cd "${submit_dir}"
 
@@ -508,107 +426,13 @@ run_summarize() {
 ########################################
 # Main program
 
-NPROC=$( ( command -v nproc > /dev/null && nproc ) || getconf _NPROCESSORS_ONLN)
-CONFIG="null"
-optarg_work_dir="null"
-step="all"
-
-export NPROC=${NPROC:-1}
-
-pandagma_conf_params='consen_iden clust_cov consen_method out_dir_base annot_str_regex work_dir'
-
-##########
-# Command-line interpreter
-
-while getopts "c:w:s:n:o:vhm" opt
-do
-  case $opt in
-    c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
-    w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
-    s) step=$OPTARG; echo "step(s): $step" ;;
-    n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
-    v) version ;;
-    h) echo >&2 "$HELP_DOC" && exit 0 ;;
-    m) printf >&2  "%s\n%s\n" "$HELP_DOC" "$MORE_INFO" && exit 0 ;;
-    *) echo >&2 echo "$HELP_DOC" && exit 1 ;;
-  esac
-done
-
-if [ "$CONFIG" == "null" ]; then
-  printf "\nPlease provide the path to a config file: -c CONFIG\n" >&2
-  printf "\nRun \"%s -h\" for help.\n\n" "$scriptname" >&2
-  exit 1;
-else
-  export CONF=${CONFIG}
-fi
-
-# shellcheck source=/dev/null
-. "${CONF}"
-
-declare consen_iden clust_cov consen_method out_dir_base annot_str_regex work_dir 
-
-if [ "$#" -eq 0 ]; then
-  echo >&2 "$HELP_DOC" && exit 0;
-fi
-
-shift $(( OPTIND - 1 ))
-
-##########
-# Check for existence of work directory.
-# work_dir provided via cli argument takes precedence over the variable specified in the conf file
-if [ "$optarg_work_dir" == "null" ] && [ -z ${work_dir+x} ]; then
-  printf "\nPlease provide the path to a config file: -c CONFIG\n" >&2
-  echo "either in the config file (work_dir=) or with option -w" >&2
-  printf "\nRun \"%s -h\" for help.\n\n" "$scriptname" >&2
-  exit 1;
-elif [ "$optarg_work_dir" != "null" ] && [ -d "$optarg_work_dir" ]; then
-  work_dir=$optarg_work_dir
-  export WORK_DIR=${work_dir}
-elif [ "$optarg_work_dir" == "null" ] && [ -d "$work_dir" ]; then
-  export WORK_DIR=${work_dir}
-elif [ ! -d "$work_dir" ] && [ ! -d "$optarg_work_dir" ]; then
-  echo "Neither work directory $work_dir nor $optarg_work_dir was not found. Please specify path in the config file or with option -w." >&2
-  exit 1;
-elif [ ! -d "$work_dir" ]; then
-  echo "Work directory $work_dir was not found. Please specify path in the config file or with option -w." >&2
-  exit 1;
-else 
-  echo "Check odd condition: optarg_work_dir: $optarg_work_dir; work_dir: $work_dir"
-  exit 1;
-fi
-
-# Get paths to the fasta and annotation files
-canonicalize_paths
-
-# Check for existence of third-party executables
-missing_req=0
-for program in hmmscan famsa; do
-  if ! type $program &> /dev/null; then
-    echo "Warning: executable $program is not on your PATH."
-    missing_req=$((missing_req+1))
-  fi
-done
-if [ "$missing_req" -gt 0 ]; then 
-  printf "\nPlease add the programs above to your environment and try again.\n\n"
-  exit 1; 
-fi
-
-# Check that the bin directory is in the PATH
-if ! type hash_into_fasta_id.pl &> /dev/null; then
-  printf "\nPlease add the pandagma bin directory to your PATH and try again. Try the following:\n"
-  printf "\n  PATH=%s/bin:\%s\n\n" "$PWD" "$PATH"
-  exit 1; 
-fi
+pandagma_conf_params='consen_iden clust_cov consen_method annot_str_regex'
 
 # Run all specified steps 
-commandlist="ingest fam_consen search_families place_matches realign_and_trim calc_trees summarize"
+commandlist="ingest fam_consen search_families realign_and_trim calc_trees summarize"
 
-if [[ $step =~ "all" ]]; then
-  for command in $commandlist; do
-    echo "RUNNING STEP run_$command"
-    run_"$command"
-    echo
-  done
-else
-  run_"${step}";
-fi
+dependencies='hmmscan famsa'
+
+declare consen_iden clust_cov consen_method annot_str_regex
+
+main_pan_fam "$@"

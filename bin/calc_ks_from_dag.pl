@@ -7,6 +7,7 @@
 use strict;
 use warnings;
 use vars qw($CODONSIZE $KS_CUTOFF $KA_CUTOFF);
+use Bio::DB::Fasta;
 use Bio::SeqIO;
 use Bio::AlignIO;
 use Bio::LocatableSeq;
@@ -27,13 +28,13 @@ use feature "say";
 my $scriptname = basename($0);
 
 my $usage = <<EOS;
-  Usage: cat FILE.aligncoords | $scriptname -fasta_db FILE.db -match_table FILE.db -report_out FILE [options]
+  Usage: cat FILE.aligncoords | $scriptname -fasta_db <dir_with_fasta.db> -match_table FILE.db -report_out FILE [options]
   
   Calculates Ks for genes in DAGchainer synteny gene pairs.
   
   Required:
     [on STDIN]      Input from an .aligncoords file, from DAGchainer
-    -fasta_db       Path to Berkeleydb file with CDS sequence containing genes from FILE.aligncoords
+    -fasta_db       Path to directory with Bio::DB::Fasta Berkeleydb file with CDS sequence containing genes from FILE.aligncoords
     -report_out     Filename for output report
                       Synteny-block header lines with the form:
                         ## alignment chrA vs. chrB Alignment #1  score = 183.0 (num aligned pairs: 6):
@@ -93,7 +94,7 @@ else {
 ##################################################
 # Tie to a berkeleydb file with fasta sequence
 
-tie my %seq_hsh, 'DB_File', $fasta_db, O_RDWR|O_CREAT, 0666, $DB_HASH;
+tie my %seq_hsh, 'Bio::DB::Fasta', $fasta_db;
 
 ##################################################
 # Process the DAGchainer output (FILE.aligncoords) 
@@ -285,20 +286,16 @@ while (my $thisline = <>) {
     warn $@ if $@;
     
     ## Calculate and report Ka and Ks
-    local $SIG{ALRM} = sub {
-      die;
-    };
     eval {
+      local $SIG{ALRM} = sub {
+        die "ABORTED from calculating ka & ks for $idA and $idB due to timeout";
+      };
       $count++;
       if ($verbose) { say "CALCULATING KA & KS for $idA and $idB"; }
       alarm 2;
       ($out_KaKs_aryref_all, $out_KaKsSum_hshref, $out_Ka_aryref, $out_Ks_aryref, $out_KaKs_aryref, $count) = 
         KaKs_report($dna_aln, $nuc_objA, $nuc_objB, $count);
-      if ($@) {
-        say "ABORTED from calculating ka & ks for $idA and $idB";
-      }
       alarm 0;
-
     }; 
     warn $@ if $@;
   }

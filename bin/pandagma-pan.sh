@@ -4,31 +4,26 @@
 # pan-gene clusters using the programs mmseqs, dagchainer, and mcl. 
 # Authors: Steven Cannon, Hyunoh Lee, Joel Berendzen, Nathan Weeks, 2020-2023
 #
-scriptname=$(basename "$0")
-version="2024-01-05"
-set -o errexit -o errtrace -o nounset -o pipefail
+scriptname='pandagma pan'
 
-trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
-
-# to help assign a heredoc value to a variable. The internal line return is intentional.
-define(){ o=; while IFS=$'\n' read -r a; do o="$o$a"'
-'; done; eval "$1=\$o"; }
+. pandagma-common.sh
 
 define HELP_DOC <<'EOS'
 Compute pan-gene clusters using a combination of synteny and homology,
 using the programs mmseqs, dagchainer, and mcl, and additional pre- and post-refinement steps.
 
 Usage:
-  ./$scriptname -c CONFIG_FILE [options]
+  $scriptname -c CONFIG_FILE [options]
 
   Required:
            -c (path to the config file)
 
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
-           -w (working directory, for temporary and intermediate files. 
-                Must be specified in config file if not specified here.)
+           -w (working directory, for temporary and intermediate files [default: './pandagma_work'].)
+           -o OUTPUT_DIR (name for the output directory [default: './pandagma_out'].
+                Applicable only to "all" and "summarize" steps.)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
-           -o (ordering method, for placing pan-genes. Options: 
+           -O (ordering method, for placing pan-genes. Options: 
                 \"reference\" (default; uses preferred_annot to order, then gap-filling for missing panIDs.)
                 \"alignment\" (uses whole-chromosome alignment of ordered panIDs from all annotations)
            -r (retain. Don't do subcommand \"clean\" after running \"all\".)
@@ -48,7 +43,7 @@ config file, in the arrays cds_files, annotation_files, and protein_files. See e
 Note that the annotation and CDS files need to be listed in CORRESPONDING ORDER in the config.
 
 Subcommands (in order they are usually run):
-                all - All of the steps below, except for clean and ReallyClean
+                all - All of the steps below, except for clean 
                         (Or equivalently: omit the -s flag; \"all\" is default)
              ingest - Prepare the assembly and annotation files for analysis
              mmseqs - Run mmseqs to do initial clustering of genes from pairs of assemblies
@@ -64,7 +59,7 @@ Subcommands (in order they are usually run):
    filter_to_pctile - Calculate orthogroup composition and filter fasta files by selected percentiles.
          tabularize - Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv
      order_and_name - Assign pan-gene names with consensus chromosomes and ordinal positions.
-     calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches.tsv
+     calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches
           summarize - Copy results into output directory, and report summary statistics.
 
   Run the following subcommands separately if you wish:
@@ -76,24 +71,26 @@ Subcommands (in order they are usually run):
               clean - Clean (delete) files in the working directory that are not needed 
                         for later addition of data using add_extra and subsequent run commands.
                         By default, \"clean\" is run as part of \"all\" unless the -r flag is set.
-        ReallyClean - Do complete clean-up of files in the working directory.
-                        Use this if you want to start over, OR if you are satisified with the results and
-                        don't anticipate adding other annotation sets to this pan-gene set.
 ''
 EOS
 
 define MORE_INFO <<'EOS'
-Optionally, a file specified in the expected_chr_matches variable can be specified in pandagma.conf,
+Optionally, an expected_chr_matches array variable can be specified in the config file,
 which provides anticipated chromosome pairings, e.g.
+
+expected_chr_matches=(
   01 01
   02 02
   ...
-  11 13  # allows for translocation between 11 and 13
+# allows for translocation between 11 and 13
+  11 13 
   12 12
+)
+
 These pairings are used in a regular expression to identify terminal portions of molecule IDs, e.g.
   glyma.Wm82.gnm2.Gm01  glyso.PI483463.gnm1.Gs01
   glyma.Wm82.gnm2.Gm13  glyso.W05.gnm1.Chr11
-If an expected_chr_matches file is not provided, then no such filtering will be done.
+If an expected_chr_matches variable is not defined in the pandagma config file, then no such filtering will be done.
 
 Variables in pandagma config file (Set the config with the CONF environment variable)
          clust_iden - Minimum identity threshold for mmseqs clustering [0.95]
@@ -101,7 +98,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
          extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [90]
       mcl_inflation - Inflation parameter, for Markov clustering [1.6]
         strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs [1]
-                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches.tsv
+                        The alternative (0) is to use all homologous pairs that satisfy expected_chr_matches
       consen_prefix - Prefix to use in names for genomic ordered consensus IDs [Genus.pan1]
        out_dir_base - Base name for the output directory [default: './out']
            pctl_low - Lower percentile bin size cutoff relative to modal count (usu. the count of annots) [25]
@@ -116,81 +113,37 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
        order_method - Method to determine consensus panID order. reference or alignment [default reference]
-           work_dir - Working directory, for temporary and intermediate files. 
 ''
 EOS
 
 ########################################
 # Helper functions begin here
 
-version() {
-  echo "$scriptname" $version
-}
-
-##########
 canonicalize_paths() {
   echo "Entering canonicalize_paths. Fasta files: "
   echo "${cds_files[@]}"
 
+  cd "${DATA_DIR}"
+
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
   mapfile -t annotation_files < <(realpath --canonicalize-existing "${annotation_files[@]}")
   mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
-  if (( ${#cds_files_extra_constr[@]} > 0 ))
+  if [[ -v cds_files_extra_constr ]]
   then
     mapfile -t cds_files_extra_constr < <(realpath --canonicalize-existing "${cds_files_extra_constr[@]}")
     mapfile -t annotation_files_extra_constr < <(realpath --canonicalize-existing "${annotation_files_extra_constr[@]}")
   fi
-  if (( ${#cds_files_extra_free[@]} > 0 ))
+  if [[ -v cds_files_extra_free ]]
   then
     mapfile -t cds_files_extra_free < <(realpath --canonicalize-existing "${cds_files_extra_free[@]}")
     mapfile -t annotation_files_extra_free < <(realpath --canonicalize-existing "${annotation_files_extra_free[@]}")
   fi
-  readonly chr_match_list=${expected_chr_matches:+$(realpath "${expected_chr_matches}")}
+
+  cd "${OLDPWD}"
   readonly submit_dir=${PWD}
 
   fasta_file=$(basename "${cds_files[0]}" .gz)
-  fna="${fasta_file##*.}"
-
-}
-
-##########
-cat_or_zcat() {
-  case ${1} in
-    *.gz) gzip -dc "$@" ;;
-       *) cat "$@" ;;
-  esac
-}
-
-##########
-check_seq_type () {
-  someseq=${1}
-  proportion_nuc=$(echo "$someseq" | fold -w1 | 
-                     awk '$1~/[ATCGN]/ {nuc++} $1!~/[ATCGN]/ {not++} END{print nuc/(nuc+not)}')
-  export proportion_nuc
-  perl -le '$PN=$ENV{"proportion_nuc"}; if ($PN>0.9){print 3} else {print 1}'
-}
-
-##########
-calc_seq_stats () {
-  # Given fasta file on STDIN and an environment variable "annot_name", report:
-  # seqs  min  max  N50  ave  annotation_set
-  awk 'BEGIN { ORS="" } 
-       /^>/ && NR==1 { print $0"\n" } 
-       /^>/ && NR!=1 { print "\n"$0"\n" } 
-       /^[^>]/ { print } 
-       END { print "\n" }' |
-  awk '/^[^>]/ {print length($1); tot_bp+=length($1) } END { print "bases: " tot_bp "\n" }' \
-   | sort -n \
-   | awk -v ANN="$annot_name" 'BEGIN { min=99999999999999 }
-          /bases:/ { N50_ct = $2/2; bases=$2 } 
-          /^[0-9]/ { 
-             ct++; sum+=$1; if ( sum >= N50_ct && !printed ) { N50=$1; printed = 1 } 
-             min = (min < $1) ? min : $1
-          } 
-          END { 
-            ave=sum/ct;
-            printf(" %4d  %4d  %4d  %4d  %7.1f  %4s\n", ct, min, $1, N50, ave, ANN);
-          }'
+  fa="${fasta_file##*.}"
 }
 
 ########################################
@@ -232,7 +185,7 @@ run_ingest() {
   echo "  Get position information from the extra annotation sets, if any,"
   echo "  for the annotations that will be added chromosome constraints (_constr)"
   cat /dev/null > 02_all_extra_cds.fna # Collect all starting sequences, for later comparisons
-  if (( ${#cds_files_extra_constr[@]} > 0 ))
+  if [[ -v cds_files_extra_constr ]]
   then
     for (( file_num = 0; file_num < ${#cds_files_extra_constr[@]} ; file_num++ )); do
       file_base=$(basename "${cds_files_extra_constr[file_num]%.*}")
@@ -253,7 +206,7 @@ run_ingest() {
 
   echo "  Get position information from the extra annotation sets, if any,"
   echo "  for the annotations that will be added without chromosome constraints (_free)"
-  if (( ${#cds_files_extra_free[@]} > 0 ))
+  if [[ -v cds_files_extra_free ]]
   then
     for (( file_num = 0; file_num < ${#cds_files_extra_free[@]} ; file_num++ )); do
       file_base=$(basename "${cds_files_extra_free[file_num]%.*}")
@@ -277,7 +230,7 @@ run_ingest() {
       cat 01_posn_hsh/*.hsh >> 01_combined_posn.hsh
 
   echo "  Count starting sequences, for later comparisons"
-  for file in 02_fasta_nuc/*."$fna"; do
+  for file in 02_fasta_nuc/*."$fa"; do
     awk '$0~/UNDEFINED/ {ct++} 
       END{if (ct>0){print "Warning: " FILENAME " has " ct " genes without position (HASH UNDEFINED)" } }' "$file"
     grep '>' "$file" | perl -pe 's/__/\t/g' | cut -f2 | # extracts the GeneName from combined genspchr__GeneName__start__end__orient
@@ -286,7 +239,7 @@ run_ingest() {
   done
 
   echo "  Also get protein files"
-  if (( ${#protein_files[@]} > 0 ))
+  if [[ -v protein_files ]]
   then
     for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
       echo "  Copying protein file ${protein_files[file_num]}"
@@ -307,12 +260,12 @@ run_mmseqs() {
   if [ -d 03_mmseqs ]; then rm -rf 03_mmseqs ; fi
   mkdir -p 03_mmseqs 03_mmseqs_tmp
   for (( file1_num = 0; file1_num < ${#cds_files[@]} ; file1_num++ )); do
-    qry_base=$(basename "${cds_files[file1_num]%.*}" ."$fna")
+    qry_base=$(basename "${cds_files[file1_num]%.*}" ."$fa")
     for (( file2_num = file1_num + 1; file2_num < ${#cds_files[@]} ; file2_num++ )); do
-      sbj_base=$(basename "${cds_files[file2_num]%.*}" ."$fna")
+      sbj_base=$(basename "${cds_files[file2_num]%.*}" ."$fa")
       echo "  Running mmseqs on comparison: ${qry_base}.x.${sbj_base}"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
-      { cat 02_fasta_nuc/"$qry_base"."$fna" 02_fasta_nuc/"$sbj_base"."$fna" ; } |
+      { cat 02_fasta_nuc/"$qry_base"."$fa" 02_fasta_nuc/"$sbj_base"."$fa" ; } |
         mmseqs easy-cluster stdin 03_mmseqs/"${qry_base}".x."${sbj_base}" "$MMTEMP" \
          --min-seq-id "$clust_iden" -c "$clust_cov" --cov-mode 0 --cluster-reassign 1>/dev/null & # background
         # allow to execute up to $MMSEQSTHREADS in parallel
@@ -328,12 +281,12 @@ run_filter() {
   echo; echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
   cd "${WORK_DIR}"
   mkdir -p 04_dag
-  if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
-    echo "Filtering on chromosome patterns from file ${chr_match_list}"
+  if [[ -v expected_chr_matches ]]; then  # filter based on list of expected chromosome pairings if provided
+    echo "Filtering on chromosome patterns defined in expected_chr_matches"
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=$(basename "$mmseqs_path" _cluster.tsv)
       echo "  $outfilebase"
-      filter_mmseqs_by_chroms.pl -chr_pat "${chr_match_list}" < "${mmseqs_path}" |
+      filter_mmseqs_by_chroms.pl -chr_pat <(printf '%s %s\n' "${expected_chr_matches[@]}") < "${mmseqs_path}" |
         awk 'NF==8' |  # matches for genes with coordinates. The case of <8 can happen for seqs with UNDEF position.
         cat > 04_dag/"${outfilebase}"_matches.tsv &
 
@@ -342,7 +295,7 @@ run_filter() {
     done
     wait # wait for last jobs to finish
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
-    echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
+    echo "No expected_chr_matches variable was defined in the config file, so proceeding without chromosome-pair filtering."
     for mmseqs_path in 03_mmseqs/*_cluster.tsv; do
       outfilebase=$(basename "$mmseqs_path" _cluster.tsv)
       perl -pe 's/__/\t/g; s/\t[\+-]//g' "${mmseqs_path}" |
@@ -367,7 +320,7 @@ run_dagchainer() {
 
     echo "Find average distance between genes for the query and subject files: "
     echo "  $qryfile and $sbjfile"
-    ave_gene_gap=$(cat 02_fasta_nuc/"$qryfile"."$fna" 02_fasta_nuc/"$sbjfile"."$fna" | 
+    ave_gene_gap=$(cat 02_fasta_nuc/"$qryfile"."$fa" 02_fasta_nuc/"$sbjfile"."$fa" | 
                      awk '$1~/^>/ {print substr($1,2)}' | perl -pe 's/__/\t/g' | sort -k1,1 -k3n,3n |
                      awk '$1 == prev1 && $3 > prev4 {sum+=$3-prev4; ct++; prev1=$1; prev3=$3; prev4=$4};
                           $1 != prev1 || $3 <= prev4 {prev1=$1; prev3=$3; prev4=$4}; 
@@ -478,14 +431,14 @@ run_consense() {
     cat > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv
 
   echo; echo "  Filter based on list of expected chromosome pairings if provided"
-  if [[ -f ${chr_match_list} ]]; then  
-    echo "Filtering on chromosome patterns from file ${chr_match_list}"
+  if [[ -v expected_chr_matches ]]; then  
+    echo "Filtering on chromosome patterns defined in expected_chr_matches"
     < 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv \
-      filter_mmseqs_by_chroms.pl -chr_pat "${chr_match_list}" |
+      filter_mmseqs_by_chroms.pl -chr_pat <(printf '%s %s\n' "${expected_chr_matches[@]}") |
       awk 'NF==9' |  # matches for genes with coordinates. The case of <9 can happen for seqs with UNDEF position.
       cat > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv 
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
-    echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
+    echo "No expected_chr_matches variable was defined in the config file, so proceeding without chromosome-pair filtering."
     perl -pe 's/__/\t/g; s/\t[\+-]//g' < 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_posn.tsv |
       awk 'NF==9' |  # matches for genes with coordinates. The case of <9 can happen for seqs with UNDEF position.
       cat > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj_matches.tsv
@@ -533,12 +486,12 @@ run_cluster_rest() {
   hash_into_table_2cols.pl 01_posn_hsh/*hsh -idx1 0 -idx2 1 -table 03_mmseqs/${complmt_self_compare}_cluster.tsv |
     cat > 03_mmseqs/${complmt_self_compare}_cluster_posn.tsv
 
-  if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
-    echo "Filtering on chromosome patterns from file ${chr_match_list}"
+  if [[ -v expected_chr_matches ]]; then  # filter based on list of expected chromosome pairings if provided
+    echo "Filtering on chromosome patterns defined in expected_chr_matches"
     < 03_mmseqs/${complmt_self_compare}_cluster_posn.tsv filter_mmseqs_by_chroms.pl \
-      -chr_pat "${chr_match_list}" > 04_dag/${complmt_self_compare}_matches.tsv
+      -chr_pat <(printf '%s %s\n' "${expected_chr_matches[@]}") > 04_dag/${complmt_self_compare}_matches.tsv
   else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
-    echo "No expected_chr_matches.tsv file was provided, so proceeding without chromosome-pair filtering."
+    echo "No expected_chr_matches was defined in the config file, so proceeding without chromosome-pair filtering."
     cat 03_mmseqs/${complmt_self_compare}_cluster.tsv |
       perl -pe 's/__/\t/g; s/\t[\+-]$//' > 04_dag/${complmt_self_compare}_matches.tsv 
   fi
@@ -591,7 +544,7 @@ run_add_extra() {
                         -hash 01_combined_posn.hsh \
                         -out 13_pan_aug_fasta_posn.fna
 
-  if (( ${#cds_files_extra_constr[@]} > 0 )) || (( ${#cds_files_extra_free[@]} > 0 ))
+  if [[ -v cds_files_extra_constr ]] || [[ -v cds_files_extra_free ]]
   then # handle the "extra" annotation files
     echo "  Search non-clustered genes against pan-gene consensus sequences"
     # Check sequence type (in case this run function is called separately from the usually-prior ones)
@@ -621,19 +574,19 @@ run_add_extra() {
     done
     wait # wait for jobs to finish
 
-    if [[ -f ${chr_match_list} ]]; then  # filter based on list of expected chromosome pairings if provided
-      echo "Filtering on chromosome patterns from file ${chr_match_list} and by identity and top match."
+    if [[ -v expected_chr_matches ]]; then  # filter based on list of expected chromosome pairings if provided
+      echo "Filtering on chromosome patterns defined in expected_chr_matches and by identity and top match."
       echo "First find top match without respect to chromosome match, then with chromosome matches."
       echo "A top hit with chromosome match trumps a top hit on the wrong chromosome."
       echo "The placement with chromosome match is prefixed with 1 and that without is prefixed with 2;"
       echo "then the first (top) gene is selected - i.e., 1 geneA before 2 geneA."
-      if (( ${#cds_files_extra_constr[@]} > 0 )); then
+      if [[ -v cds_files_extra_constr ]]; then
         for m8file in 13_extra_out_constr_dir/*.m8; do
           base=$(basename "$m8file" .m8)
           echo "  Processing file $m8file"
           top_line.awk "$m8file" | awk -v IDEN="${extra_iden}" '$3>=IDEN {print $1 "\t" $2}' |
               perl -pe 's/^\S+__(\S+)__\d+__\d\S*\t\S+__(\S+)__\d+__\d\S+$/2\t$1\t$2/' > 13_extra_out_constr_dir/"$base".top_2nd
-          filter_mmseqs_by_chroms.pl -chr_pat "${chr_match_list}" < "$m8file" |
+          filter_mmseqs_by_chroms.pl -chr_pat <(printf '%s %s\n' "${expected_chr_matches[@]}") < "$m8file" |
               top_line.awk | awk -v IDEN="${extra_iden}" '$3>=IDEN {print $1 "\t" $2}' | 
               perl -pe 's/^\S+__(\S+)__\d+__\d+\t\S+__(\S+)__\d+__\d+$/1\t$1\t$2/' > 13_extra_out_constr_dir/"$base".top_1st
         done
@@ -646,7 +599,7 @@ run_add_extra() {
       exit 1;
     fi
 
-    if (( ${#cds_files_extra_free[@]} > 0 )); then
+    if [[ -v cds_files_extra_free ]]; then
       for m8file in 13_extra_out_free_dir/*.m8; do
         base=$(basename "$m8file" .m8)
         echo "  Processing file $m8file"
@@ -835,7 +788,7 @@ run_order_and_name() {
     for filepath in 23_encoded_chroms_aligned/*; do 
       base=$(basename "$filepath")
       cons -sequence "$filepath" -outseq 23_encoded_chroms_filt1/"$base" -name "$base" &
-      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+      if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
     done
     wait
   
@@ -986,7 +939,7 @@ run_model_and_trim() {
   mkdir -p 22_hmmalign
   for filepath in 21_hmm/*; do
     file=$(basename "$filepath");
-    printf "%s " "$file"
+    printf "%f " "$file"
     hmmalign --trim --outformat A2M -o 22_hmmalign/"$file" 21_hmm/"$file" 19_pan_aug_leftover_merged_cds/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
@@ -1012,7 +965,7 @@ run_model_and_trim() {
   min_pct_aligned=20
   for filepath in 23_hmmalign_trim1/*; do
     file=$(basename "$filepath")
-    printf "%s " "$file"
+    printf "%f " "$file"
     filter_align.pl -in "$filepath" -out 23_hmmalign_trim2/"$file" -log 23_hmmalign_trim2_log/"$file" \
                     -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
@@ -1022,43 +975,10 @@ run_model_and_trim() {
 }
 
 ##########
-run_calc_trees() {
-  echo; echo "== Calculate trees =="
-  cd "${WORK_DIR}"
-
-  mkdir -p 24_trees
-
-  echo; echo "== Move small (<4) and very low-entropy families (sequences are all identical) to the side =="
-  mkdir -p 23_pan_aug_small_or_identical
-  min_seq_count=4
-  # Below, "count" is the number of unique sequences in the alignment.
-  for filepath in 23_hmmalign_trim2/*; do
-    file=$(basename "$filepath")
-    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
-    if [[ $count -lt $min_seq_count ]]; then
-      echo "Set aside small or low-entropy family $file";
-      mv "$filepath" 23_pan_aug_small_or_identical/
-    fi;
-  done
-
-  # By default, FastTreeMP uses all available threads.
-  # It is more efficient to run more jobs on one core each by setting an environment variable.
-  OMP_NUM_THREADS=1
-  export OMP_NUM_THREADS
-  for filepath in 23_hmmalign_trim2/*; do
-    file=$(basename "$filepath")
-    echo "  Calculating tree for $file"
-    fasttree -nt -quiet "$filepath" > 24_trees/"$file" &
-  done
-  wait
-}
-
-##########
 run_xfr_aligns_trees() {
   echo; echo "Copy alignment and tree results into output directory"
 
-  conf_base=$(basename "$CONF" .conf)
-  full_out_dir="${out_dir_base}_$conf_base"
+  full_out_dir="${out_dir}"
 
   cd "${submit_dir}"
 
@@ -1114,9 +1034,8 @@ run_summarize() {
   someseq=$(head "${WORK_DIR}"/07_pan_fasta_cds.fna | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
   SEQTYPE=$(check_seq_type "${someseq}")
 
-  conf_base=$(basename "$CONF" .conf)
-  full_out_dir="${out_dir_base}_$conf_base"
-  stats_file=${full_out_dir}/stats.$conf_base.txt
+  full_out_dir="${out_dir}"
+  stats_file=${full_out_dir}/stats.txt
   export ANN_REX=${annot_str_regex}
 
   cd "${submit_dir}"
@@ -1335,171 +1254,20 @@ run_clean() {
   cd "$OLDPWD"
 }
 
-##########
-run_ReallyClean() {
-  echo "Doing complete clean-up of files in the working directory (remove all files and directories)"
-  if [ -d "${WORK_DIR}" ]; then
-    cd "${WORK_DIR}"
-    echo "  work_dir: $PWD"
-    if [ -d 01_posn_hsh ]; then
-      echo "Expected directory 01_posn_hsh exists in the work_dir (${WORK_DIR}),"
-      echo "so proceeding with complete clean-up from that location."
-      for dir in *; do
-        rm -rf "$dir" &
-      done
-    else 
-      echo "Expected directory 01_posn_hsh is not present in the work_dir (${WORK_DIR}),"
-      echo "so aborting the -K ReallyClean step. Please do this manually if you wish."
-      cd "$OLDPWD"
-      exit 1;
-    fi
-  fi
-  wait
-  cd "$OLDPWD"
-}
-
 ########################################
 # Main program
 
-NPROC=$( ( command -v nproc > /dev/null && nproc ) || getconf _NPROCESSORS_ONLN)
-CONFIG="null"
-optarg_work_dir="null"
-optarg_order_method="null"
-step="all"
-retain="no"
-
-export NPROC=${NPROC:-1}
-export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
-
-# mmseqs uses significant number of threads on its own. Set a maximum, which may be below NPROC.
-MMSEQSTHREADS=$(( 4 < NPROC ? 4 : NPROC ))
-
 pandagma_conf_params='clust_iden clust_cov extra_iden mcl_inflation 
-  strict_synt out_dir_base pctl_low pctl_med pctl_hi 
-  consen_prefix annot_str_regex order_method preferred_annot work_dir'
+  strict_synt pctl_low pctl_med pctl_hi 
+  consen_prefix annot_str_regex order_method preferred_annot'
 
-##########
-# Command-line interpreter
-
-while getopts "c:w:s:n:o:rvhm" opt
-do
-  case $opt in
-    c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
-    w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
-    s) step=$OPTARG; echo "step(s): $step" ;;
-    n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
-    o) optarg_order_method=$OPTARG; echo "order method: $optarg_order_method" ;;
-    r) retain="yes" ;;
-    v) version ;;
-    h) echo >&2 "$HELP_DOC" && exit 0 ;;
-    m) printf >&2  "%s\n%s\n" "$HELP_DOC" "$MORE_INFO" && exit 0 ;;
-    *) echo >&2 echo "$HELP_DOC" && exit 1 ;;
-  esac
-done
-
-if [ "$CONFIG" == "null" ]; then
-  printf "\nPlease provide the path to a config file: -c CONFIG\n" >&2
-  echo "either in the config file (work_dir=) or with option -w" >&2
-  printf "\nRun \"%s -h\" for help.\n\n" "$scriptname" >&2
-  exit 1;
-else
-  export CONF=${CONFIG}
-fi
-
-# Add shell variables from config file
-# shellcheck source=/dev/null
-. "${CONF}"
-
-declare clust_iden clust_cov extra_iden mcl_inflation strict_synt out_dir_base \
-        pctl_low pctl_med pctl_hi consen_prefix annot_str_regex preferred_annot order_method work_dir 
-
-export ANN_REX=${annot_str_regex}
-
-if [ "$#" -eq 0 ]; then
-  echo >&2 "$HELP_DOC" && exit 0;
-fi
-
-shift $(( OPTIND - 1 ))
-
-if [ "$order_method" != "$optarg_order_method" ] && [ "$optarg_order_method" != "null" ]; then
-  echo "Command-line option for order_method was \"$optarg_order_method\", overriding"
-  echo "the setting of \"$order_method\" from the config."
-  order_method=$optarg_order_method
-fi
-
-##########
-# Check for existence of work directory.
-# work_dir provided via cli argument takes precedence over the variable specified in the conf file
-if [ "$optarg_work_dir" == "null" ] && [ -z ${work_dir+x} ]; then
-  printf "\nPlease provide the path to a work directory, for intermediate files," >&2
-  printf "either in the config file (work_dir=) or with option -w" >&2
-  printf "\nRun \"%s -h\" for help.\n\n" "$scriptname" >&2
-  exit 1;
-elif [ "$optarg_work_dir" != "null" ] && [ -d "$optarg_work_dir" ]; then
-  work_dir=$optarg_work_dir
-  export WORK_DIR=${work_dir}
-elif [ "$optarg_work_dir" == "null" ] && [ -d "$work_dir" ]; then
-  export WORK_DIR=${work_dir}
-elif [ ! -d "$work_dir" ] && [ ! -d "$optarg_work_dir" ]; then
-  echo "Neither work directory $work_dir nor $optarg_work_dir was not found. Please specify path in the config file or with option -w." >&2
-  exit 1;
-elif [ ! -d "$work_dir" ]; then
-  echo "Work directory $work_dir was not found. Please specify path in the config file or with option -w." >&2
-  exit 1;
-else 
-  echo "Check odd condition: optarg_work_dir: $optarg_work_dir; work_dir: $work_dir"
-  exit 1;
-fi
-
-if [[ $step == "clean" ]] || [[ $step == "ReallyClean" ]] ; then
-  run_"$step"
-  echo "Command \"$step\" was run for cleanup in the work directory: $WORK_DIR"
-  exit 0;
-fi
-
-# Get paths to the fasta and annotation files
-canonicalize_paths
-
-# Check for existence of third-party executables
-missing_req=0
-for program in mmseqs dagchainer mcl cons famsa hmmalign hmmbuild run_DAG_chainer.pl; do
-  if ! type $program &> /dev/null; then
-    echo "Warning: executable $program is not on your PATH."
-    missing_req=$((missing_req+1))
-  fi
-done
-if [ "$missing_req" -gt 0 ]; then 
-  printf "\nPlease add the programs above to your environment and try again.\n\n"
-  exit 1; 
-fi
-
-# Check that the bin directory is in the PATH
-if ! type hash_into_fasta_id.pl &> /dev/null; then
-  printf "\nPlease add the pandagma bin directory to your PATH and try again. Try the following:\n"
-  printf "\n  PATH=%s/bin:\%s\n\n" "$PWD" "$PATH"
-  exit 1; 
-fi
-
-# Run all specified steps (except clean -- see below; and  ReallyClean, which can be run separately).
-# Also, the steps align_cds, align_protein, model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
+# The steps align_cds, align_protein, model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
 commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra pick_exemplars \
              filter_to_pctile tabularize order_and_name  calc_chr_pairs summarize"
 
-if [[ $step =~ "all" ]]; then
-  for command in $commandlist; do
-    echo "RUNNING STEP run_$command"
-    run_"$command"
-    echo
-  done
-else
-  run_"${step}";
-fi
+dependencies='mmseqs dagchainer mcl cons famsa hmmalign hmmbuild run_DAG_chainer.pl'
 
-if [[ $step =~ "all" ]] && [[ $retain == "yes" ]]; then
-  echo "Flag -r (retain) was set, so skipping clean-up of the work directory."
-  echo "If you wish to do a cleanupt separately, you can call "
-  echo "  .pandagma-pan.sh -c $CONF -s clean";
-elif [[ $step =~ "all" ]] && [[ $retain == "no" ]]; then
-  echo "Calling the medium cleanup function \"run_clean\" ..."
-  run_clean  
-fi
+declare clust_iden clust_cov extra_iden mcl_inflation strict_synt \
+        pctl_low pctl_med pctl_hi consen_prefix annot_str_regex preferred_annot order_method
+
+main_pan_fam "$@"
