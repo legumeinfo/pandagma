@@ -389,31 +389,6 @@ run_ks_calc() {
     mkdir -p "$WORK_DIR"/05_kaksout
   fi
   
-  # Generate berkeleydb such that the sequence IDs are in lexical order, and coords and seqs are ordered accordingly
-  # qry, sbj, iden, len, mism, gap, qstart, qend, sstart, ssend, eval, bitsc, qaln, saln
-  # 0    1    2     3    4     5    6       7     8       9      10    11     12    13
-  for MATCHFILE in "$WORK_DIR"/03_mmseqs/*.m8; do
-    base=$(basename "$MATCHFILE" .m8)
-    dir=$(dirname "$MATCHFILE")
-    echo "  Create berkeleydb file for $base.m8"
-    < "$MATCHFILE" \
-      perl -lane '($qry, $sbj, $iden, $len, $mism, $gap, $qstart, $qend, $sstart, $ssend, $eval, $bitsc, $qaln, $saln) = @F;
-                   if ($qry gt $sbj){ 
-                     ($qry, $sbj)      = ($F[1], $F[0]);
-                     ($qstart, $qend)  = ($F[8], $F[9]);
-                     ($sstart, $ssend) = ($F[6], $F[7]);
-                     ($qaln, $saln)    = ($F[13], $F[12]);
-                   }
-                   $qry =~ s/^\S+__(\S+)__\d+__\d+__[+-]$/$1/;
-                   $sbj =~ s/^\S+__(\S+)__\d+__\d+__[+-]$/$1/;
-
-                   print "$qry $sbj";
-                   print join(" ", $iden, $len, $mism, $gap, $qstart, $qend, $sstart, $ssend, $eval, $bitsc, $qaln, $saln);
-                 ' | db_load -T -t hash "$dir"/"$base".db &
-    if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
-  done
-  wait
-
   echo "  Create berkeleydb index file (directory.index) for fasta file(s) 02_*_cds.fna"
   perl -MBio::DB::Fasta -e 'Bio::DB::Fasta->new(".", -glob=>"02_*_cds.fna")'
     
@@ -425,15 +400,15 @@ run_ks_calc() {
     echo "   -align_method precalc -match_table 03_mmseqs/$base.db \\ ";
     echo "  -report_out 05_kaksout/$base.rptout";
     < "$DAGFILE" calc_ks_from_dag.pl -fasta_db . \
-      -match_table 03_mmseqs/"$base".db  -align_method precalc \
+      -match_table 03_mmseqs/"$base".m8  -align_method precalc \
       -report_out 05_kaksout/"$base".rptout & #2> /dev/null & # discard verbose warnings from LocatableSeq.pm
     echo
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
 
-  echo "  Delete large Berkeleydb files (they derive from the .m8 files in 03_mmseqs and 02_*_cds.fna)"
-  rm 03_mmseqs/*.db
+  echo "  Delete Berkeleydb files (they derive from the .m8 files in 03_mmseqs and 02_*_cds.fna)"
+  rm 03_mmseqs/*.index
   rm -f directory.index # Bio::DB::Fasta index
 
   echo "Determine provisional Ks peaks (Ks values and amplitudes) and generate Ks plots."

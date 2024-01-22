@@ -10,7 +10,6 @@ dependencies:
   - famsa
   - fasttree
   - hmmer
-  - libdb
   - make
   - mcl
   - mmseqs2
