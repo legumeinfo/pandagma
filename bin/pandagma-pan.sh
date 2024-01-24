@@ -118,28 +118,31 @@ EOS
 
 ########################################
 # Helper functions begin here
-
 canonicalize_paths() {
   echo "Entering canonicalize_paths. Fasta files: "
   echo "${cds_files[@]}"
 
-  cd "${DATA_DIR}"
+  cd "${DATA_DIR}" || exit
 
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
   mapfile -t annotation_files < <(realpath --canonicalize-existing "${annotation_files[@]}")
   mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
+
   if [[ -v cds_files_extra_constr ]]
   then
     mapfile -t cds_files_extra_constr < <(realpath --canonicalize-existing "${cds_files_extra_constr[@]}")
     mapfile -t annotation_files_extra_constr < <(realpath --canonicalize-existing "${annotation_files_extra_constr[@]}")
-  fi
+    mapfile -t protein_files_extra_constr < <(realpath --canonicalize-existing "${protein_files_extra_constr[@]}")
+  fi  
+
   if [[ -v cds_files_extra_free ]]
   then
     mapfile -t cds_files_extra_free < <(realpath --canonicalize-existing "${cds_files_extra_free[@]}")
     mapfile -t annotation_files_extra_free < <(realpath --canonicalize-existing "${annotation_files_extra_free[@]}")
-  fi
+    mapfile -t protein_files_extra_free < <(realpath --canonicalize-existing "${protein_files_extra_free[@]}")
+  fi  
 
-  cd "${OLDPWD}"
+  cd "${OLDPWD}" || exit
   readonly submit_dir=${PWD}
 
   fasta_file=$(basename "${cds_files[0]}" .gz)
@@ -244,6 +247,20 @@ run_ingest() {
     for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
       echo "  Copying protein file ${protein_files[file_num]}"
       cp "${protein_files[file_num]}" 02_fasta_prot/
+    done
+  fi
+  if [[ -v protein_files_extra_constr ]]
+  then
+    for (( file_num = 0; file_num < ${#protein_files_extra_constr[@]} ; file_num++ )); do
+      echo "  Copying protein file ${protein_files_extra_constr[file_num]}"
+      cp "${protein_files_extra_constr[file_num]}" 02_fasta_prot/
+    done
+  fi
+  if [[ -v protein_files_extra_free ]]
+  then
+    for (( file_num = 0; file_num < ${#protein_files_extra_free[@]} ; file_num++ )); do
+      echo "  Copying protein file ${protein_files_extra_free[file_num]}"
+      cp "${protein_files_extra_free[file_num]}" 02_fasta_prot/
     done
   fi
 
@@ -637,7 +654,7 @@ run_add_extra() {
     hash_to_rows_by_1st_col.awk 18_syn_pan_aug_extra.hsh.tsv > 18_syn_pan_aug_extra.clust.tsv
 
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    echo "    Fasta file:" "${protein_files[@]}"
+    echo "    Fasta file:" "${protein_files[@]} ${protein_files_extra_constr[@]} ${protein_files_extra_free[@]}"
     if [ -d 19_pan_aug_leftover_merged_cds ]; then rm -rf 19_pan_aug_leftover_merged_cds; fi
     mkdir -p 19_pan_aug_leftover_merged_cds
     get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
@@ -908,7 +925,7 @@ run_align_protein() {
   else
     mkdir -p 19_pan_aug_leftover_merged_prot
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    get_fasta_from_family_file.pl "${protein_files[@]}" \
+    get_fasta_from_family_file.pl "${protein_files[@]}" "${protein_files_extra_constr[@]}" "${protein_files_extra_free[@]}" \
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
   fi
 
