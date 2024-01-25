@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2023-01-15"
+version="2023-01-24"
 set -o errexit -o errtrace -o nounset -o pipefail
 shopt -s inherit_errexit
 
@@ -154,7 +154,9 @@ main_pan_fam() {
 
   shift $(( OPTIND - 1 ))
   
-  if [ "${scriptname}" != 'pandagma pan' ] && [ "${order_method:-}${optarg_order_method:-}" != "null" ]; then
+  if [ "${scriptname}" != 'pandagma pan' ] && \
+     [ "${scriptname}" != 'pandagma TEfilter' ] && \
+     [ "${order_method:-}${optarg_order_method:-}" != "null" ]; then
     printf '\norder_method is applicable only to pandagma pan\n' >&2
     exit 1 
   elif [ "${order_method:-}" != "$optarg_order_method" ] && [ "$optarg_order_method" != "null" ]; then

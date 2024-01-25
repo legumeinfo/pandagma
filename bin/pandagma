@@ -8,10 +8,11 @@ Usage:
   pandagma <command> <options>...
 
 Available Commands:
-  fam      calculate gene family sets
-  fsup     add annotation to existing gene family set
-  pan      calculate pangene sets
-  pupdate  add annotation to existing pangene set
+  TEfilter Exclude genes with matches to transposable elements or other provided sequences
+  fam      Calculate gene family sets
+  fsup     Add annotation to existing gene family set
+  pan      Calculate pangene sets
+  pupdate  Compare and generate a mapping between two pangene sets
     
 For help with a specific <command>, run:
   pandagma <command> -h
@@ -24,6 +25,7 @@ subcommand=${1}
 shift
 
 case ${subcommand} in
+  TEfilter) pandagma-TEfilter.sh "$@" ;;
   fam) pandagma-fam.sh "$@" ;;
   fsup) pandagma-fsup.sh "$@" ;;
   pan) pandagma-pan.sh "$@" ;;

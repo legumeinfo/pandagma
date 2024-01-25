@@ -107,8 +107,8 @@ Variables in pandagma config file (Set the config with the CONF environment vari
       ks_low_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values less than this. [0.5]
        ks_hi_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values greater than this. [2.0]
          ks_binsize - For calculating and displaying histograms. [0.05]
-ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
-        max_pair_ks - Fallback value for excluding gene pairs, if a ks_cutoffs file is not provided. [4.0]
+ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
+        max_pair_ks - Fallback value for excluding gene pairs, if a ks_peaks.tsv file is not provided. [4.0]
 
       consen_prefix - Prefix to use in orthogroup names
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
@@ -131,7 +131,7 @@ annotation_files_extra
    protein_files_extra
 
 Optional files with cutoff values
-          ks_cutoffs.tsv
+          ks_peaks.tsv
 EOS
 
 ########################################
@@ -437,7 +437,7 @@ run_ks_calc() {
   rm -f directory.index # Bio::DB::Fasta index
 
   echo "Determine provisional Ks peaks (Ks values and amplitudes) and generate Ks plots."
-  cat /dev/null > stats/ks_peaks_auto.tsv
+  cat /dev/null > "${DATA_DIR}"/ks_peaks_auto.tsv
   cat /dev/null > stats/ks_histograms.tsv
   cat /dev/null > stats/ks_histplots.tsv
   for ks_path in 05_kaksout/*.rptout; do
@@ -448,12 +448,14 @@ run_ks_calc() {
     < "$ks_path" awk 'NF==7 && $7<=3 {print $7}' | histogram.pl -z -n -s "$ks_binsize" |
       awk -v KSLC="$ks_low_cutoff" -v KSHC="$ks_hi_cutoff" -v QA="$qry_ann" -v SA="$sbj_ann" '
         $1>=KSLC && $1<=KSHC && $2>=maxampl { maxampl=$2; maxbin=$1 } 
-        END{ printf("%s\t%s\t%.2f\t%d\n", QA, SA, maxbin, maxampl)}' >> stats/ks_peaks_auto.tsv
+        END{ printf("%s\t%s\t%.2f\t%d\n", QA, SA, maxbin, maxampl)}' >> "${DATA_DIR}"/ks_peaks_auto.tsv
 
-    ks_bin=$(< stats/ks_peaks_auto.tsv awk -v QA="$qry_ann" -v SA="$sbj_ann" -v OFS="\t" \
+    ks_bin=$(< "${DATA_DIR}"/ks_peaks_auto.tsv awk -v QA="$qry_ann" -v SA="$sbj_ann" -v OFS="\t" \
                                             '$1 == QA && $2 == SA {print $3}')
-    ks_amplitude=$(< stats/ks_peaks_auto.tsv awk -v QA="$qry_ann" -v SA="$sbj_ann" -v OFS="\t" \
+    ks_amplitude=$(< "${DATA_DIR}"/ks_peaks_auto.tsv awk -v QA="$qry_ann" -v SA="$sbj_ann" -v OFS="\t" \
                                             '$1 == QA && $2 == SA {print $4}')
+    ln -s "${DATA_DIR}"/ks_peaks_auto.tsv stats/ks_peaks_auto.tsv
+
     export ks_amplitude
     ks_amplitude_pct=$(perl -e '$KSA=$ENV{ks_amplitude}; {printf("%.2f", $KSA/100)}')
       
@@ -492,18 +494,19 @@ run_ks_filter() {
           -ks_peak "$ks_peaks" -annot_regex "$annot_str_regex" -max_pair_ks "$max_pair_ks" |
         awk 'NF==7' > 05_kaksout_ks_filtered/"${outfilebase}".rptout 
     done
-  elif [[ -f stats/ks_peaks_auto.tsv ]]; then  # filter based on list of Ks values determined automatically in step ks_calc above
+  elif [[ -f "${DATA_DIR}"/ks_peaks_auto.tsv ]]; then  # filter based on list of Ks values determined automatically in step ks_calc above
     echo "Filtering on quotas from expected_quotas and ks_pair_cutoff value calculated and stored at ks_peaks_auto.tsv"
     for ks_path in 05_kaksout/*.rptout; do
       outfilebase=$(basename "$ks_path" .rptout)
       echo "  Filtering $ks_path based on expected block-median Ks values"
       < "${ks_path}" filter_mmseqs_by_ks.pl \
-          -ks_peak stats/ks_peaks_auto.tsv -annot_regex "$annot_str_regex" -max_pair_ks "$max_pair_ks" |
+          -ks_peak "${DATA_DIR}"/ks_peaks_auto.tsv -annot_regex "$annot_str_regex" -max_pair_ks "$max_pair_ks" |
         awk 'NF==7' > 05_kaksout_ks_filtered/"${outfilebase}".rptout 
     done
   else   # don't filter, since ks_peaks.tsv file isn't provided
     echo "No ks_peaks.tsv file was provided. It is recommended to review the provisional stats/ks_peaks_auto.tsv file and"
-    echo "ks_histplots.tsv file and edit ks_peaks_auto.tsv to generate ks_peaks.tsv to be placed in the data/ directory."
+    echo "ks_histplots.tsv file and edit ks_peaks_auto.tsv to generate ks_peaks.tsv to be placed in the ${DATA_DIR} directory."
+    echo "Note that ks_peaks.tsv is used in preference to ks_peaks_auto.tsv, if ks_peaks.tsv is provided."
     echo "$*" 1>&2 ; exit 1;
   fi
 }
