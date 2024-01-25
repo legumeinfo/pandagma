@@ -58,6 +58,12 @@ canonicalize_paths() {
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
   mapfile -t annotation_files < <(realpath --canonicalize-existing "${annotation_files[@]}")
   mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
+  if [[ -v cds_files_extra ]]
+  then
+    mapfile -t cds_files_extra < <(realpath --canonicalize-existing "${cds_files_extra[@]}")
+    mapfile -t annotation_files_extra < <(realpath --canonicalize-existing "${annotation_files_extra[@]}")
+    mapfile -t protein_files_extra < <(realpath --canonicalize-existing "${protein_files_extra[@]}")
+  fi
   if [[ -v cds_files_extra_constr ]]
   then
     mapfile -t cds_files_extra_constr < <(realpath --canonicalize-existing "${cds_files_extra_constr[@]}")
@@ -141,6 +147,37 @@ run_TEfilter() {
     cp ${DATA_DIR}/$annot_file ${DATA_DIR}_TEfilt/$annot_file
     gzip -f ${DATA_DIR}_TEfilt/"$cds_base.$fna" ${DATA_DIR}_TEfilt/"$prot_base.$faa"
   done
+
+  ##########
+  if [[ -v cds_files_extra ]]
+  then
+    echo "Handle cds_files_extra and corresponding protein files"
+    for (( file1_num = 0; file1_num < ${#cds_files_extra[@]} ; file1_num++ )); do
+      cds_base=$(basename "${cds_files_extra[file1_num]%.*}" ".$fna")
+      prot_base=$(basename "${protein_files_extra[file1_num]%.*}" ".$faa")
+      annot_file=$(basename "${annotation_files_extra[file1_num]}")
+      echo; echo "  Running mmseqs on comparison: ${cds_base}.x.${exclude_TE_match_base}"
+
+      cat_or_zcat "${cds_files_extra[file1_num]}" > 00_fasta_nuc_orig/"$cds_base.$fna" # Pull uncompressed file locally
+      cat_or_zcat "${protein_files_extra[file1_num]}" > 00_fasta_prot_orig/"$prot_base.$faa" # Pull uncompressed file locally
+        mmseqs easy-search "00_fasta_nuc_orig/${cds_base}.$fna" \
+                   00_exclude_TE_match_file/"$exclude_TE_match_base"."$fna" \
+                   00_TEsearch/"$cds_base".x."$exclude_TE_match_base".m8 \
+                   "$MMTEMP" --min-seq-id "$TE_match_iden" --search-type 3 --cov-mode 2 -c "${clust_cov}" 1>/dev/null
+
+      echo "  Get list of top matches for each 00_TEsearch file $cds_base.x.$exclude_TE_match_base.m8"
+      top_line.awk 00_TEsearch/"$cds_base".x."$exclude_TE_match_base".m8 > 00_TEsearch/"$cds_base".x."$exclude_TE_match_base".m8_top
+      cut -f1 00_TEsearch/"$cds_base".x."$exclude_TE_match_base".m8_top > 00_TEsearch/lis."$cds_base"
+
+      echo "  Generate CDS and protein files, excluding matches from the TEsearch"
+      get_fasta_subset.pl -in 00_fasta_nuc_orig/"$cds_base.$fna" -clobber \
+                           -xclude -lis 00_TEsearch/lis."$cds_base" -out ${DATA_DIR}_TEfilt/"$cds_base.$fna"
+      get_fasta_subset.pl -in 00_fasta_prot_orig/"$prot_base.$faa" -clobber \
+                           -xclude -lis 00_TEsearch/lis."$cds_base" -out ${DATA_DIR}_TEfilt/"$prot_base.$faa"
+      cp ${DATA_DIR}/$annot_file ${DATA_DIR}_TEfilt/$annot_file
+      gzip -f ${DATA_DIR}_TEfilt/"$cds_base.$fna" ${DATA_DIR}_TEfilt/"$prot_base.$faa"
+    done
+  fi
 
   ##########
   if [[ -v cds_files_extra_constr ]]
