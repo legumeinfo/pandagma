@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 version="2023-01-24"
-set -o errexit -o errtrace -o nounset -o pipefail
-shopt -s inherit_errexit
+set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 

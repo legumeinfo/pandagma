@@ -184,7 +184,7 @@ Subcommands for the **gene family** workflow, `pandagma fam`, in order they are 
             ks_calc - Calculation of Ks values on gene pairs from DAGchainer output.
 
   Evaluate the stats/ks_histplots.tsv and stats/ks_peaks_auto.tsv files and
-  put ks_peaks.tsv into the original data directory, then run the following commands:
+  put ks_peaks.tsv into the work directory, then run the following commands:
           ks_filter - Filtering based on provided ks_peaks.tsv file (assumes prior ks_calc step)
                 mcl - Derive clusters, with Markov clustering.
            consense - Calculate a consensus sequences from each pan-gene set,
@@ -354,16 +354,14 @@ ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
    calling the pandagma workflows using singularity and conda.
 
 3. The typical usage for the family workflow is to run all steps from `ingest` through `ks_calc`; 
-   then evalute the Ks peaks and add a `ks_peaks.tsv` file to the data_fam directory; and then run the  
+   then evalute the Ks peaks and add a `ks_peaks.tsv` file to work directory; and then run the  
    remaining steps (see **8** below).
 
-    An intermediate output file, `ks_peaks_auto.tsv`, is written to the data directory
-    (and linked to the stats directory within the work directory).
+    An intermediate output file, `stats/ks_peaks_auto.tsv`, is written to the work directory
     This should be examined for biological plausibility, along with the other 
     Ks results (histograms) in the pandagma_work/stats subdirectory.
     The `ks_peaks_auto.tsv` file can be examined and used to create a file named `ks_peaks.tsv`
     with changes relative to `ks_peaks_auto.tsv` if necessary to reflect known or suspected WGD histories. 
-    See the example in get_data/get_family_7_3.sh.
 
 4. Run steps `ks_filter` through `summarize`.
     The family workflow can be run straight through, without providing a `ks_peaks.tsv` file; 
