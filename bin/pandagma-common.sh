@@ -105,7 +105,7 @@ main_pan_fam() {
   export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
   
   # mmseqs uses significant number of threads on its own. Set a maximum, which may be below NPROC.
-  MMSEQSTHREADS=$(( 4 < NPROC ? 4 : NPROC ))
+  : ${MMSEQSTHREADS:=$(( 4 < NPROC ? 4 : NPROC ))}
   
   ##########
   # Command-line interpreter

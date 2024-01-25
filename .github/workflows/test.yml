@@ -1,0 +1,17 @@
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pandagma-pan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Create conda environment
+      run: conda env create && conda clean --all -y
+    - name: Fetch data
+      run: |
+        mkdir data
+        PATH=$PWD/bin:$PATH conda run -n pandagma --no-capture-output make -j 2 -C data -f ${PWD}/get_data/Glycine_7_3_2.mk
+    - name: Run pandagma pan
+      run: MMSEQSTHREADS=1 PATH=$PWD/bin:$PATH conda run -n pandagma --no-capture-output pandagma pan -d data -c config/Glycine_7_3_2.conf
