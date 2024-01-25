@@ -239,8 +239,8 @@ Variables in the config file for the **family workflow**, `pandagma fam`:
       ks_low_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values less than this. [0.5]
        ks_hi_cutoff - For inferring Ks peak per species pair. Don't consider Ks block-median values greater than this. [2.0]
          ks_binsize - For calculating and displaying histograms. [0.05]
-ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
-        max_pair_ks - Fallback value for excluding gene pairs, if a ks_cutoffs file is not provided. [4.0]
+ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
+        max_pair_ks - Fallback value for excluding gene pairs, if a ks_peaks.tsv file is not provided. [4.0]
 
       consen_prefix - Prefix to use in orthogroup names
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g.
@@ -289,7 +289,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
         cds_files_extra_free -- optional extra annotations, not constrained by chromosome match
 ```
 
-3. Start the run. The examples below assume a run using `$PANDAGMA_ROOT/config/Glycine_7_3.conf`
+3. Start the run. The examples below assume a run using `$PANDAGMA_ROOT/config/Glycine_7_3_2.conf`
        
    This workflow is best run in an HPC environment. If your environment uses job scheduling such as slurm, 
    then you will modify a batch submission script to submit and control the job. Examples are provided for
@@ -357,14 +357,13 @@ ks_block_wgd_cutoff - Fallback, if a ks_cutoffs file is not provided. [1.75]
    then evalute the Ks peaks and add a `ks_peaks.tsv` file to the data_fam directory; and then run the  
    remaining steps (see **8** below).
 
-    An intermediate output file, `ks_peaks_auto.tsv`, is located in the work directory, stats 
-    subdirectory: `out/stats`.
+    An intermediate output file, `ks_peaks_auto.tsv`, is written to the data directory
+    (and linked to the stats directory within the work directory).
     This should be examined for biological plausibility, along with the other 
-    Ks results (histograms) in that subdirectory.
-    The `ks_peaks_auto.tsv` file can be copied to the data directory (data_fam in this case) 
-    and named `ks_peaks.tsv`
-    -- editing it if necessary to reflect known or suspected WGD histories. See the example in 
-    get_data/get_family_7_3.sh.
+    Ks results (histograms) in the pandagma_work/stats subdirectory.
+    The `ks_peaks_auto.tsv` file can be examined and used to create a file named `ks_peaks.tsv`
+    with changes relative to `ks_peaks_auto.tsv` if necessary to reflect known or suspected WGD histories. 
+    See the example in get_data/get_family_7_3.sh.
 
 4. Run steps `ks_filter` through `summarize`.
     The family workflow can be run straight through, without providing a `ks_peaks.tsv` file; 
