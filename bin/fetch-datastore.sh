@@ -13,7 +13,6 @@ case ${DATAFILE} in
   bauva.BV-YZ2020.gnm2.ann1.RJ1G.*|\
   chafa.ISC494698.gnm1.ann1.G7XW.*|\
   dalod.SKLTGB.gnm1.ann1.R67B.*|\
-  glyma.Wm82.gnm5.ann1.*|\
   prupe.Lovell.gnm2.ann1.S2ZZ.*|\
   quisa.S10.gnm1.ann1.RQ4J.*|\
   sento.Myeongyun.gnm1.ann1.*|\
