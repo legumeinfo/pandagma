@@ -66,7 +66,12 @@ medsa.XinJiangDaYe_%.gnm1.ann1.RKB9.gene_models_main.bed.gz:
 	fetch-datastore.sh $(subst _$*,,$@) | gzip -d | sed -n 's/\(chr[1-8]\)\.$*/\1/p' | gzip > $@
 
 # % == ([1-4]|sc)
-medsa.XinJiangDaYe_%.gnm1.ann1.RKB9.cds.fna.gz \
+medsa.XinJiangDaYe_%.gnm1.ann1.RKB9.cds.fna.gz:
+	fetch-datastore.sh $(subst _$*,,$@) | gzip -d |
+	  awk '/^>/ { keep = ("$*" == "sc" ? !/chr/ : $$2 ~ "chr[1-8].$*" ) }
+	       keep { sub(/ \[translate_table: standard\]/,""); print}' | gzip > $@
+
+# % == ([1-4]|sc)
 medsa.XinJiangDaYe_%.gnm1.ann1.RKB9.protein.faa.gz:
 	fetch-datastore.sh $(subst _$*,,$@) | gzip -d |
 	  awk '/^>/ { keep = ("$*" == "sc" ? !/chr/ : $$2 ~ "chr[1-8].$*" ) }
