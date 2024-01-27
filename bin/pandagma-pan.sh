@@ -284,9 +284,7 @@ run_mmseqs() {
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       { cat 02_fasta_nuc/"$qry_base"."$fa" 02_fasta_nuc/"$sbj_base"."$fa" ; } |
         mmseqs easy-cluster stdin 03_mmseqs/"${qry_base}".x."${sbj_base}" "$MMTEMP" \
-         --min-seq-id "$clust_iden" -c "$clust_cov" --cov-mode 0 --cluster-reassign 1>/dev/null & # background
-        # allow to execute up to $MMSEQSTHREADS in parallel
-        if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+         --min-seq-id "$clust_iden" -c "$clust_cov" --cov-mode 0 --cluster-reassign 1>/dev/null
     done
     echo
   done
@@ -574,9 +572,7 @@ run_add_extra() {
       echo "Extra: 02_fasta_nuc/$file_base"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       mmseqs easy-search "02_fasta_nuc/$file_base" 13_pan_aug_fasta_posn.fna 13_extra_out_constr_dir/"${file_base}".x.all_cons.m8 \
-                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null & # background
-
-      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null
     done
     wait # wait for jobs to finish
 
@@ -585,9 +581,7 @@ run_add_extra() {
       echo "Extra: 02_fasta_nuc/$file_base"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       mmseqs easy-search "02_fasta_nuc/$file_base" 13_pan_aug_fasta_posn.fna 13_extra_out_free_dir/"${file_base}".x.all_cons.m8 \
-                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null & # background
-
-      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null
     done
     wait # wait for jobs to finish
 
