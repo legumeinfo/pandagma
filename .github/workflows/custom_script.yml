@@ -1,0 +1,78 @@
+name: Run custom workflow
+run-name: ${{ inputs.run-name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      custom_script:
+        description: 'Repository path (relative) or URL of custom script'
+        required: true
+        type: string
+      run-name:
+        description: 'Name of workflow run'
+        required: false
+        type: string
+      ssh_enabled:
+        type: boolean
+        description: 'Stop after cloning the repository and enable SSH access for debugging'
+        required: false
+        default: false
+      
+
+jobs:
+  workflow:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH session for debugging
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ inputs.ssh_enabled }}
+        with:
+          limit-access-to-actor: true
+
+      - name: Download custom script
+        if: contains(inputs.custom_script, '://')
+        run: |
+          curl --fail -o custom_script.txt -L ${{ inputs.custom_script }}
+          chmod +x custom_script.txt
+          echo "Custom script"
+          echo "================================================================================"
+          cat custom_script.txt
+          echo "================================================================================"
+
+      - name: Check custom script path exists and is executable
+        if: !contains(inputs.custom_script, '://')
+        run: |
+          test -f ${{ inputs.custom_script }}
+          test -x ${{ inputs.custom_script }}
+
+      - name: Create conda environment
+        run: conda env create && conda clean --all -y
+
+# GitHub Action runner (2024-01-27) has
+# ~30 GB available in /
+# ~60 GB available in /mnt 
+      - name: Run custom script
+        run: |
+          sudo mkdir -m 777 /mnt/pandagma_work
+          ln -s /mnt/pandagma_work .
+          if [ -e custom_script.txt ]
+          then
+            custom_script=./custom_script.txt
+          else
+            custom_script="${{ inputs.custom_script }}"
+          fi
+          env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output ${{ custom_script }}
+          cp "${custom_script}" pandagma_out
+          printf 'GITHUB_REPOSITORY: %s\n\n' "${GITHUB_REPOSITORY}" > pandagma_out/VERSION
+          git show --quiet >> pandagma_out/VERSION
+      - name: Upload output artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.run-name }}
+          path: pandagma_out
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 9
