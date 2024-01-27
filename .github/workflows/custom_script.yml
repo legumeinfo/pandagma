@@ -43,7 +43,7 @@ jobs:
           echo "================================================================================"
 
       - name: Check custom script path exists and is executable
-        if: !contains(inputs.custom_script, '://')
+        if: ${{ ! contains(inputs.custom_script, '://') }}
         run: |
           test -f ${{ inputs.custom_script }}
           test -x ${{ inputs.custom_script }}
@@ -64,7 +64,7 @@ jobs:
           else
             custom_script="${{ inputs.custom_script }}"
           fi
-          env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output ${{ custom_script }}
+          env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output "${custom_script}"
           cp "${custom_script}" pandagma_out
           printf 'GITHUB_REPOSITORY: %s\n\n' "${GITHUB_REPOSITORY}" > pandagma_out/VERSION
           git show --quiet >> pandagma_out/VERSION
@@ -76,3 +76,4 @@ jobs:
           if-no-files-found: error
           retention-days: 90
           compression-level: 9
+
