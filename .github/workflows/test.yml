@@ -22,6 +22,7 @@ jobs:
         PATH=$PWD/bin:$PATH make -j 2 -C data -f "${PWD}/get_data/${{ matrix.PAN_CONF }}.mk"
     - name: Create conda environment
       run: conda env create && conda clean --all -y
+
     - name: Run pandagma pan
       run: |
         sudo mkdir -m 777 /mnt/pandagma_work
@@ -30,11 +31,15 @@ jobs:
         printf 'GITHUB_REPOSITORY: %s\n\n' "${GITHUB_REPOSITORY}" > pandagma_out/VERSION
         git show --quiet >> pandagma_out/VERSION
         cp config/${{ matrix.PAN_CONF }}.conf pandagma_out/
+        mkdir upload-artifact
+        mv pandagma_out upload-artifact/pandagma_out-${{ matrix.PAN_CONF }}
     - name: Upload output artifacts
       uses: actions/upload-artifact@v4
       with:
         name: pandagma_out-${{ matrix.PAN_CONF }}
-        path: pandagma_out
+        # Need to create subdirectory to unzip as directory
+        # https://github.com/actions/upload-artifact/issues/248
+        path: upload-artifact
         if-no-files-found: error
         retention-days: 90
         compression-level: 9
