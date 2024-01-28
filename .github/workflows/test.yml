@@ -1,42 +1,48 @@
-name: pandagma pan test
+name: pandagma test
 on:
   workflow_dispatch:
     inputs:
-      pan-conf:
-        default: '["Arachis2_4_1_0", "Arachis2_5_2_0", "Cicer2_4_2_0", "Glycine_7_3_2", "Glycine5_18_31_6", "Medicago2_7_0_16", "Vigna3_7_1_4"]'
-        description: Run pandagma pan once for each config/NAME.conf file in the list
+      pandagma-conf:
+        default: '["Arachis2_4_1_0", "Arachis2_5_2_0", "Cicer2_4_2_0", "Glycine_7_3_2", "Glycine5_18_31_6", "Medicago2_7_0_16", "Vigna3_7_1_4", "family3_4_3"]'
+        description: Run pandagma once for each config/NAME.conf file in the list
         required: false
 
 jobs:
-  pandagma-pan:
+  pandagma:
     strategy:
       fail-fast: false
       matrix:
-        PAN_CONF: ${{ fromJSON(github.event.inputs.pan-conf) }}
+        PANDAGMA_CONF: ${{ fromJSON(github.event.inputs.pandagma-conf) }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: Fetch data
       run: |
         mkdir data
-        PATH=$PWD/bin:$PATH make -C data -f "${PWD}/get_data/${{ matrix.PAN_CONF }}.mk"
+        PATH=$PWD/bin:$PATH make -C data -f "${PWD}/get_data/${{ matrix.PANDAGMA_CONF }}.mk"
     - name: Create conda environment
       run: conda env create && conda clean --all -y
 
-    - name: Run pandagma pan
+    - name: Run pandagma
+      env:
+        PANDAGMA_CONF: ${{ matrix.PANDAGMA_CONF }}
       run: |
         sudo mkdir -m 777 /mnt/pandagma_work
         ln -s /mnt/pandagma_work .
-        env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output pandagma pan -d data -c "config/${{ matrix.PAN_CONF }}.conf"
+        case ${PANDAGMA_CONF} in
+          family*) WORKFLOW=fam ;;
+          *) WORKFLOW=pan ;;
+        esac
+        env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output pandagma ${WORKFLOW} -d data -c "config/${PANDAGMA_CONF}.conf"
         printf 'GITHUB_REPOSITORY: %s\n\n' "${GITHUB_REPOSITORY}" > pandagma_out/VERSION
         git show --quiet >> pandagma_out/VERSION
-        cp config/${{ matrix.PAN_CONF }}.conf pandagma_out/
+        cp config/${PANDAGMA_CONF}.conf pandagma_out/
         mkdir upload-artifact
-        mv pandagma_out upload-artifact/pandagma_out-${{ matrix.PAN_CONF }}
+        mv pandagma_out upload-artifact/pandagma_out-${PANDAGMA_CONF}
     - name: Upload output artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: pandagma_out-${{ matrix.PAN_CONF }}
+        name: pandagma_out-${{ matrix.PANDAGMA_CONF }}
         # Need to create subdirectory to unzip as directory
         # https://github.com/actions/upload-artifact/issues/248
         path: upload-artifact
