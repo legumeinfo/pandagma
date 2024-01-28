@@ -40,6 +40,7 @@ jobs:
           echo "Custom script"
           echo "================================================================================"
           cat custom_script.txt
+          echo
           echo "================================================================================"
 
       - name: Check custom script path exists and is executable
@@ -68,11 +69,13 @@ jobs:
           cp "${custom_script}" pandagma_out
           printf 'GITHUB_REPOSITORY: %s\n\n' "${GITHUB_REPOSITORY}" > pandagma_out/VERSION
           git show --quiet >> pandagma_out/VERSION
+          mkdir upload-artifact
+          mv pandagma_out upload-artifact/pandagma_out-"${{ inputs.run-name }}"
       - name: Upload output artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.run-name }}
-          path: pandagma_out
+          name: pandagma_out-${{ inputs.run-name }}
+          path: upload-artifact
           if-no-files-found: error
           retention-days: 90
           compression-level: 9
