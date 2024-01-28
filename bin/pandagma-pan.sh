@@ -6,6 +6,7 @@
 #
 scriptname='pandagma pan'
 
+# shellcheck source=/dev/null
 . pandagma-common.sh
 
 define HELP_DOC <<'EOS'
@@ -156,7 +157,7 @@ canonicalize_paths() {
 run_ingest() {
 # Add positional information from GFF3 or 4- or 6-column BED to FASTA IDs
 # BED start coordinate converted to 1-based
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   echo; echo "Run ingest: from fasta and gff or bed data, create fasta with IDs containing positional info."
   
   mkdir -p 02_fasta_nuc 02_fasta_prot 01_posn_hsh stats
@@ -270,7 +271,7 @@ run_ingest() {
 ##########
 run_mmseqs() {
   # Do mmseqs clustering on all pairings of the main annotation sets (not the extra ones though)
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   echo; echo "Run mmseqs -- at ${clust_iden} percent identity and minimum of ${clust_cov}% coverage."
   #
 
@@ -296,7 +297,7 @@ run_mmseqs() {
 ##########
 run_filter() {
   echo; echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   mkdir -p 04_dag
   if [[ -v expected_chr_matches ]]; then  # filter based on list of expected chromosome pairings if provided
     echo "Filtering on chromosome patterns defined in expected_chr_matches"
@@ -325,7 +326,7 @@ run_filter() {
 ##########
 run_dagchainer() {
   # Identify syntenic blocks, using DAGchainer
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   dagchainer_args='-M 50 -E 1e-5 -A 6 -s'  # -g and -D are calculated from the data
   echo; echo "Run DAGchainer using arguments \"${dagchainer_args}\" (-g and -D are calculated from the data)"
   # Check and preemptively remove malformed \*_matches.file, which can result from an aborted run
@@ -352,7 +353,7 @@ run_dagchainer() {
     # use per-process temp directory to avoid any data race
     (
       tmpdir=$(mktemp -d)
-      cd "${tmpdir}"
+      cd "${tmpdir}" || exit
       run_DAG_chainer.pl "$dagchainer_args"  -g "$ave_gene_gap" -D "$max_gene_gap" -i "${OLDPWD}/${match_path}" 1>/dev/null
       rmdir "${tmpdir}"
     ) &
@@ -375,7 +376,7 @@ run_dagchainer() {
 ##########
 run_mcl() {
   # Calculate clusters using Markov clustering
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   printf "\nDo Markov clustering with inflation parameter %s and %d threads\n" "$mcl_inflation" "${NPROC}"
   echo "MCL COMMAND: mcl 05_filtered_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv"
   mcl 05_filtered_pairs.tsv -I "$mcl_inflation" -te "${NPROC}" --abc -o tmp.syn_pan.clust.tsv \
@@ -394,7 +395,7 @@ run_consense() {
   echo; 
   printf "\nStep \"consense\" will add previously unclustered"
   printf "\nsequences into an \"augmented\" pan-gene set, by homology.\n"
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   if [ -d 07_pan_fasta ]; then rm -rf 07_pan_fasta; fi
   mkdir -p 07_pan_fasta lists
 
@@ -484,7 +485,7 @@ run_consense() {
 run_cluster_rest() {
   echo
   echo; echo "== Retrieve unclustered sequences and cluster those that can be =="
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   echo "  Retrieve genes present in the original CDS files but absent from 12_syn_pan_aug.hsh"
   cut -f2 12_syn_pan_aug_pre.hsh.tsv | LC_ALL=C sort > lists/lis.12_syn_pan_aug_complement
@@ -538,7 +539,7 @@ run_cluster_rest() {
 ##########
 run_add_extra() {
   echo; echo "== Add extra annotation sets (if provided) to the augmented clusters, by homology =="
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   if [ -d 13_pan_aug_fasta ]; then rm -rf 13_pan_aug_fasta; fi
   if [ -d 13_extra_out_constr_dir ]; then rm -rf 13_extra_out_constr_dir; fi
@@ -654,7 +655,7 @@ run_add_extra() {
     hash_to_rows_by_1st_col.awk 18_syn_pan_aug_extra.hsh.tsv > 18_syn_pan_aug_extra.clust.tsv
 
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    echo "    Fasta file:" "${protein_files[@]} ${protein_files_extra_constr[@]} ${protein_files_extra_free[@]}"
+    echo "    Fasta file:" "${protein_files[@]}" "${protein_files_extra_constr[@]}" "${protein_files_extra_free[@]}"
     if [ -d 19_pan_aug_leftover_merged_cds ]; then rm -rf 19_pan_aug_leftover_merged_cds; fi
     mkdir -p 19_pan_aug_leftover_merged_cds
     get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
@@ -674,7 +675,7 @@ run_add_extra() {
 ##########
 run_pick_exemplars() {
   echo; echo "== Pick representative (exemplar) sequence for each pan-gene set (protein and CDS) =="
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   echo "  Get all protein sequences corresponding with 18_syn_pan_aug_extra.clust.tsv"
   cat /dev/null > 20_pan_fasta_prot.faa
@@ -714,7 +715,7 @@ run_pick_exemplars() {
 ##########
 run_tabularize() {
   echo; echo "== Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv"
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   # Get table header 
   pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv -annot_str_regex "$ANN_REX" > tmp.18_syn_pan_aug_extra.clust.tsv
@@ -740,7 +741,7 @@ run_tabularize() {
 
 ##########
 run_filter_to_pctile() {
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   echo "  Calculate matrix of gene counts per orthogroup and annotation set"
   calc_pan_stats.pl -annot_regex "$ANN_REX" -pan 18_syn_pan_aug_extra.clust.tsv -out 18_syn_pan_aug_extra.counts.tsv
@@ -765,7 +766,7 @@ run_filter_to_pctile() {
 
 ##########
 run_order_and_name() {
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   echo "  Reshape from mcl output format, clustered IDs on one line, to a hash format"
   perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 22_syn_pan_aug_extra_pctl"${pctl_low}".clust.tsv |
@@ -888,7 +889,7 @@ run_order_and_name() {
 
 ##########
 run_align_cds() {
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   echo "== Align CDS sequences =="
 
@@ -915,7 +916,7 @@ run_align_cds() {
 
 ##########
 run_align_protein() {
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   echo "== Align protein sequences =="
 
@@ -943,7 +944,7 @@ run_align_protein() {
 ##########
 run_model_and_trim() {
   echo; echo "== Build HMMs =="
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   mkdir -p 21_hmm
   for filepath in 20_aligns_cds/*; do
     file=$(basename "$filepath");
@@ -997,7 +998,7 @@ run_xfr_aligns_trees() {
 
   full_out_dir="${out_dir}"
 
-  cd "${submit_dir}"
+  cd "${submit_dir}" || exit
 
   if [ ! -d "$full_out_dir" ]; then
       echo "creating output directory \"${full_out_dir}/\""
@@ -1016,7 +1017,7 @@ run_xfr_aligns_trees() {
 
 ##########
 run_calc_chr_pairs() {
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   echo "Generate a report of observed chromosome pairs"
 
   echo "  Identify gene pairs, using mmseqs --easy_cluster"
@@ -1055,7 +1056,7 @@ run_summarize() {
   stats_file=${full_out_dir}/stats.txt
   export ANN_REX=${annot_str_regex}
 
-  cd "${submit_dir}"
+  cd "${submit_dir}" || exit
 
   if [ ! -d "$full_out_dir" ]; then
       echo "creating output directory \"${full_out_dir}/\""
@@ -1190,8 +1191,9 @@ run_summarize() {
   printf "\n== Sequence stats for final pangene CDS files -- pctl%f and trimmed\n" "$pctl_low" >> "${stats_file}"
   printf "  Class:   seqs     min max    N50    ave     annotation_name\n" >> "${stats_file}" 
   annot_name=23_syn_pan_pctl${pctl_low}_posn_cds.fna
-    printf "  pctl%f: " "${pctl_low}" >> "${stats_file}"
-    cat_or_zcat "${WORK_DIR}/23_syn_pan_pctl${pctl_low}_posn_cds.fna" | calc_seq_stats >> "${stats_file}"
+  echo "  CHECK: report annot_name to stats file? [$annot_name]"
+  printf "  pctl%f: " "${pctl_low}" >> "${stats_file}"
+  cat_or_zcat "${WORK_DIR}/23_syn_pan_pctl${pctl_low}_posn_cds.fna" | calc_seq_stats >> "${stats_file}"
 
   echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
   #   tmp.gene_count_start was generated during run_ingest
@@ -1253,7 +1255,7 @@ run_summarize() {
 ##########
 run_clean() {
   echo "Clean (delete) files in the working directory that are not needed with subsequent add_extra"
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   echo "  work_dir: $PWD"
   if [ -d MMTEMP ]; then rm -rf MMTEMP/*; 
   fi
@@ -1268,7 +1270,7 @@ run_clean() {
     fi
   done
   wait
-  cd "$OLDPWD"
+  cd "$OLDPWD" || exit
 }
 
 ########################################
@@ -1279,12 +1281,12 @@ pandagma_conf_params='clust_iden clust_cov extra_iden mcl_inflation
   consen_prefix annot_str_regex order_method preferred_annot'
 
 # The steps align_cds, align_protein, model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
-commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra pick_exemplars \
-             filter_to_pctile tabularize order_and_name  calc_chr_pairs summarize"
+export commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra \
+         pick_exemplars filter_to_pctile tabularize order_and_name  calc_chr_pairs summarize"
 
-dependencies='mmseqs dagchainer mcl cons famsa hmmalign hmmbuild run_DAG_chainer.pl'
+export dependencies='mmseqs dagchainer mcl cons famsa hmmalign hmmbuild run_DAG_chainer.pl'
 
-declare clust_iden clust_cov extra_iden mcl_inflation strict_synt \
+declare out_dir version clust_iden clust_cov extra_iden mcl_inflation strict_synt \
         pctl_low pctl_med pctl_hi consen_prefix annot_str_regex preferred_annot order_method
 
 main_pan_fam "$@"

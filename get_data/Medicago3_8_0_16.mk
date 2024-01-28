@@ -47,6 +47,9 @@ medtr.HM058.gnm1.ann1.LXPZ.protein.faa.gz \
 medtr.HM060.gnm1.ann1.H41P.cds.fna.gz \
 medtr.HM060.gnm1.ann1.H41P.gene_models_main.bed.gz \
 medtr.HM060.gnm1.ann1.H41P.protein.faa.gz \
+medtr.HM078.gnm1.ann1.3RNP.cds.fna.gz \
+medtr.HM078.gnm1.ann1.3RNP.gene_models_main.bed.gz \
+medtr.HM078.gnm1.ann1.3RNP.protein.faa.gz \
 medtr.HM095.gnm1.ann1.55W4.cds.fna.gz \
 medtr.HM095.gnm1.ann1.55W4.gene_models_main.bed.gz \
 medtr.HM095.gnm1.ann1.55W4.protein.faa.gz \

@@ -16,6 +16,9 @@ arahy.Tifrunner.gnm2.ann1.4K0L.gene_models_main.bed.gz \
 arahy.Tifrunner.gnm2.ann1.4K0L.protein_primary.faa.gz \
 arahy.Tifrunner.gnm2.ann2.PVFB.cds.fna.gz \
 arahy.Tifrunner.gnm2.ann2.PVFB.gene_models_main.bed.gz \
-arahy.Tifrunner.gnm2.ann2.PVFB.protein.faa.gz
+arahy.Tifrunner.gnm2.ann2.PVFB.protein.faa.gz \
+arast.V10309.gnm1.ann1.CZRZ.cds_primary.fna.gz \
+arast.V10309.gnm1.ann1.CZRZ.gene_models_main.bed.gz \
+arast.V10309.gnm1.ann1.CZRZ.protein_primary.faa.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk

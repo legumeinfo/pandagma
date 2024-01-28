@@ -42,6 +42,14 @@ data and thresholds provided by the user.
 * Calculate gene trees
 * Calculate and report statistics
 
+Several additional optional worflows are available:
+* `pandagma TEfilter` - to compare CDS and protein data sets against a user-provided set of transposable elements 
+    or other sequences to be filtered against. The intended use is to remove such sequences prior to calculating
+    pangenes and gene families.
+* `pandagma pupdate` - to compare and generate a mapping between two pangene sets.
+* `pandagma fsup` - to "supplement" or add species/annotations into gene families calculated previously. 
+    The selected new annotation sets are compared against HMMs calculated as part of a prior full run of pandagma-fam.sh.
+
 ## Installation methods <a name="installation"></a>
 
 First, clone this repository and change your working directory:

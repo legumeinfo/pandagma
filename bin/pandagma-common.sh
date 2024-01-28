@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2023-01-24"
+version="2023-01-27"
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -8,6 +8,8 @@ trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 # to help assign a heredoc value to a variable. The internal line return is intentional.
 define(){ o=; while IFS=$'\n' read -r a; do o="$o$a"'
 '; done; eval "$1=\$o"; }
+
+declare scriptname annot_name fam_dir annot_str_regex dependencies commandlist
 
 version() {
   echo "$scriptname" $version
@@ -59,18 +61,18 @@ run_calc_trees() {
   echo; echo "== Calculate trees =="
   cd "${WORK_DIR}"
 
-  mkdir -p ${dir_prefix}4_trees
+  mkdir -p "${dir_prefix}4_trees"
 
   echo; echo "== Move small (<4) and very low-entropy families (sequences are all identical) to the side =="
-  mkdir -p ${dir_prefix}3_pan_aug_small_or_identical
+  mkdir -p "${dir_prefix}3_pan_aug_small_or_identical"
   min_seq_count=4
   # Below, "count" is the number of unique sequences in the alignment.
-  for filepath in ${dir_prefix}3_hmmalign_trim2/*; do
+  for filepath in "${dir_prefix}3_hmmalign_trim2"/*; do
     file=$(basename "$filepath")
     count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
     if [[ $count -lt $min_seq_count ]]; then
       echo "Set aside small or low-entropy family $file";
-      mv "$filepath" ${dir_prefix}3_pan_aug_small_or_identical/
+      mv "$filepath" "${dir_prefix}3_pan_aug_small_or_identical"/
     fi;
   done
 
@@ -78,10 +80,10 @@ run_calc_trees() {
   # It is more efficient to run more jobs on one core each by setting an environment variable.
   OMP_NUM_THREADS=1
   export OMP_NUM_THREADS
-  for filepath in ${dir_prefix}3_hmmalign_trim2/*; do
+  for filepath in "${dir_prefix}3_hmmalign_trim2"/*; do
     file=$(basename "$filepath")
     echo "  Calculating tree for $file"
-    fasttree ${fasttree_opts} -quiet "$filepath" > ${dir_prefix}4_trees/"$file" &
+    fasttree "${fasttree_opts}" -quiet "$filepath" > "${dir_prefix}4_trees/$file" &
     # allow to execute up to $NPROC concurrent asynchronous processes
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
@@ -105,7 +107,7 @@ main_pan_fam() {
   export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
   
   # mmseqs uses significant number of threads on its own. Set a maximum, which may be below NPROC.
-  MMSEQSTHREADS=$(( 4 < NPROC ? 4 : NPROC ))
+  export MMSEQSTHREADS=$(( 4 < NPROC ? 4 : NPROC ))
   
   ##########
   # Command-line interpreter
@@ -120,7 +122,7 @@ main_pan_fam() {
       n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
       O) optarg_order_method=$OPTARG; echo "order method: $optarg_order_method" ;;
       o) out_dir=$OPTARG; echo "out_dir: $out_dir" ;;
-      f) fam_dir=$(realpath --canonicalize-existing $OPTARG) ;;
+      f) fam_dir=$(realpath --canonicalize-existing "$OPTARG") ;;
       r) retain="yes" ;;
       v) version ;;
       h) echo >&2 "$HELP_DOC" && exit 0 ;;
@@ -128,6 +130,8 @@ main_pan_fam() {
       *) echo >&2 echo "$HELP_DOC" && exit 1 ;;
     esac
   done
+  
+  export fam_dir
 
   case ${step} in 
     all|summarize|xfr_aligns_trees) : "${out_dir:=pandagma_out}" ;; # default to ./pandagma_out 
@@ -182,7 +186,7 @@ main_pan_fam() {
   # Check for existence of third-party executables
   missing_req=0
   for program in $dependencies; do
-    if ! type $program &> /dev/null; then
+    if ! type "$program" &> /dev/null; then
       echo "Warning: executable $program is not on your PATH."
       missing_req=$((missing_req+1))
     fi

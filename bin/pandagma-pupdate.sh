@@ -25,9 +25,12 @@
 # AUTHOR
 #     Steven Cannon <steven.cannon@usda.gov>
 
-scriptname=$(basename "$0")
-version="2023-12-16"
 set -o errexit -o errtrace -o nounset -o pipefail
+
+# shellcheck source=/dev/null
+. pandagma-common.sh
+
+export scriptname='pandagma pupdate'
 
 PG1=$1
 PG2=$2

@@ -6,6 +6,7 @@
 #
 scriptname='pandagma fam'
 
+# shellcheck source=/dev/null
 . pandagma-common.sh 
 
 define HELP_DOC <<'EOS'
@@ -138,7 +139,7 @@ EOS
 # Helper functions begin here
 
 canonicalize_paths() {
-  cd "${DATA_DIR}"
+  cd "${DATA_DIR}" || exit
   echo "Entering canonicalize_paths. Annotation files: " "${annotation_files[@]}"
 
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
@@ -156,7 +157,7 @@ canonicalize_paths() {
     mapfile -t annotation_files_extra < <(realpath --canonicalize-existing "${annotation_files_extra[@]}")
   fi
 
-  cd "${OLDPWD}"
+  cd "${OLDPWD}" || exit
   readonly submit_dir=${PWD}
 
   fasta_file=$(basename "${protein_files[0]}" .gz)
@@ -170,7 +171,7 @@ canonicalize_paths() {
 run_ingest() {
 # Add positional information from GFF3 or 4- or 6-column BED to FASTA IDs
 # BED start coordinate converted to 1-based
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   echo; echo "Run ingest: from fasta and gff or bed data, create fasta with IDs containing positional info."
   
   mkdir -p 02_fasta_nuc 02_fasta_prot 01_posn_hsh stats
@@ -229,6 +230,7 @@ run_ingest() {
                             -out 02_fasta_prot/"$file_base"
       # calc basic sequence stats
       annot_name=$(basename 02_fasta_prot/"$file_base" | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
+      echo "  CHECK: report annot_name to stats file? [$annot_name]"
       printf "  Extra: " >> stats/tmp.fasta_seqstats
       cat_or_zcat "${protein_files_extra[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats
     done
@@ -265,7 +267,7 @@ run_ingest() {
 ##########
 run_mmseqs() {
   # Do mmseqs clustering on all pairings of the main annotation sets (not the extra ones though)
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   echo; echo "Run mmseqs -- at ${clust_iden} percent identity and minimum of ${clust_cov}% coverage."
   #
 
@@ -299,7 +301,7 @@ run_mmseqs() {
 ##########
 run_filter() {
   echo; echo "From homology (mmseqs -m8) output, split out the following fields: molecule, gene, start, stop."
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   if [ -d 04_dag ]; then rm -rf 04_dag ; fi
   mkdir -p 04_dag
   if [[ -v expected_quotas ]]; then  # filter based on list of match quotas if provided
@@ -335,7 +337,7 @@ run_filter() {
 ##########
 run_dagchainer() {
   # Identify syntenic blocks, using DAGchainer
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   dagchainer_args='-M 50 -E 1e-5 -A 6 -s'  # -g and -D are calculated from the data
   echo; echo "Run DAGchainer using arguments \"${dagchainer_args}\" (-g and -D are calculated from the data)"
   # Check and preemptively remove malformed \*_matches.file, which can result from an aborted run
@@ -362,7 +364,7 @@ run_dagchainer() {
     # use per-process temp directory to avoid any data race
     (
       tmpdir=$(mktemp -d)
-      cd "${tmpdir}"
+      cd "${tmpdir}" || exit
       run_DAG_chainer.pl "$dagchainer_args"  -g "$ave_gene_gap" -D "$max_gene_gap" -i "${OLDPWD}/${match_path}" 1>/dev/null
       rmdir "${tmpdir}"
     ) &
@@ -381,7 +383,7 @@ run_ks_calc() {
   echo       "DAGChainer has query and subject in lexical order."
   echo "NPROC: ${NPROC}"
 
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   if [ ! -d "$WORK_DIR"/05_kaksout ]; then
     echo "creating output directory $WORK_DIR/05_kaksout"
@@ -454,7 +456,7 @@ run_ks_filter() {
   echo; echo "From optional provided ks_peaks.tsv file and from processed DAGChainer output, (with gene-pair and "
   echo       "block-median Ks values added by calc_ks_from_dag.pl), filter on block-median Ks values."
 
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   if [ -d 05_kaksout_ks_filtered ]; then rm -rf 05_kaksout_ks_filtered ; fi
   mkdir -p 05_kaksout_ks_filtered
   if [[ -f ks_peaks.tsv ]] || [[ -f stats/ks_peaks_auto.tsv ]]; then  # filter based on list of Ks values
@@ -483,7 +485,7 @@ run_ks_filter() {
 ##########
 run_mcl() {
   # Calculate clusters using Markov clustering
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   mkdir -p lists
 
   printf "\nPreparatory to clustering, combine the homology data into a file with gene pairs to be clustered.\n"
@@ -537,7 +539,7 @@ run_mcl() {
 run_consense() {
   echo; 
   echo "Add previously unclustered sequences into an \"augmented\" pan-gene set, by homology."
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   if [ -d 07_pan_fasta ]; then rm -rf 07_pan_fasta; fi
   mkdir -p 07_pan_fasta lists
 
@@ -601,7 +603,7 @@ run_consense() {
 run_cluster_rest() {
   echo
   echo; echo "== Retrieve unclustered sequences and cluster those that can be =="
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   echo "  Retrieve genes present in the original protein files but absent from 12_syn_pan_aug.hsh"
   cut -f2 12_syn_pan_aug_pre.hsh.tsv | LC_ALL=C sort > lists/lis.12_syn_pan_aug_complement
@@ -638,7 +640,7 @@ run_cluster_rest() {
 ##########
 run_add_extra() {
   echo; echo "== Add extra annotation sets (if provided) to the augmented clusters, by homology =="
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   if [ -d 13_extra_out_dir ]; then rm -rf 13_extra_out_dir; fi
   if [ -d 13_pan_aug_fasta ]; then rm -rf 13_pan_aug_fasta; fi
@@ -712,7 +714,7 @@ run_add_extra() {
 ##########
 run_tabularize() {
   echo; echo "== Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv"
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   # Get table header
   pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv -annot_str_regex "$ANN_REX" > tmp.18_syn_pan_aug_extra.clust.tsv
@@ -730,7 +732,7 @@ run_tabularize() {
 ##########
 run_align() {
   echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   if [[ -d 19_pan_aug_leftover_merged_prot ]] && [[ -f 19_pan_aug_leftover_merged_prot/${consen_prefix}00001 ]]; then
     : # do nothing; the directory and file(s) exist
   else 
@@ -754,7 +756,7 @@ run_align() {
 ##########
 run_model_and_trim() {
   echo; echo "== Build HMMs =="
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   mkdir -p 21_hmm
   for filepath in 20_aligns/*; do 
     file=$(basename "$filepath");
@@ -806,7 +808,7 @@ run_model_and_trim() {
 run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
 
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   echo "  work_dir: $PWD"
 
   echo "  Calculate matrix of gene counts per orthogroup and annotation set"
@@ -815,7 +817,7 @@ run_summarize() {
   full_out_dir="${out_dir}"
   stats_file=${full_out_dir}/stats.txt
 
-  cd "${submit_dir}"
+  cd "${submit_dir}" || exitd
 
   if [ ! -d "$full_out_dir" ]; then
       echo "creating output directory \"${full_out_dir}/\""
@@ -933,7 +935,7 @@ run_summarize() {
 ##########
 run_clean() {
   echo "Clean (delete) files in the working directory that are not needed with subsequent add_extra"
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   echo "  work_dir: $PWD"
   if [ -d MMTEMP ]; then rm -rf MMTEMP/*; 
   fi
@@ -947,7 +949,7 @@ run_clean() {
     fi
   done
   wait
-  cd "$OLDPWD"
+  cd "$OLDPWD" || exit
 }
 
 ########################################
@@ -957,16 +959,15 @@ pandagma_conf_params='clust_iden clust_cov extra_iden mcl_inflation strict_synt
 ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff max_pair_ks 
 consen_prefix annot_str_regex'
 
-commandlist="ingest mmseqs filter dagchainer \
+export commandlist="ingest mmseqs filter dagchainer \
              ks_calc ks_filter \
              mcl consense cluster_rest add_extra tabularize \
              align model_and_trim calc_trees summarize"
 
-dependencies='dagchainer mcl cons famsa run_DAG_chainer.pl'
+export dependencies='dagchainer mcl cons famsa run_DAG_chainer.pl'
 
-declare clust_iden clust_cov extra_iden mcl_inflation strict_synt \
+declare out_dir version clust_iden clust_cov extra_iden mcl_inflation strict_synt \
         ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff max_pair_ks \
         consen_prefix annot_str_regex
-
 
 main_pan_fam "$@"

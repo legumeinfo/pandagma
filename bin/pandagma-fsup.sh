@@ -8,6 +8,7 @@
 #
 scriptname='pandagma fsup'
 
+# shellcheck source=/dev/null
 . pandagma-common.sh
 
 define HELP_DOC <<'EOS'
@@ -75,12 +76,12 @@ canonicalize_paths() {
     exit 1
   fi
 
-  cd "${DATA_DIR}"
+  cd "${DATA_DIR}" || exit
 
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
   mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
 
-  cd "${OLDPWD}"
+  cd "${OLDPWD}" || exit
   readonly submit_dir=${PWD}
 
   prot_file=$(basename "${protein_files[0]}" .gz)
@@ -93,7 +94,7 @@ canonicalize_paths() {
 ##########
 run_ingest() {
 # Retrieve nucleotide and protein data sets
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   echo; echo "Run ingest: pull nucleotide and protein data sets into the work directory."
   echo "Note that this is a simpler ingest than for the primary gene family or pangene construction,"
   echo "as the identifiers aren't modified with positional information."
@@ -117,6 +118,7 @@ run_ingest() {
     zcat "${protein_files[file_num]}" > 02_fasta_prot_sup/"$file_base"
     # calc basic sequence stats
     annot_name=$(basename 02_fasta_prot/"$file_base" | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
+    echo "  CHECK: report annot_name to stats file? [$annot_name]"
     printf "  Added with hmmsearch:  " >> stats/tmp.fasta_seqstats_sup
     cat_or_zcat "${protein_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats_sup
   done
@@ -142,7 +144,7 @@ run_ingest() {
 run_fam_consen() {
   echo
   echo; echo "== Generate a consensus sequence for each family =="
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   if [ "$consen_method" == "hmmemit" ]; then
     if [ -d 21_hmmemit ]; then rm -rf 21_hmmemit; fi
@@ -195,7 +197,7 @@ run_fam_consen() {
 
 ##########
 run_search_families() {
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   echo "Search provided annotation sets (protein) against family consensus sequences, using method $consen_method"
 
   if [ -d 33_mmseqs_fam_match ]; then rm -rf 33_mmseqs_fam_match; fi
@@ -257,7 +259,7 @@ run_search_families() {
 ##########
 run_tabularize() {
   echo; echo "== Derive a table-format version of 34_sup_vs_fam_consen.clust.tsv"
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
 
   # Get table header
   pangene_tabularize.pl -pan 34_sup_vs_fam_consen.clust.tsv -annot_str_regex "$ANN_REX" > tmp.34_sup_vs_fam_consen.clust.tsv
@@ -277,7 +279,7 @@ run_tabularize() {
 ##########
 run_realign_and_trim() {
   echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   mkdir -p 35_sup_in_fams_prot
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
   get_fasta_from_family_file.pl "${protein_files[@]}" \
@@ -320,7 +322,7 @@ run_realign_and_trim() {
 run_summarize() {
   echo; echo "Summarize: Move results into output directory, and report some summary statistics"
 
-  cd "${WORK_DIR}"
+  cd "${WORK_DIR}" || exit
   echo "  work_dir: $PWD"
 
   echo "  Calculate matrix of gene counts per orthogroup and annotation set"
@@ -329,7 +331,7 @@ run_summarize() {
   full_out_dir="${out_dir}"
   stats_file=${full_out_dir}/stats.txt
 
-  cd "${submit_dir}"
+  cd "${submit_dir}" || exit
 
   if [ ! -d "$full_out_dir" ]; then
       echo "creating output directory \"${full_out_dir}/\""
@@ -429,10 +431,11 @@ run_summarize() {
 pandagma_conf_params='consen_iden clust_cov consen_method annot_str_regex'
 
 # Run all specified steps 
-commandlist="ingest fam_consen search_families realign_and_trim calc_trees summarize"
+export commandlist="ingest fam_consen search_families realign_and_trim calc_trees summarize"
 
-dependencies='hmmscan famsa'
+export dependencies='hmmscan famsa'
+export ANN_REX=${annot_str_regex}
 
-declare consen_iden clust_cov consen_method annot_str_regex
+declare out_dir version consen_iden clust_cov consen_method annot_str_regex
 
 main_pan_fam "$@"

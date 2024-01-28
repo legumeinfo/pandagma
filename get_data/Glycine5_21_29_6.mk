@@ -113,6 +113,9 @@ glyma.Wm82_IGA1008.gnm1.ann1.FGN6.protein.faa.gz \
 glyma.Wm82_ISU01.gnm2.ann1.FGFB.cds_primary.fna.gz \
 glyma.Wm82_ISU01.gnm2.ann1.FGFB.gene_models_main.bed.gz \
 glyma.Wm82_ISU01.gnm2.ann1.FGFB.protein_primary.faa.gz \
+glyma.Wm82_NJAU.gnm1.ann1.KM71.cds_primary.fna.gz \
+glyma.Wm82_NJAU.gnm1.ann1.KM71.gene_models_main.bed.gz \
+glyma.Wm82_NJAU.gnm1.ann1.KM71.protein_primary.faa.gz \
 glyma.XuDouNo_1.gnm1.ann1.G2T7.cds_primary.fna.gz \
 glyma.XuDouNo_1.gnm1.ann1.G2T7.gene_models_main.bed.gz \
 glyma.XuDouNo_1.gnm1.ann1.G2T7.protein_primary.faa.gz \

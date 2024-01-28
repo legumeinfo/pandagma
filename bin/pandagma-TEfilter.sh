@@ -4,10 +4,11 @@
 # to exclude genes with matches to transposable elements or other sequences that the researcher wishes
 # not to include in the pangene calculations.
 # Authors: Steven Cannon, Joel Berendzen, Nathan Weeks, 2020-2023
-#
-scriptname='pandagma TEfilter'
 
+# shellcheck source=/dev/null
 . pandagma-common.sh
+
+export scriptname='pandagma TEfilter'
 
 define HELP_DOC <<'EOS'
 This workflow, pandagma-TEfilter.sh, is for optional pre-filtering of CDS and protein data
@@ -21,10 +22,9 @@ Usage:
 
   Required:
            -c (path to the config file)
-           -i (path to initial data directory, with CDS, protein, annotation, and transposable element files)
-           -o (path to output data directory)
 
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
+           -i (path to initial data directory, with CDS, protein, annotation, and transposable element files)
            -w (working directory, for temporary and intermediate files [default: './pandagma_work'].)
            -o OUTPUT_DIR (name for the output directory [default: './pandagma_out'].
                 Applicable only to "all" and "summarize" steps.)
@@ -52,7 +52,7 @@ canonicalize_paths() {
   echo "Entering canonicalize_paths. Fasta files: "
   echo "${cds_files[@]}"
 
-  mkdir -p ${DATA_DIR}_TEfilt
+  mkdir -p "${DATA_DIR}"
   cd "${DATA_DIR}" || exit
 
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
@@ -85,7 +85,6 @@ canonicalize_paths() {
   fi
 
   cd "${OLDPWD}" || exit
-  readonly submit_dir=${PWD}
 
   cds_fasta_file=$(basename "${cds_files[0]}" .gz)
   fna="${cds_fasta_file##*.}"
@@ -141,11 +140,11 @@ run_TEfilter() {
 
     echo "  Generate CDS and protein files, excluding matches from the TEsearch"
     get_fasta_subset.pl -in 00_fasta_nuc_orig/"$cds_base.$fna" -clobber \
-                         -xclude -lis 00_TEsearch/lis."$cds_base" -out ${DATA_DIR}_TEfilt/"$cds_base.$fna"
+                         -xclude -lis 00_TEsearch/lis."$cds_base" -out "${DATA_DIR}/$cds_base.$fna"
     get_fasta_subset.pl -in 00_fasta_prot_orig/"$prot_base.$faa" -clobber \
-                         -xclude -lis 00_TEsearch/lis."$cds_base" -out ${DATA_DIR}_TEfilt/"$prot_base.$faa"
-    cp ${DATA_DIR}/$annot_file ${DATA_DIR}_TEfilt/$annot_file
-    gzip -f ${DATA_DIR}_TEfilt/"$cds_base.$fna" ${DATA_DIR}_TEfilt/"$prot_base.$faa"
+                         -xclude -lis 00_TEsearch/lis."$cds_base" -out "${DATA_DIR}/$prot_base.$faa"
+    cp "${DATA_DIR}/$annot_file" "${DATA_DIR}/$annot_file"
+    gzip -f "${DATA_DIR}/$cds_base.$fna" "${DATA_DIR}/$prot_base.$faa"
   done
 
   ##########
@@ -171,11 +170,11 @@ run_TEfilter() {
 
       echo "  Generate CDS and protein files, excluding matches from the TEsearch"
       get_fasta_subset.pl -in 00_fasta_nuc_orig/"$cds_base.$fna" -clobber \
-                           -xclude -lis 00_TEsearch/lis."$cds_base" -out ${DATA_DIR}_TEfilt/"$cds_base.$fna"
+                           -xclude -lis 00_TEsearch/lis."$cds_base" -out "${DATA_DIR}/$cds_base.$fna"
       get_fasta_subset.pl -in 00_fasta_prot_orig/"$prot_base.$faa" -clobber \
-                           -xclude -lis 00_TEsearch/lis."$cds_base" -out ${DATA_DIR}_TEfilt/"$prot_base.$faa"
-      cp ${DATA_DIR}/$annot_file ${DATA_DIR}_TEfilt/$annot_file
-      gzip -f ${DATA_DIR}_TEfilt/"$cds_base.$fna" ${DATA_DIR}_TEfilt/"$prot_base.$faa"
+                           -xclude -lis 00_TEsearch/lis."$cds_base" -out "${DATA_DIR}/$prot_base.$faa"
+      cp "${DATA_DIR}/$annot_file" "${DATA_DIR}/$annot_file"
+      gzip -f "${DATA_DIR}/$cds_base.$fna" "${DATA_DIR}/$prot_base.$faa"
     done
   fi
 
@@ -202,11 +201,11 @@ run_TEfilter() {
 
       echo "  Generate CDS and protein files, excluding matches from the TEsearch"
       get_fasta_subset.pl -in 00_fasta_nuc_orig/"$cds_base.$fna" -clobber \
-                           -xclude -lis 00_TEsearch/lis."$cds_base" -out ${DATA_DIR}_TEfilt/"$cds_base.$fna"
+                           -xclude -lis "00_TEsearch/lis.$cds_base" -out "${DATA_DIR}/$cds_base.$fna"
       get_fasta_subset.pl -in 00_fasta_prot_orig/"$prot_base.$faa" -clobber \
-                           -xclude -lis 00_TEsearch/lis."$cds_base" -out ${DATA_DIR}_TEfilt/"$prot_base.$faa"
-      cp ${DATA_DIR}/$annot_file ${DATA_DIR}_TEfilt/$annot_file
-      gzip -f ${DATA_DIR}_TEfilt/"$cds_base.$fna" ${DATA_DIR}_TEfilt/"$prot_base.$faa"
+                           -xclude -lis "00_TEsearch/lis.$cds_base" -out "${DATA_DIR}/$prot_base.$faa"
+      cp "${DATA_DIR}/$annot_file" "${DATA_DIR}/$annot_file"
+      gzip -f "${DATA_DIR}/$cds_base.$fna" "${DATA_DIR}/$prot_base.$faa"
     done
   fi
 
@@ -232,11 +231,11 @@ run_TEfilter() {
       cut -f1 00_TEsearch/"$cds_base".x."$exclude_TE_match_base".m8_top > 00_TEsearch/lis."$cds_base"
 
       get_fasta_subset.pl -in 00_fasta_nuc_orig/"$cds_base.$fna" -clobber \
-                           -xclude -lis 00_TEsearch/lis."$cds_base" -out ${DATA_DIR}_TEfilt/"$cds_base.$fna"
-      get_fasta_subset.pl -in 00_fasta_prot_orig/"$prot_base.$faa" -clobber \
-                           -xclude -lis 00_TEsearch/lis."$cds_base" -out ${DATA_DIR}_TEfilt/"$prot_base.$faa"
-      cp ${DATA_DIR}/$annot_file ${DATA_DIR}_TEfilt/$annot_file
-      gzip -f ${DATA_DIR}_TEfilt/"$cds_base.$fna" ${DATA_DIR}_TEfilt/"$prot_base.$faa"
+                           -xclude -lis "00_TEsearch/lis.$cds_base" -out "${DATA_DIR}/$cds_base.$fna"
+      get_fasta_subset.pl -in "00_fasta_prot_orig/$prot_base.$faa" -clobber \
+                           -xclude -lis "00_TEsearch/lis.$cds_base" -out "${DATA_DIR}/$prot_base.$faa"
+      cp "${DATA_DIR}/$annot_file" "${DATA_DIR}/$annot_file"
+      gzip -f "${DATA_DIR}/$cds_base.$fna" "${DATA_DIR}/$prot_base.$faa"
     done
   fi
 }
@@ -244,13 +243,11 @@ run_TEfilter() {
 ########################################
 # Main program
 
-pandagma_conf_params='clust_cov '
+declare clust_cov TE_match_iden commandlist dependencies
 
 # Run all specified steps 
-commandlist="TEfilter"
+export commandlist="TEfilter"
 
-dependencies='mmseqs'
-
-declare  clust_cov 
+export dependencies='mmseqs'
 
 main_pan_fam "$@"
