@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2023-01-27"
+version="2023-01-28"
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -134,7 +134,7 @@ main_pan_fam() {
   export fam_dir
 
   case ${step} in 
-    all|summarize|xfr_aligns_trees) : "${out_dir:=pandagma_out}" ;; # default to ./pandagma_out 
+    all|summarize|xfr_aligns_trees) : "${out_dir:=out_pandagma}" ;; # default to ./pandagma_out 
     *) if [ "${out_dir:-}" ]; then
          printf '\noption -o OUT_DIR not applicable to step %s\n' "$step" >&2
          exit 1
@@ -171,8 +171,9 @@ main_pan_fam() {
   ##########
   # Set the DATA_DIR, defaulting to ./data if -d DATA_DIR option not specified
   export DATA_DIR=${optarg_data_dir:-${PWD}/data}
-  # Set the work_dir, defaulting to ./pandagma_work if -w WORK_DIR option not specified
-  export WORK_DIR=${optarg_work_dir:-${PWD}/pandagma_work}
+  echo "From common: $DATA_DIR"
+  # Set the work_dir, defaulting to ./work_pandagma if -w WORK_DIR option not specified
+  export WORK_DIR=${optarg_work_dir:-${PWD}/work_pandagma}
   
   if [[ $step == "clean" ]] ; then
     run_"$step"

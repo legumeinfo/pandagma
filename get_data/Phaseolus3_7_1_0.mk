@@ -22,6 +22,7 @@ phavu.LaborOvalle.gnm1.ann1.L1DY.gene_models_main.bed.gz \
 phavu.LaborOvalle.gnm1.ann1.L1DY.protein_primary.faa.gz \
 phavu.UI111.gnm1.ann1.8L4N.cds_primary.fna.gz \
 phavu.UI111.gnm1.ann1.8L4N.gene_models_main.bed.gz \
-phavu.UI111.gnm1.ann1.8L4N.protein_primary.faa.gz
+phavu.UI111.gnm1.ann1.8L4N.protein_primary.faa.gz \
+legume.TE_lib_2024.rpt.YFQ7.fna.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk

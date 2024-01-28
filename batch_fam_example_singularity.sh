@@ -23,8 +23,8 @@ export SINGULARITY_CLEANENV=TRUE
 
 ##########
 ## Run all main steps, assuming input data files exist in ./data
-## Work directory will be ./pandagma_work
-## Output will go to ./pandagma_out
+## Work directory will be ./work_pandagma
+## Output will go to ./out_pandagma
 singularity exec $IMAGE pandagma fam -c $CONFIG
 
 ##########
@@ -47,7 +47,7 @@ singularity exec $IMAGE pandagma fam -c $CONFIG
 ##########
 ## Optional work-directory cleanup steps
 #singularity exec $IMAGE pandagma fam -c $CONFIG -s clean
-#rm -rf ./pandagma_work
+#rm -rf ./work_pandagma
 
 date   # print timestamp
 

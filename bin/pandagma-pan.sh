@@ -20,8 +20,8 @@ Usage:
            -c (path to the config file)
 
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
-           -w (working directory, for temporary and intermediate files [default: './pandagma_work'].)
-           -o OUTPUT_DIR (name for the output directory [default: './pandagma_out'].
+           -w (working directory, for temporary and intermediate files [default: './work_pandagma'].)
+           -o OUTPUT_DIR (name for the output directory [default: './out_pandagma'].
                 Applicable only to "all" and "summarize" steps.)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
            -O (ordering method, for placing pan-genes. Options: 
