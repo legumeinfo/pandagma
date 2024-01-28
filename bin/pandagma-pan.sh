@@ -655,7 +655,9 @@ run_add_extra() {
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_cds
   
     echo "  Merge files in 19_pan_aug_leftover_merged_cds, prefixing IDs with panID__"
-    merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_cds/* > 19_pan_aug_leftover_merged_cds.fna
+    find 19_pan_aug_leftover_merged_cds -maxdepth 1 -mindepth 1 |
+      sort |
+        xargs awk '/^>/ {printf(">%s__%s\n", substr(FILENAME,index(FILENAME,"/")+1), substr($0,2)); next} {print}' > 19_pan_aug_leftover_merged_cds.fna
 
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
@@ -683,7 +685,9 @@ run_pick_exemplars() {
               -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
 
   echo "  Get all protein sequences from files in 19_pan_aug_leftover_merged_prot"
-  merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_prot/* > 19_pan_aug_leftover_merged_prot.faa
+  find 19_pan_aug_leftover_merged_prot -maxdepth 1 -mindepth 1 |
+    sort |
+      xargs awk '/^>/ {printf(">%s__%s\n", substr(FILENAME,index(FILENAME,"/")+1), substr($0,2)); next} {print}' > 19_pan_aug_leftover_merged_prot.faa
 
   echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
   echo "    == first proteins:"
