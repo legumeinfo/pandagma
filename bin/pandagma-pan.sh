@@ -288,7 +288,6 @@ run_mmseqs() {
     done
     echo
   done
-  wait # wait for last jobs to finish
 }
 
 ##########
@@ -574,7 +573,6 @@ run_add_extra() {
       mmseqs easy-search "02_fasta_nuc/$file_base" 13_pan_aug_fasta_posn.fna 13_extra_out_constr_dir/"${file_base}".x.all_cons.m8 \
                    "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null
     done
-    wait # wait for jobs to finish
 
     for file in "${cds_files_extra_free[@]}"; do
       file_base=$(basename "$file" .gz)
@@ -583,7 +581,6 @@ run_add_extra() {
       mmseqs easy-search "02_fasta_nuc/$file_base" 13_pan_aug_fasta_posn.fna 13_extra_out_free_dir/"${file_base}".x.all_cons.m8 \
                    "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null
     done
-    wait # wait for jobs to finish
 
     if [[ -v expected_chr_matches ]]; then  # filter based on list of expected chromosome pairings if provided
       echo "Filtering on chromosome patterns defined in expected_chr_matches and by identity and top match."
