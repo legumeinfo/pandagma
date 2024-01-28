@@ -19,7 +19,7 @@ jobs:
     - name: Fetch data
       run: |
         mkdir data
-        PATH=$PWD/bin:$PATH make -j 2 -C data -f "${PWD}/get_data/${{ matrix.PAN_CONF }}.mk"
+        PATH=$PWD/bin:$PATH make -C data -f "${PWD}/get_data/${{ matrix.PAN_CONF }}.mk"
     - name: Create conda environment
       run: conda env create && conda clean --all -y
 
