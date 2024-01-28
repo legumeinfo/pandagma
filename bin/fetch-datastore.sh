@@ -13,7 +13,6 @@ case ${DATAFILE} in
   bauva.BV-YZ2020.gnm2.ann1.RJ1G.*|\
   chafa.ISC494698.gnm1.ann1.G7XW.*|\
   dalod.SKLTGB.gnm1.ann1.R67B.*|\
-  glyma.Lee.gnm3.ann1.*|glyma.Wm82.gnm5.ann1.*|\
   prupe.Lovell.gnm2.ann1.S2ZZ.*|\
   quisa.S10.gnm1.ann1.RQ4J.*|\
   sento.Myeongyun.gnm1.ann1.*|\
@@ -27,17 +26,13 @@ collection=${DATAFILE#*.}
 collection=${collection%.*.*.*}
 collection_type=annotations
 
-# special case
-case ${DATAFILE} in
-  sento.Myeongyun.gnm1.ann1.*) collection=Myeongyun.gnm1.ann1.5WXB ;; # lacks 5WXB in filenames
-esac
-
 case ${genspa} in
   [A-Z]*) genus=${genspa} species=GENUS collection_type=pangenes collection=${1%.*.*.*} ;;
   aesev) genus=Aeschynomene species=evenia ;;
   aradu) genus=Arachis species=duranensis ;;
   arahy) genus=Arachis species=hypogaea ;;
   araip) genus=Arachis species=ipaensis ;;
+  arast) genus=Arachis species=stenosperma ;;
   arath) genus=Arabidopsis species=thaliana ;;
   bauva) genus=Bauhinia species=variegata ;;
   cajca) genus=Cajanus species=cajan ;;
