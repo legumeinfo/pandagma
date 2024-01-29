@@ -44,6 +44,7 @@ vigan.Gyeongwon.gnm3.ann1.3Nz5.protein_primary.faa.gz \
 vigra.VC1973A.gnm7.ann1.RWBG.cds.fna.gz \
 vigra.VC1973A.gnm7.ann1.RWBG.protein.faa.gz \
 vigun.IT97K-499-35.gnm1.ann2.FD7K.cds_primary.fna.gz \
-vigun.IT97K-499-35.gnm1.ann2.FD7K.protein_primary.faa.gz
+vigun.IT97K-499-35.gnm1.ann2.FD7K.protein_primary.faa.gz \
+legume.TE_lib_2024.rpt.YFQ7.fna.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk
