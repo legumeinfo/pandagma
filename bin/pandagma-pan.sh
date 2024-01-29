@@ -1188,16 +1188,16 @@ run_summarize() {
                  }' >> "${stats_file}"
   fi
 
-  printf "\n== Sequence stats for final pangene CDS files -- pctl%f and trimmed\n" "$pctl_low" >> "${stats_file}"
+  printf "\n== Sequence stats for final pangene CDS files -- pctl%d and trimmed\n" "$pctl_low" >> "${stats_file}"
   printf "  Class:   seqs     min max    N50    ave     annotation_name\n" >> "${stats_file}" 
   annot_name=23_syn_pan_pctl${pctl_low}_posn_cds.fna
   echo "  CHECK: report annot_name to stats file? [$annot_name]"
-  printf "  pctl%f: " "${pctl_low}" >> "${stats_file}"
+  printf "  pctl%d: " "${pctl_low}" >> "${stats_file}"
   cat_or_zcat "${WORK_DIR}/23_syn_pan_pctl${pctl_low}_posn_cds.fna" | calc_seq_stats >> "${stats_file}"
 
   echo "  Print per-annotation-set coverage stats (sequence counts, sequences retained)"
   #   tmp.gene_count_start was generated during run_ingest
-  printf "\n== Proportion of initial genes retained in the \"aug_extra\" and \"pctl%f\" sets:\n" "${pctl_low}" \
+  printf "\n== Proportion of initial genes retained in the \"aug_extra\" and \"pctl%d\" sets:\n" "${pctl_low}" \
     >> "${stats_file}"
 
   cut -f2 "${WORK_DIR}"/18_syn_pan_aug_extra.hsh.tsv | 
