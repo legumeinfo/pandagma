@@ -745,8 +745,8 @@ run_align() {
   for filepath in 19_pan_aug_leftover_merged_prot/*; do 
     file=$(basename "$filepath");
     echo "  Computing alignment, using program famsa, for file $file"
-    famsa -t 2 19_pan_aug_leftover_merged_prot/"$file" 20_aligns/"$file" 1>/dev/null &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+    famsa 19_pan_aug_leftover_merged_prot/"$file" 20_aligns/"$file" 1>/dev/null &
+    if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
 }
@@ -759,9 +759,9 @@ run_model_and_trim() {
   for filepath in 20_aligns/*; do 
     file=$(basename "$filepath");
     hmmbuild -n "$file" 21_hmm/"$file" "$filepath" 1>/dev/null &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+    if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
-  wait
+wait
 
   echo; echo "== Realign to HMMs =="
   mkdir -p 22_hmmalign
@@ -769,7 +769,7 @@ run_model_and_trim() {
     file=$(basename "$filepath");
     printf "%s " "$file"
     hmmalign --trim --outformat A2M --amino -o 22_hmmalign/"$file" 21_hmm/"$file" 19_pan_aug_leftover_merged_prot/"$file" &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+    if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
   echo
@@ -781,7 +781,7 @@ run_model_and_trim() {
     printf "%s " "$file"
     < "$filepath" perl -ne 'if ($_ =~ />/) {print $_} else {$line = $_; $line =~ s/[a-z]//g; print $line}' |
       sed '/^$/d' > 23_hmmalign_trim1/"$file" &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+    if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
   echo
@@ -796,7 +796,7 @@ run_model_and_trim() {
     printf "%s " "$file"
     filter_align.pl -in "$filepath" -out 23_hmmalign_trim2/"$file" -log 23_hmmalign_trim2_log/"$file" \
                     -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+    if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
   echo
