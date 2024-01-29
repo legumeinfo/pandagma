@@ -14,8 +14,9 @@ define HELP_DOC <<'EOS'
 This workflow, pandagma-TEfilter.sh, is for optional pre-filtering of CDS and protein data
 to exclude genes with matches to transposable elements or other sequences that the 
 researcher wishes not to include in the pangene calculations. A nucleotide fasta file of 
-sequences-to-avoid needs to be provided in the initial data directory; and another directory
-needs to be indicated to receive the cleaned data.
+sequences-to-avoid needs to be provided in the initial data directory (default "data" 
+or indicated with the -d flag). Output files are written to ./data_TEfilter 
+(or -d <data_dir>_TEfilter, if the -d option is specified).
 
 Usage:
   $scriptname -c CONFIG_FILE [options]
@@ -23,15 +24,15 @@ Usage:
   Required:
            -c (path to the config file)
 
-  Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
-           -i (path to initial data directory, with CDS, protein, annotation, and transposable element files)
+  Options: -d (path to initial data directory, with CDS, protein, annotation, and transposable element files
+                 [default: './data'])
            -w (working directory, for temporary and intermediate files [default: './work_pandagma'].)
            -o OUTPUT_DIR (name for the output directory [default: './out_pandagma'].
+           -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
                 Applicable only to "all" and "summarize" steps.)
            -n (number of processors to use. Defaults to number of processors available to the parent process)
            -v (version)
            -h (help)
-           -m (more information)
 
 Environment requirements: The following packages need to be available in your PATH:
     mmseqs
