@@ -15,7 +15,7 @@ araduip.V14167K30076.gnm1.ann1.cxSMJ37m.protein.faa.gz:
 	  fetch-datastore.sh aradu.V14167.gnm1.ann1.cxSM.$${suffix} | gzip -d
 	  fetch-datastore.sh araip.K30076.gnm1.ann1.J37m.$${suffix} | gzip -d
 	} | sed -e 's/^>aradu.V14167.gnm1/>araduip.V14167K30076.gnm1/' \
-	        -e 's/^>araip.K30076.gnm1/>araduip.V14167K30076.gnm1/' > "$@"
+	        -e 's/^>araip.K30076.gnm1/>araduip.V14167K30076.gnm1/' | gzip > "$@"
 
 araduip.V14167K30076.gnm1.ann1.cxSMJ37m.gene_models_main.bed.gz:
 	{
