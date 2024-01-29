@@ -21,28 +21,31 @@ jobs:
         mkdir data
         PATH=$PWD/bin:$PATH make -C data -f "${PWD}/get_data/${{ matrix.PANDAGMA_CONF }}.mk"
     - name: Create conda environment
-      run: conda env create && conda clean --all -y
+      # bioconda mmseqs doesn't have AVX2 enabled
+      run: |
+        sed -i'' -n '/mmseqs/!p' environment.yml
+        conda env create && conda clean --all -y
+        set -o pipefail -o errexit
+        curl --fail -L https://github.com/soedinglab/MMseqs2/releases/download/15-6f452/mmseqs-linux-avx2.tar.gz | tar -xzf -
 
     - name: Run pandagma
       env:
         PANDAGMA_CONF: ${{ matrix.PANDAGMA_CONF }}
       run: |
-        sudo mkdir -m 777 /mnt/pandagma_work
-        ln -s /mnt/pandagma_work .
+        sudo mkdir -m 777 /mnt/work
         case ${PANDAGMA_CONF} in
           family*) WORKFLOW=fam ;;
           *) WORKFLOW=pan ;;
         esac
-        env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output pandagma ${WORKFLOW} -d data -c "config/${PANDAGMA_CONF}.conf"
-        printf 'GITHUB_REPOSITORY: %s\n\n' "${GITHUB_REPOSITORY}" > pandagma_out/VERSION
-        git show --quiet >> pandagma_out/VERSION
-        cp config/${PANDAGMA_CONF}.conf pandagma_out/
-        mkdir upload-artifact
-        mv pandagma_out upload-artifact/pandagma_out-${PANDAGMA_CONF}
+        mkdir -p ${PANDAGMA_OUT:=upload-artifact/pandagma-${PANDAGMA_CONF}}
+        printf 'GITHUB_REPOSITORY: %s\n\n' "${GITHUB_REPOSITORY}" > ${PANDAGMA_OUT}/VERSION
+        git show --quiet >> ${PANDAGMA_OUT}/VERSION
+        cp config/${PANDAGMA_CONF}.conf ${PANDAGMA_OUT}
+        env PATH=$PWD/bin:$PWD/mmseqs/bin:$PATH time -v conda run -n pandagma --no-capture-output pandagma ${WORKFLOW} -d data -c "config/${PANDAGMA_CONF}.conf" -w /mnt/work -o ${PANDAGMA_OUT} 2>&1 | tee ${PANDAGMA_OUT}/pandagma.log
     - name: Upload output artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: pandagma_out-${{ matrix.PANDAGMA_CONF }}
+        name: pandagma-${{ matrix.PANDAGMA_CONF }}
         # Need to create subdirectory to unzip as directory
         # https://github.com/actions/upload-artifact/issues/248
         path: upload-artifact
