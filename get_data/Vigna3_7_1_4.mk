@@ -34,7 +34,8 @@ vigun.UCR779.gnm1.ann1.VF6G.gene_models_main.bed.gz \
 vigun.UCR779.gnm1.ann1.VF6G.protein_primary.faa.gz \
 vigun.ZN016.gnm1.ann2.C7YV.cds_primary.fna.gz \
 vigun.ZN016.gnm1.ann2.C7YV.gene_models_main.bed.gz \
-vigun.ZN016.gnm1.ann2.C7YV.protein_primary.faa.gz
+vigun.ZN016.gnm1.ann2.C7YV.protein_primary.faa.gz \
+legume.TE_lib_2024.rpt.YFQ7.fna.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk
 
