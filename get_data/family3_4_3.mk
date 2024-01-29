@@ -14,9 +14,9 @@ Glycine.pan4.RK4P.pctl25_named_protein.faa.gz \
 prupe.Lovell.gnm2.ann1.S2ZZ.cds_primary.fna.gz \
 prupe.Lovell.gnm2.ann1.S2ZZ.gene_models_main.bed.gz \
 prupe.Lovell.gnm2.ann1.S2ZZ.protein_primary.faa.gz \
-sento.Myeongyun.gnm1.ann1.cds.fna.gz \
-sento.Myeongyun.gnm1.ann1.gene_models_main.bed.gz \
-sento.Myeongyun.gnm1.ann1.protein.faa.gz \
+sento.Myeongyun.gnm1.ann1.5WXB.cds.fna.gz \
+sento.Myeongyun.gnm1.ann1.5WXB.gene_models_main.bed.gz \
+sento.Myeongyun.gnm1.ann1.5WXB.protein.faa.gz \
 vitvi.PN40024.gnm2.ann1.V31M.cds_primary.fna.gz \
 vitvi.PN40024.gnm2.ann1.V31M.gene_models_main.bed.gz \
 vitvi.PN40024.gnm2.ann1.V31M.protein_primary.faa.gz \
