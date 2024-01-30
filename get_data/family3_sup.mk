@@ -31,8 +31,8 @@ pissa.Cameor.gnm1.ann1.7SZR.cds_primary.fna.gz \
 pissa.Cameor.gnm1.ann1.7SZR.protein_primary.faa.gz \
 quisa.S10.gnm1.ann1.RQ4J.cds_primary.fna.gz \
 quisa.S10.gnm1.ann1.RQ4J.protein_primary.faa.gz \
-sento.Myeongyun.gnm1.ann1.cds.fna.gz \
-sento.Myeongyun.gnm1.ann1.protein.faa.gz \
+sento.Myeongyun.gnm1.ann1.5WXB.cds.fna.gz \
+sento.Myeongyun.gnm1.ann1.5WXB.protein.faa.gz \
 singl.CAF01.gnm1.ann1.WFKC.cds.fna.gz \
 singl.CAF01.gnm1.ann1.WFKC.protein.faa.gz \
 tripr.MilvusB.gnm2.ann1.DFgp.cds_primary.fna.gz \
@@ -44,6 +44,7 @@ vigan.Gyeongwon.gnm3.ann1.3Nz5.protein_primary.faa.gz \
 vigra.VC1973A.gnm7.ann1.RWBG.cds.fna.gz \
 vigra.VC1973A.gnm7.ann1.RWBG.protein.faa.gz \
 vigun.IT97K-499-35.gnm1.ann2.FD7K.cds_primary.fna.gz \
-vigun.IT97K-499-35.gnm1.ann2.FD7K.protein_primary.faa.gz
+vigun.IT97K-499-35.gnm1.ann2.FD7K.protein_primary.faa.gz \
+legume.TE_lib_2024.rpt.YFQ7.fna.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk

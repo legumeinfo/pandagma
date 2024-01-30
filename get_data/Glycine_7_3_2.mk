@@ -34,6 +34,7 @@ glyso.PI483463.gnm1.ann1.3Q3Q.gene_models_main.bed.gz \
 glyso.PI483463.gnm1.ann1.3Q3Q.protein_primary.faa.gz \
 glyso.W05.gnm1.ann1.T47J.cds_primary.fna.gz \
 glyso.W05.gnm1.ann1.T47J.gene_models_main.bed.gz \
-glyso.W05.gnm1.ann1.T47J.protein_primary.faa.gz
+glyso.W05.gnm1.ann1.T47J.protein_primary.faa.gz \
+legume.TE_lib_2024.rpt.YFQ7.fna.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk

@@ -23,6 +23,8 @@ esac
 
 genspa=${DATAFILE%%.*}
 collection=${DATAFILE#*.}
+trim_first=${DATAFILE#*.*}
+TE_collection=${trim_first%.*.*}
 collection=${collection%.*.*.*}
 collection_type=annotations
 
@@ -32,6 +34,7 @@ case ${genspa} in
   aradu) genus=Arachis species=duranensis ;;
   arahy) genus=Arachis species=hypogaea ;;
   araip) genus=Arachis species=ipaensis ;;
+  arast) genus=Arachis species=stenosperma ;;
   arath) genus=Arabidopsis species=thaliana ;;
   bauva) genus=Bauhinia species=variegata ;;
   cajca) genus=Cajanus species=cajan ;;
@@ -49,6 +52,7 @@ case ${genspa} in
   glyso) genus=Glycine species=soja ;;
   glyst) genus=Glycine species=stenophita ;;
   glysy) genus=Glycine species=syndetika ;;
+  legume) genus=LEGUMES species=Fabaceae ;;
   lencu) genus=Lens species=culinaris ;;
   lotja) genus=Lotus species=japonicus ;;
   lupal) genus=Lupinus species=albus ;;
@@ -70,5 +74,15 @@ case ${genspa} in
   vitvi) genus=Vitis species=vinifera ;;
   *) echo "ERROR: genus/species unknown: ${DATAFILE}" >&2; exit 1
 esac
+
+# Special case for file of transposable elements, indicated by string TE_lib
+if [[ "$collection" == *"TE_lib"* ]]; then
+  genus=LEGUMES 
+  species=Fabaceae 
+  collection_type=repeats 
+  collection=$TE_collection
+fi
+
+#echo "${DATASTORE}/${genus}/${species}/${collection_type}/${collection}/${DATAFILE}"
 
 curl --no-progress-meter --fail "${DATASTORE}/${genus}/${species}/${collection_type}/${collection}/${DATAFILE}"

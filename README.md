@@ -42,6 +42,14 @@ data and thresholds provided by the user.
 * Calculate gene trees
 * Calculate and report statistics
 
+Several additional optional worflows are available:
+* `pandagma TEfilter` - to compare CDS and protein data sets against a user-provided set of transposable elements 
+    or other sequences to be filtered against. The intended use is to remove such sequences prior to calculating
+    pangenes and gene families.
+* `pandagma pupdate` - to compare and generate a mapping between two pangene sets.
+* `pandagma fsup` - to "supplement" or add species/annotations into gene families calculated previously. 
+    The selected new annotation sets are compared against HMMs calculated as part of a prior full run of pandagma-fam.sh.
+
 ## Installation methods <a name="installation"></a>
 
 First, clone this repository and change your working directory:
@@ -91,8 +99,9 @@ Usage:
            -c (path to the config file)
 
   Options: -s (subcommand to run. If "all" or omitted, all steps will be run; otherwise, run specified step)
-           -w (working directory, for temporary and intermediate files [default: './pandagma_work'].)
-           -o OUTPUT_DIR (name for the output directory [default: './pandagma_out'].
+           -w (working directory, for temporary and intermediate files [default: './work_pandagma'].)
+           -d (data directory, for annotation files [default: './data'; or set to data_TEFilter following 'pandagma TEfilter']
+           -o OUTPUT_DIR (name for the output directory [default: './out_pandagma'].
                 Applicable only to "all" and "summarize" steps.)
            -O (ordering method, for placing pan-genes. Options: 
                 "reference" (default; uses preferred_annot to order, then gap-filling for missing panIDs.)
@@ -296,7 +305,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
    calling the pandagma workflows using singularity and conda.
 
 4. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
-    Output will go into a directory specified by the `-o OUT_DIR` option (default "./pandagma_out").
+    Output will go into a directory specified by the `-o OUT_DIR` option (default "./out_pandagma").
 
     The summary of the run is given in the file stats.txt . Look at the modal values
     in the histograms, the report of proportion of each assembly with matches, etc.
@@ -359,7 +368,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
 
     An intermediate output file, `stats/ks_peaks_auto.tsv`, is written to the work directory
     This should be examined for biological plausibility, along with the other 
-    Ks results (histograms) in the pandagma_work/stats subdirectory.
+    Ks results (histograms) in the work_pandagma/stats subdirectory.
     The `ks_peaks_auto.tsv` file can be examined and used to create a file named `ks_peaks.tsv`
     with changes relative to `ks_peaks_auto.tsv` if necessary to reflect known or suspected WGD histories. 
 
@@ -371,7 +380,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
     then run the steps `ks_filter` through `summarize`. In step 8 here, we run that last set of steps.
 
 5. Examine the output, and adjust parameters and possibly the initial chromosome correspondences.
-    Output will go into a directory specified by the `-o OUT_DIR` option (default "./pandagma_out").
+    Output will go into a directory specified by the `-o OUT_DIR` option (default "./out_pandagma").
 
     The summary of the run is given in the file stats.[parameters].txt .
     Look at the modal values in the histograms, the report of proportion of each assembly 

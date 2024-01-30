@@ -55,7 +55,7 @@ pandagma fam -c $CONFIG -s summarize
 ##########
 # Optional work-directory cleanup steps
 #pandagma fam -c $CONFIG -s clean
-#rm -rf ./pandagma_work
+#rm -rf ./work_pandagma
 
 date   # print timestamp
 

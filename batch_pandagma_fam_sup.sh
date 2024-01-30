@@ -26,7 +26,7 @@ printf "Testing path: hash_into_fasta_id.pl is ";
 echo
 
 ##########
-# Run all main steps, assuming ./pandagma_out exists from previous run of pandagma fam
+# Run all main steps, assuming ./out_pandagma exists from previous run of pandagma fam
 #pandagma fsup -c $CONFIG
 
 # Below: run indicated steps.

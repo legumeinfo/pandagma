@@ -47,6 +47,9 @@ medtr.HM058.gnm1.ann1.LXPZ.protein.faa.gz \
 medtr.HM060.gnm1.ann1.H41P.cds.fna.gz \
 medtr.HM060.gnm1.ann1.H41P.gene_models_main.bed.gz \
 medtr.HM060.gnm1.ann1.H41P.protein.faa.gz \
+medtr.HM078.gnm1.ann1.3RNP.cds.fna.gz \
+medtr.HM078.gnm1.ann1.3RNP.gene_models_main.bed.gz \
+medtr.HM078.gnm1.ann1.3RNP.protein.faa.gz \
 medtr.HM095.gnm1.ann1.55W4.cds.fna.gz \
 medtr.HM095.gnm1.ann1.55W4.gene_models_main.bed.gz \
 medtr.HM095.gnm1.ann1.55W4.protein.faa.gz \
@@ -67,6 +70,7 @@ medtr.R108.gnmHiC_1.ann1.Y8NH.gene_models_main.bed.gz \
 medtr.R108.gnmHiC_1.ann1.Y8NH.protein.faa.gz \
 medtr.R108_HM340.gnm1.ann1.85YW.cds_primary.fna.gz \
 medtr.R108_HM340.gnm1.ann1.85YW.gene_models_main.bed.gz \
-medtr.R108_HM340.gnm1.ann1.85YW.protein_primary.faa.gz
+medtr.R108_HM340.gnm1.ann1.85YW.protein_primary.faa.gz \
+legume.TE_lib_2024.rpt.YFQ7.fna.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk
