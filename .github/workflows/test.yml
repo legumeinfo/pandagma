@@ -8,6 +8,11 @@ on:
         default: '["Arachis3_5_2_0", "Cicer3_4_2_0", "Glycine_7_3_2", "Medicago3_8_0_16", "Vigna4_7_1_4"]'
         description: Run pandagma pan for each config/NAME.conf file in the (JSON) array
         required: true
+      ssh_enabled:
+        type: boolean
+        description: 'Stop after cloning repository and enable SSH access for debugging'
+        required: false
+        default: false
 
 jobs:
   pandagma:
@@ -18,13 +23,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Setup SSH session for debugging
+      uses: mxschmitt/action-tmate@v3
+      if: ${{ inputs.ssh_enabled }}
+      with:
+        limit-access-to-actor: true
     - name: Fetch data
       run: |
         mkdir data
         PATH=$PWD/bin:$PATH make -C data -f "${PWD}/get_data/${{ matrix.PANDAGMA_CONF }}.mk"
     - name: Create conda environment
       run: conda env create && conda clean --all -y
-
     - name: Run pandagma
       env:
         PANDAGMA_CONF: ${{ matrix.PANDAGMA_CONF }}

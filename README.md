@@ -100,7 +100,7 @@ Usage:
 
   Options: -s (subcommand to run. If "all" or omitted, all steps will be run; otherwise, run specified step)
            -w (working directory, for temporary and intermediate files [default: './work_pandagma'].)
-           -d (data directory, for annotation files [default: './data'; or set to data_TEFilter following 'pandagma TEfilter']
+           -d (data directory, for annotation files [default: './data'; or set to data_TEfilter following 'pandagma TEfilter']
            -o OUTPUT_DIR (name for the output directory [default: './out_pandagma'].
                 Applicable only to "all" and "summarize" steps.)
            -O (ordering method, for placing pan-genes. Options: 

@@ -54,7 +54,7 @@ canonicalize_paths() {
   echo "${cds_files[@]}"
 
   echo "DATA_DIR: ${DATA_DIR}"
-  DATA_DIR_TEF="${DATA_DIR}_TEFilter"
+  DATA_DIR_TEF="${DATA_DIR}_TEfilter"
   mkdir -p "$DATA_DIR_TEF"
   cd "${DATA_DIR}" || exit
 
