@@ -37,6 +37,9 @@ jobs:
     - name: Run pandagma
       env:
         PANDAGMA_CONF: ${{ matrix.PANDAGMA_CONF }}
+      # explicitly use bash to enforce pipefail
+      # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#exit-codes-and-error-action-preference
+      shell: bash
       run: |
         sudo mkdir -m 777 /mnt/work
         mkdir -p ${PANDAGMA_OUT:=upload-artifact/pandagma-pan-${PANDAGMA_CONF}}
