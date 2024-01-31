@@ -167,6 +167,6 @@ glyst.G1974.gnm1.ann1.F257.protein.faa.gz \
 glysy.G1300.gnm1.ann1.RRK6.cds.fna.gz \
 glysy.G1300.gnm1.ann1.RRK6.gene_models_main.bed.gz \
 glysy.G1300.gnm1.ann1.RRK6.protein.faa.gz \
-legume.TE_lib_2024.rpt.YFQ7.fna.gz
+legume.TE_lib_2024.rpt.6WVT.fna.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk

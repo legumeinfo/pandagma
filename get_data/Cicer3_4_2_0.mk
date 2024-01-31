@@ -17,6 +17,6 @@ cicec.S2Drd065.gnm1.ann1.YZ9H.protein.faa.gz \
 cicre.Besev079.gnm1.ann1.F01Z.cds.fna.gz \
 cicre.Besev079.gnm1.ann1.F01Z.gene_models_main.bed.gz \
 cicre.Besev079.gnm1.ann1.F01Z.protein.faa.gz \
-legume.TE_lib_2024.rpt.YFQ7.fna.gz
+legume.TE_lib_2024.rpt.6WVT.fna.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk

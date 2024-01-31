@@ -62,6 +62,6 @@ Vigna.pan2.MQQM.pctl25_named_protein.faa.gz \
 vitvi.PN40024.gnm2.ann1.V31M.cds_primary.fna.gz \
 vitvi.PN40024.gnm2.ann1.V31M.gene_models_main.bed.gz \
 vitvi.PN40024.gnm2.ann1.V31M.protein_primary.faa.gz \
-legume.TE_lib_2024.rpt.YFQ7.fna.gz
+legume.TE_lib_2024.rpt.6WVT.fna.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk

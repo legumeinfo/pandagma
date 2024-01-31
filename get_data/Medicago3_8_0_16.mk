@@ -71,6 +71,6 @@ medtr.R108.gnmHiC_1.ann1.Y8NH.protein.faa.gz \
 medtr.R108_HM340.gnm1.ann1.85YW.cds_primary.fna.gz \
 medtr.R108_HM340.gnm1.ann1.85YW.gene_models_main.bed.gz \
 medtr.R108_HM340.gnm1.ann1.85YW.protein_primary.faa.gz \
-legume.TE_lib_2024.rpt.YFQ7.fna.gz
+legume.TE_lib_2024.rpt.6WVT.fna.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk
