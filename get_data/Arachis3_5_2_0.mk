@@ -20,6 +20,6 @@ arahy.Tifrunner.gnm2.ann2.PVFB.protein.faa.gz \
 arast.V10309.gnm1.ann1.CZRZ.cds_primary.fna.gz \
 arast.V10309.gnm1.ann1.CZRZ.gene_models_main.bed.gz \
 arast.V10309.gnm1.ann1.CZRZ.protein_primary.faa.gz \
-legume.TE_lib_2024.rpt.YFQ7.fna.gz
+legume.TE_lib_2024.rpt.6WVT.fna.gz
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk
