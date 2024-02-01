@@ -287,7 +287,7 @@ run_mmseqs() {
         mmseqs easy-cluster stdin 03_mmseqs/"${qry_base}".x."${sbj_base}" "$MMTEMP" \
          --min-seq-id "$clust_iden" -c "$clust_cov" --cov-mode 0 --cluster-reassign 1>/dev/null
       # remove mmseqs easy-cluster .fasta output -- not needed downstream, and uses more work_dir storage than any other workflow step
-      rm -f 03_mmseqs/"${qry_base}.x.${sbj_base}"_rep_seq.fasta 03_mmseqs/"${qry_base}.x.${sbj_base}"_all_seq.fasta
+      rm -f 03_mmseqs/"${qry_base}.x.${sbj_base}"_rep_seq.fasta 03_mmseqs/"${qry_base}.x.${sbj_base}"_all_seqs.fasta
     done
     echo
   done
