@@ -83,6 +83,11 @@ if [[ "$collection" == *"TE_lib"* ]]; then
   collection=$TE_collection
 fi
 
+# Special case for Medicago sativa XinJiangDaYe.gnm1.ann1.RKB9, where the annotations have been split into four haplotypes
+if [[ "$collection" == *"XinJiangDaYe"* ]]; then
+  collection="XinJiangDaYe.gnm1.ann1.RKB9"
+fi
+
 #echo "${DATASTORE}/${genus}/${species}/${collection_type}/${collection}/${DATAFILE}"
 
 curl --no-progress-meter --fail "${DATASTORE}/${genus}/${species}/${collection_type}/${collection}/${DATAFILE}"
