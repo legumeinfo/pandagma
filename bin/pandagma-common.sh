@@ -116,7 +116,7 @@ main_pan_fam() {
   do
     case $opt in
       c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
-      d) optarg_data_dir=$OPTARG; echo "Data dir: $optarg_data_dir" ;;
+      d) optarg_data_dir=$(realpath -e "$OPTARG"); echo "Data dir: $optarg_data_dir" ;;
       w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
       s) step=$OPTARG; echo "step(s): $step" ;;
       n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
