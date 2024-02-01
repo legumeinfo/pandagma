@@ -46,7 +46,7 @@ jobs:
         printf 'GITHUB_REPOSITORY: %s\n\n' "${GITHUB_REPOSITORY}" > ${PANDAGMA_OUT}/VERSION
         git show --quiet >> ${PANDAGMA_OUT}/VERSION
         cp config/${PANDAGMA_CONF}.conf ${PANDAGMA_OUT}
-        env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output pandagma TEfilter -d data -c "config/${PANDAGMA_CONF}.conf" -w /mnt/work | tee ${PANDAGMA_OUT}/pandagma.log
+        env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output pandagma TEfilter -d data -c "config/${PANDAGMA_CONF}.conf" -w /mnt/work 2>&1 | tee ${PANDAGMA_OUT}/pandagma.log
         env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output pandagma pan -d data_TEfilter -c "config/${PANDAGMA_CONF}.conf" -w /mnt/work -o ${PANDAGMA_OUT} 2>&1 | tee ${PANDAGMA_OUT}/pandagma.log
     - name: Upload output artifacts
       uses: actions/upload-artifact@v4
