@@ -68,8 +68,10 @@ Create a conda environment called `pandagma` from the environment.yml in this re
 Set a shell variable (e.g., PANDAGMA_ROOT) that contains the path to the pandagma git repository, add the pandagma/bin directory to your PATH, and activate the conda environment:
 ```
     export PANDAGMA_ROOT=/path/to/repo/pandagma
-    export PATH=$PANDAGMA_ROOT/pandagma/bin:$PATH
+    export PATH=$PANDAGMA_ROOT/bin:$PATH
     conda activate pandagma
+      #or
+    source activate pandagma
 ```
 
 
