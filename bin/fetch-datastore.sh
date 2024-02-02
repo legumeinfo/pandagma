@@ -15,7 +15,7 @@ case ${DATAFILE} in
   dalod.SKLTGB.gnm1.ann1.R67B.*|\
   prupe.Lovell.gnm2.ann1.S2ZZ.*|\
   quisa.S10.gnm1.ann1.RQ4J.*|\
-  sento.Myeongyun.gnm1.ann1.*|\
+  sento.Myeongyun.gnm1.ann1.5WXB.*|\
   singl.CAF01.gnm1.ann1.WFKC.*|\
   vitvi.PN40024.gnm2.ann1.V31M.*)
     DATASTORE=${DATASTORE}/annex 

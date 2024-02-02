@@ -285,13 +285,12 @@ run_mmseqs() {
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       { cat 02_fasta_nuc/"$qry_base"."$fa" 02_fasta_nuc/"$sbj_base"."$fa" ; } |
         mmseqs easy-cluster stdin 03_mmseqs/"${qry_base}".x."${sbj_base}" "$MMTEMP" \
-         --min-seq-id "$clust_iden" -c "$clust_cov" --cov-mode 0 --cluster-reassign 1>/dev/null & # background
-        # allow to execute up to $MMSEQSTHREADS in parallel
-        if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+         --min-seq-id "$clust_iden" -c "$clust_cov" --cov-mode 0 --cluster-reassign 1>/dev/null
+      # remove mmseqs easy-cluster .fasta output -- not needed downstream, and uses more work_dir storage than any other workflow step
+      rm -f 03_mmseqs/"${qry_base}.x.${sbj_base}"_rep_seq.fasta 03_mmseqs/"${qry_base}.x.${sbj_base}"_all_seqs.fasta
     done
     echo
   done
-  wait # wait for last jobs to finish
 }
 
 ##########
@@ -575,22 +574,16 @@ run_add_extra() {
       echo "Extra: 02_fasta_nuc/$file_base"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       mmseqs easy-search "02_fasta_nuc/$file_base" 13_pan_aug_fasta_posn.fna 13_extra_out_constr_dir/"${file_base}".x.all_cons.m8 \
-                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null & # background
-
-      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null
     done
-    wait # wait for jobs to finish
 
     for file in "${cds_files_extra_free[@]}"; do
       file_base=$(basename "$file" .gz)
       echo "Extra: 02_fasta_nuc/$file_base"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       mmseqs easy-search "02_fasta_nuc/$file_base" 13_pan_aug_fasta_posn.fna 13_extra_out_free_dir/"${file_base}".x.all_cons.m8 \
-                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null & # background
-
-      if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
+                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null
     done
-    wait # wait for jobs to finish
 
     if [[ -v expected_chr_matches ]]; then  # filter based on list of expected chromosome pairings if provided
       echo "Filtering on chromosome patterns defined in expected_chr_matches and by identity and top match."
@@ -662,7 +655,9 @@ run_add_extra() {
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_cds
   
     echo "  Merge files in 19_pan_aug_leftover_merged_cds, prefixing IDs with panID__"
-    merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_cds/* > 19_pan_aug_leftover_merged_cds.fna
+    find 19_pan_aug_leftover_merged_cds -maxdepth 1 -mindepth 1 |
+      sort |
+        xargs awk '/^>/ {printf(">%s__%s\n", substr(FILENAME,index(FILENAME,"/")+1), substr($0,2)); next} {print}' > 19_pan_aug_leftover_merged_cds.fna
 
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
@@ -690,7 +685,9 @@ run_pick_exemplars() {
               -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
 
   echo "  Get all protein sequences from files in 19_pan_aug_leftover_merged_prot"
-  merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_prot/* > 19_pan_aug_leftover_merged_prot.faa
+  find 19_pan_aug_leftover_merged_prot -maxdepth 1 -mindepth 1 |
+    sort |
+      xargs awk '/^>/ {printf(">%s__%s\n", substr(FILENAME,index(FILENAME,"/")+1), substr($0,2)); next} {print}' > 19_pan_aug_leftover_merged_prot.faa
 
   echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
   echo "    == first proteins:"

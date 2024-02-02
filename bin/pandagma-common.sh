@@ -107,7 +107,7 @@ main_pan_fam() {
   export MMSEQS_NUM_THREADS=${NPROC} # mmseqs otherwise uses all cores by default
   
   # mmseqs uses significant number of threads on its own. Set a maximum, which may be below NPROC.
-  export MMSEQSTHREADS=$(( 4 < NPROC ? 4 : NPROC ))
+  : ${MMSEQSTHREADS:=$(( 4 < NPROC ? 4 : NPROC ))}
   
   ##########
   # Command-line interpreter
@@ -116,7 +116,7 @@ main_pan_fam() {
   do
     case $opt in
       c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
-      d) optarg_data_dir=$OPTARG; echo "Data dir: $optarg_data_dir" ;;
+      d) optarg_data_dir=$(realpath -e "$OPTARG"); echo "Data dir: $optarg_data_dir" ;;
       w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
       s) step=$OPTARG; echo "step(s): $step" ;;
       n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
