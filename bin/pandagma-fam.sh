@@ -747,8 +747,8 @@ run_align() {
   for filepath in 19_pan_aug_leftover_merged_prot/*; do 
     file=$(basename "$filepath");
     echo "  Computing alignment, using program famsa, for file $file"
-    famsa 19_pan_aug_leftover_merged_prot/"$file" 20_aligns/"$file" 1>/dev/null &
-    if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
+    famsa -t 2 19_pan_aug_leftover_merged_prot/"$file" 20_aligns/"$file" 1>/dev/null &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
 }
