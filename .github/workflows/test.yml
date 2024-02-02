@@ -27,13 +27,21 @@ jobs:
       uses: mxschmitt/action-tmate@v3
       if: ${{ inputs.ssh_enabled }}
       with:
-        limit-access-to-actor: true
+        limit-access-to-actor: false
     - name: Fetch data
       run: |
         mkdir data
         PATH=$PWD/bin:$PATH make -C data -f "${PWD}/get_data/${{ matrix.PANDAGMA_CONF }}.mk"
     - name: Create conda environment
       run: conda env create && conda clean --all -y
+# Need transparent filesystem compression for larger datasets
+    - name: Create work filesystem
+      run: |
+        sudo apt update
+        sudo apt install -y --no-install-recommends zfsutils-linux
+        sudo truncate -s $((55*2**30)) /mnt/zpool
+        sudo zpool create work -O atime=off -O compression=lz4 /mnt/zpool
+        sudo chmod 777 /work
     - name: Run pandagma
       env:
         PANDAGMA_CONF: ${{ matrix.PANDAGMA_CONF }}
@@ -41,13 +49,12 @@ jobs:
       # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#exit-codes-and-error-action-preference
       shell: bash
       run: |
-        sudo mkdir -m 777 /mnt/work
         mkdir -p ${PANDAGMA_OUT:=upload-artifact/pandagma-pan-${PANDAGMA_CONF}}
         printf 'GITHUB_REPOSITORY: %s\n\n' "${GITHUB_REPOSITORY}" > ${PANDAGMA_OUT}/VERSION
         git show --quiet >> ${PANDAGMA_OUT}/VERSION
         cp config/${PANDAGMA_CONF}.conf ${PANDAGMA_OUT}
-        env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output pandagma TEfilter -d data -c "config/${PANDAGMA_CONF}.conf" -w /mnt/work 2>&1 | tee ${PANDAGMA_OUT}/pandagma.log
-        env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output pandagma pan -d data_TEfilter -c "config/${PANDAGMA_CONF}.conf" -w /mnt/work -o ${PANDAGMA_OUT} 2>&1 | tee ${PANDAGMA_OUT}/pandagma.log
+        env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output pandagma TEfilter -d data -c "config/${PANDAGMA_CONF}.conf" -w /work 2>&1 | tee ${PANDAGMA_OUT}/pandagma.log
+        env PATH=$PWD/bin:$PATH time -v conda run -n pandagma --no-capture-output pandagma pan -d data_TEfilter -c "config/${PANDAGMA_CONF}.conf" -w /work -r -o ${PANDAGMA_OUT} 2>&1 | tee ${PANDAGMA_OUT}/pandagma.log
     - name: Upload output artifacts
       uses: actions/upload-artifact@v4
       with:
