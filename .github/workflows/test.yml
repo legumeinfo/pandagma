@@ -5,7 +5,7 @@ on:
     inputs:
       pandagma-conf:
         # Need to test Glycine5_21_29_6
-        default: '["Arachis3_5_2_0", "Cicer3_4_2_0", "Glycine_7_3_2", "Medicago3_8_0_16", "Vigna4_7_1_4"]'
+        default: '["Arachis3_5_2_0", "Cicer3_4_2_0", "Glycine_7_3_2", "Medicago3_8_0_15", "Vigna4_7_1_4"]'
         description: Run pandagma pan for each config/NAME.conf file in the (JSON) array
         required: true
       ssh_enabled:
