@@ -595,12 +595,16 @@ run_add_extra() {
         for m8file in 13_extra_out_constr_dir/*.m8; do
           base=$(basename "$m8file" .m8)
           echo "  Processing file $m8file"
-          top_line.awk "$m8file" | awk -v IDEN="${extra_iden}" '$3>=IDEN {print $1 "\t" $2}' |
-              perl -pe 's/^\S+__(\S+)__\d+__\d\S*\t\S+__(\S+)__\d+__\d\S+$/2\t$1\t$2/' > 13_extra_out_constr_dir/"$base".top_2nd
-          filter_mmseqs_by_chroms.pl -chr_pat <(printf '%s %s\n' "${expected_chr_matches[@]}") < "$m8file" |
-              top_line.awk | awk -v IDEN="${extra_iden}" '$3>=IDEN {print $1 "\t" $2}' | 
-              perl -pe 's/^\S+__(\S+)__\d+__\d+\t\S+__(\S+)__\d+__\d+$/1\t$1\t$2/' > 13_extra_out_constr_dir/"$base".top_1st
+          {
+            top_line.awk "$m8file" | awk -v IDEN="${extra_iden}" '$3>=IDEN {print $1 "\t" $2}' |
+                perl -pe 's/^\S+__(\S+)__\d+__\d\S*\t\S+__(\S+)__\d+__\d\S+$/2\t$1\t$2/' > 13_extra_out_constr_dir/"$base".top_2nd
+            filter_mmseqs_by_chroms.pl -chr_pat <(printf '%s %s\n' "${expected_chr_matches[@]}") < "$m8file" |
+                top_line.awk | awk -v IDEN="${extra_iden}" '$3>=IDEN {print $1 "\t" $2}' |
+                perl -pe 's/^\S+__(\S+)__\d+__\d+\t\S+__(\S+)__\d+__\d+$/1\t$1\t$2/' > 13_extra_out_constr_dir/"$base".top_1st
+          } &
+          if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
         done
+        wait
       fi
     else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
       echo "WARNING: No expected_chr_matches.tsv file was provided, but annotations were indicated in the "
