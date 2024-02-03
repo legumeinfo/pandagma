@@ -52,11 +52,10 @@ glyso.W05.gnm1.ann1.T47J.cds_primary.fna.gz \
 glyso.W05.gnm1.ann1.T47J.protein_primary.faa.gz:
 	fetch-datastore.sh $@ | gzip -d | awk '/^>/ {keep = !index($$1, "Glysoja.10G027808")} keep' | gzip > $@
 
+# fix unusual scaffold naming
+medtr.A17.gnm5.ann1_6.L2RX.gene_models_main.bed.gz:
+	fetch-datastore.sh $@ | gzip -d | sed -e 's/MtrunA17Chr0c/scaff_/' | gzip > $@
 
-## fix unusual scaffold naming
-#medtr.A17.gnm5.ann1_6.L2RX.gene_models_main.bed.gz:
-#	fetch-datastore.sh $@ | gzip -d | sed -e 's/MtrunA17Chr0c/scaff_/' | gzip > $@
-#
 
 # Standardize on *.chr\d\d chromosome names in Vigna bed files
 vig%.bed.gz:
