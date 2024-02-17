@@ -459,13 +459,10 @@ run_ks_filter() {
   cd "${WORK_DIR}" || exit
   if [ -d 05_kaksout_ks_filtered ]; then rm -rf 05_kaksout_ks_filtered ; fi
   mkdir -p 05_kaksout_ks_filtered
-  if [[ -f ks_peaks.tsv ]] || [[ -f stats/ks_peaks_auto.tsv ]]; then  # filter based on list of Ks values
+  if [[ -f ks_peaks.tsv ]]; then  # filter based on list of Ks values
     if [[ -f ks_peaks.tsv ]]; then
       echo "Filtering on quotas from expected_quotas and ks_pair_cutoff values provided in ks_peaks.tsv"
       ks_peaks=ks_peaks.tsv
-    else
-      echo "Filtering on quotas from expected_quotas and ks_pair_cutoff value calculated and stored at stats/ks_peaks_auto.tsv"
-      ks_peaks=stats/ks_peaks_auto.tsv
     fi
     for ks_path in 05_kaksout/*.rptout; do
       outfilebase=$(basename "$ks_path" .rptout)
@@ -475,9 +472,12 @@ run_ks_filter() {
         awk 'NF==7' > 05_kaksout_ks_filtered/"${outfilebase}".rptout 
     done
   else   # don't filter, since ks_peaks.tsv file isn't provided
-    echo "No ks_peaks.tsv file was provided. It is recommended to review the provisional stats/ks_peaks_auto.tsv file and"
-    echo "stats/ks_histplots.tsv file and edit ks_peaks_auto.tsv to generate ks_peaks.tsv to be placed in the ${WORK_DIR} directory."
-    echo "Note that ks_peaks.tsv is used in preference to stats/ks_peaks_auto.tsv, if ks_peaks.tsv is provided."
+    echo "No ks_peaks.tsv file was provided. It is recommended to review the provisional stats/ks_peaks_auto.tsv"
+    echo "and stats/ks_histplots.tsv files and provide a file stats/ks_peaks.tsv -- either simply copying"
+    echo "ks_peaks_auto.tsv to ks_peaks.tsv if the reported Ks peak values (column 3) are acceptable,"
+    echo "or revising those values based on interpretation of stats/ks_histplots.tsv."
+    echo "If stats/ks_histplots.tsv is not provided, then Ks filtering will be done using values provided"
+    echo "in the config file for ks_block_wgd_cutoff and max_pair_ks."
     echo "$*" 1>&2 ; exit 1;
   fi
 }
@@ -498,7 +498,7 @@ run_mcl() {
       # https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_06_02
       if [ -z ${ks_block_wgd_cutoff+x} ] || [ -z ${max_pair_ks+x} ] || 
           [ ! -d "${WORK_DIR}/05_kaksout" ] && [ ! "$(ls -A 05_kaksout/*.rptout)" ]; then
-        echo "## One or both of ks_block_wgd_cutoff max_pair_ks are unset or 05_kaksout doesn't exist; no Ks filtering will be done.";
+        echo "## One or both of ks_block_wgd_cutoff and max_pair_ks are unset or 05_kaksout doesn't exist; no Ks filtering will be done.";
         echo "## Combine the DAGChainer synteny pairs into a file to be clustered."
         cat 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
       else 
