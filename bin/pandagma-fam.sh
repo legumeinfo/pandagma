@@ -496,17 +496,17 @@ run_mcl() {
     if [ "$strict_synt" -eq 1 ]; then
       # https://stackoverflow.com/questions/3601515/how-to-check-if-a-variable-is-set-in-bash
       # https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_06_02
-      if [ -z ${ks_block_wgd_cutoff+x} ] || [ -z ${ks_pair_cutoff+x} ] || 
+      if [ -z ${ks_block_wgd_cutoff+x} ] || [ -z ${max_pair_ks+x} ] || 
           [ ! -d "${WORK_DIR}/05_kaksout" ] && [ ! "$(ls -A 05_kaksout/*.rptout)" ]; then
-        echo "## One or both of ks_block_wgd_cutoff ks_pair_cutoff are unset or 05_kaksout doesn't exist; no Ks filtering will be done.";
+        echo "## One or both of ks_block_wgd_cutoff max_pair_ks are unset or 05_kaksout doesn't exist; no Ks filtering will be done.";
         echo "## Combine the DAGChainer synteny pairs into a file to be clustered."
         cat 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
       else 
-        echo "## The ks_block_wgd_cutoff is set to '$ks_block_wgd_cutoff' and ks_pair_cutoff is set to '$ks_pair_cutoff'";
+        echo "## The ks_block_wgd_cutoff is set to '$ks_block_wgd_cutoff' and max_pair_ks is set to '$max_pair_ks'";
         echo "## Combine the DAGChainer synteny pairs, with additional filtering by pairwise and block Ks thresholds, into a file to be clustered."
         # Combine the synteny pairs into a file to be clustered
         cat 05_kaksout/*.rptout | 
-          awk -v PAIR_CUTOFF="$ks_pair_cutoff" -v BLOCK_CUTOFF="$ks_block_wgd_cutoff" '
+          awk -v PAIR_CUTOFF="$max_pair_ks" -v BLOCK_CUTOFF="$ks_block_wgd_cutoff" '
               NF>0 && $1!~/^#/ && ($5<=PAIR_CUTOFF || $7<=BLOCK_CUTOFF) {print $1 "\t" $2}' |
             sort -u > 05_filtered_pairs.tsv
       fi
