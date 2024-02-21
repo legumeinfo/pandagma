@@ -17,7 +17,7 @@
   the set ID in the first column and genes in the second.
 18_syn_pan_aug_extra.table.tsv: Tabular format of all gene families, in columns by species. Multiple paralogs 
   from a species in a gene family are comma-separated within the column of the species.
-19_pan_aug_leftover_merged_prot: Directory of fasta files for all families corresponding with 18_syn_pan_aug_extra.clust.tsv
+19_palm: (short for pan_aug_leftover_merged) - directory of fasta files for all families corresponding with 18_syn_pan_aug_extra.clust.tsv
 stats.family_4_3.txt: Descriptive statistics about program parameters, input
   sequences, and Gene family products.
 

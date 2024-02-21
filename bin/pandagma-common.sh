@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2023-01-28"
+version="2023-02-19"
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -65,12 +65,11 @@ run_calc_trees() {
 
   echo; echo "== Move small (<4) and very low-entropy families (sequences are all identical) to the side =="
   mkdir -p "${dir_prefix}3_pan_aug_small_or_identical"
-  min_seq_count=4
   # Below, "count" is the number of unique sequences in the alignment.
   for filepath in "${dir_prefix}3_hmmalign_trim2"/*; do
     file=$(basename "$filepath")
     count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
-    if [[ $count -lt $min_seq_count ]]; then
+    if [[ $count -lt $min_align_count ]]; then
       echo "Set aside small or low-entropy family $file";
       mv "$filepath" "${dir_prefix}3_pan_aug_small_or_identical"/
     fi;

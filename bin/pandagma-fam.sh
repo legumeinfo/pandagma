@@ -110,6 +110,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
          ks_binsize - For calculating and displaying histograms. [0.05]
 ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
         max_pair_ks - Fallback value for excluding gene pairs, if a ks_peaks.tsv file is not provided. [4.0]
+    min_align_count - Minimum number of sequences to trigger alignments, modeling, and trees
 
       consen_prefix - Prefix to use in orthogroup names
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
@@ -459,16 +460,14 @@ run_ks_filter() {
   cd "${WORK_DIR}" || exit
   if [ -d 05_kaksout_ks_filtered ]; then rm -rf 05_kaksout_ks_filtered ; fi
   mkdir -p 05_kaksout_ks_filtered
-  if [[ -f ks_peaks.tsv ]]; then  # filter based on list of Ks values
-    if [[ -f ks_peaks.tsv ]]; then
-      echo "Filtering on quotas from expected_quotas and ks_pair_cutoff values provided in ks_peaks.tsv"
-      ks_peaks=ks_peaks.tsv
-    fi
+  if [[ -f stats/ks_peaks.tsv ]]; then  # filter based on list of Ks values
+    echo "Filtering on quotas from expected_quotas and ks_pair_cutoff values provided in stats/ks_peaks.tsv"
+    ks_peaks=stats/ks_peaks.tsv
     for ks_path in 05_kaksout/*.rptout; do
       outfilebase=$(basename "$ks_path" .rptout)
       echo "  Filtering $ks_path based on expected block-median Ks values"
       < "${ks_path}" filter_mmseqs_by_ks.pl \
-          -ks_peak ${ks_peaks} -annot_regex "$annot_str_regex" -max_pair_ks "$max_pair_ks" |
+          -ks_peaks ${ks_peaks} -annot_regex "$annot_str_regex" -max_pair_ks "$max_pair_ks" |
         awk 'NF==7' > 05_kaksout_ks_filtered/"${outfilebase}".rptout 
     done
   else   # don't filter, since ks_peaks.tsv file isn't provided
@@ -478,7 +477,6 @@ run_ks_filter() {
     echo "or revising those values based on interpretation of stats/ks_histplots.tsv."
     echo "If stats/ks_histplots.tsv is not provided, then Ks filtering will be done using values provided"
     echo "in the config file for ks_block_wgd_cutoff and max_pair_ks."
-    echo "$*" 1>&2 ; exit 1;
   fi
 }
 
@@ -490,7 +488,8 @@ run_mcl() {
 
   printf "\nPreparatory to clustering, combine the homology data into a file with gene pairs to be clustered.\n"
 
-  if [ -d 05_kaksout_ks_filtered ]; then # From step ks_filter; supersedes all other conditions
+  files=$(shopt -s nullglob dotglob; echo 05_kaksout_ks_filtered/*)
+  if [ -d 05_kaksout_ks_filtered ] && (( ${#files} )); then # From step ks_filter; supersedes all other conditions
     cat 05_kaksout_ks_filtered/*.rptout | awk 'NF==7 {print $1 "\t" $2}' | sort -u > 05_filtered_pairs.tsv
   else
     if [ "$strict_synt" -eq 1 ]; then
@@ -693,19 +692,24 @@ run_add_extra() {
     perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 18_syn_pan_aug_extra.clust.tsv \
       > 18_syn_pan_aug_extra.hsh.tsv
 
-    echo "  For each family set, retrieve sequences into a multifasta file."
+    echo "  For each family set, retrieve sequences into a multifasta file 19_pan_aug_leftover_merged_prot (abbreviated 19_palm)"
     printf "    Fasta file: %s %s\n" "${protein_files[@]}" "${protein_files_extra[@]}"
-    if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot ; fi
-    mkdir -p 19_pan_aug_leftover_merged_prot
+    if [ -d 19_palm ]; then rm -rf 19_palm ; fi
+    mkdir -p 19_palm
     get_fasta_from_family_file.pl "${protein_files[@]}" "${protein_files_extra[@]}" \
-      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
+      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_palm
 
-    echo "  Merge fasta files from 19_pan_aug_leftover_merged_prot, prefixing IDs with panID__"
-    merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_prot/* > 19_pan_aug_leftover_merged_prot.faa
+    echo "  Merge fasta files from 19_palm, prefixing IDs with panID__"
+    merge_files_to_pan_fasta.awk 19_palm/* > 19_palm.faa
+    #for path in 19_palm/*; do
+    #  pan_file=`basename $path`
+    #  cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
+    #                    $1!~/^>/ {print $1} ' >> 19_palm.faa
+    #done
 
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
-    cp 07_pan_fasta_prot.faa 19_pan_aug_leftover_merged_prot.faa
+    cp 07_pan_fasta_prot.faa 19_palm.faa
     cp 12_syn_pan_aug.clust.tsv 18_syn_pan_aug_extra.clust.tsv
     cp 12_syn_pan_aug.hsh.tsv 18_syn_pan_aug_extra.hsh.tsv
   fi
@@ -733,21 +737,33 @@ run_tabularize() {
 run_align() {
   echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
   cd "${WORK_DIR}" || exit
-  if [[ -d 19_pan_aug_leftover_merged_prot ]] && [[ -f 19_pan_aug_leftover_merged_prot/${consen_prefix}00001 ]]; then
+  if [[ -d 19_palm ]] && [[ -f 19_palm/${consen_prefix}00001 ]]; then
     : # do nothing; the directory and file(s) exist
   else 
-    mkdir -p 19_pan_aug_leftover_merged_prot
+    mkdir -p 19_palm
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
     get_fasta_from_family_file.pl "${protein_files[@]}" "${protein_files_extra[@]}" \
-      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
+      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_palm
   fi
+
+  echo; echo "== Move small families to the side =="
+  mkdir -p 19_pan_aug_leftover_merged_small
+  # Below, "count" is the number of unique sequences in the alignment.
+  for filepath in 19_palm/*; do
+    file=$(basename "$filepath")
+    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
+    if [[ $count -lt $min_align_count ]]; then
+      echo "Set aside small family $file";
+      mv "$filepath" 19_pan_aug_leftover_merged_small/
+    fi;
+  done
 
   echo; echo "== Align the gene families =="
   mkdir -p 20_aligns
-  for filepath in 19_pan_aug_leftover_merged_prot/*; do 
+  for filepath in 19_palm/*; do 
     file=$(basename "$filepath");
     echo "  Computing alignment, using program famsa, for file $file"
-    famsa -t 2 19_pan_aug_leftover_merged_prot/"$file" 20_aligns/"$file" 1>/dev/null &
+    famsa -t 2 19_palm/"$file" 20_aligns/"$file" 1>/dev/null &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -757,6 +773,7 @@ run_align() {
 run_model_and_trim() {
   echo; echo "== Build HMMs =="
   cd "${WORK_DIR}" || exit
+
   mkdir -p 21_hmm
   for filepath in 20_aligns/*; do 
     file=$(basename "$filepath");
@@ -770,7 +787,7 @@ run_model_and_trim() {
   for filepath in 21_hmm/*; do
     file=$(basename "$filepath");
     printf "%s " "$file"
-    hmmalign --trim --outformat A2M --amino -o 22_hmmalign/"$file" 21_hmm/"$file" 19_pan_aug_leftover_merged_prot/"$file" &
+    hmmalign --trim --outformat A2M --amino -o 22_hmmalign/"$file" 21_hmm/"$file" 19_palm/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -842,7 +859,7 @@ run_summarize() {
     echo "Couldn't find file manifests/MANIFEST_output_fam.yml"
   fi
 
-  for dir in 19_pan_aug_leftover_merged_prot 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
+  for dir in 19_palm 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
     if [ -d "${WORK_DIR}"/$dir ]; then
       echo "Copying directory $dir to output directory"
       cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
@@ -901,15 +918,19 @@ run_summarize() {
         { printf "  %i\t%i\t%2.1f\t%s\n", $2, $4, 100*($4/$2), $1 }'  >> "${stats_file}"
 
   echo "  Print counts per accession"
-  if [ -f "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv ]; then
+  {
     printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n"
     printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n" 
+  } >> "${stats_file}"
+  if [ -f "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv ]; then
+    {
     transpose.pl "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv | 
       perl -lane 'next if ($.<=3); 
         $ct=0; $sum=0; $nulls=0; $OGs=0;
         for $i (@F[1..(@F-1)]){ $OGs++; if ($i>0){$ct++; $sum+=$i} if ($i==0){$nulls++} }; 
         printf("  %d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
       >> "${stats_file}"
+    }
   fi
 
   echo "  Print histograms"
@@ -939,7 +960,7 @@ run_clean() {
   echo "  work_dir: $PWD"
   if [ -d MMTEMP ]; then rm -rf MMTEMP/*; 
   fi
-  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_pan_aug_leftover_merged_prot; do
+  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_palm; do
     if [ -d $dir ]; then echo "  Removing directory $dir"; rm -rf $dir &
     fi
   done

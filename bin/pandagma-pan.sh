@@ -114,6 +114,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
        order_method - Method to determine consensus panID order. reference or alignment [default reference]
+    min_align_count - Minimum number of sequences in a family to trigger alignments, modeling, and trees
 ''
 EOS
 
@@ -930,6 +931,18 @@ run_align_protein() {
     get_fasta_from_family_file.pl "${protein_files[@]}" "${protein_files_extra_constr[@]}" "${protein_files_extra_free[@]}" \
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
   fi
+
+  echo; echo "== Move small families to the side =="
+  mkdir -p 19_pan_aug_leftover_merged_small
+  # Below, "count" is the number of unique sequences in the alignment.
+  for filepath in 19_pan_aug_leftover_merged_prot/*; do
+    file=$(basename "$filepath")
+    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
+    if [[ $count -lt $min_align_count ]]; then
+      echo "Set aside small family $file";
+      mv "$filepath" 19_pan_aug_leftover_merged_small/
+    fi;
+  done
 
   echo; echo "== Align protein sequence for the each gene family =="
   mkdir -p 20_aligns_prot
