@@ -114,7 +114,8 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
        order_method - Method to determine consensus panID order. reference or alignment [default reference]
-    min_align_count - Minimum number of sequences in a family to trigger alignments, modeling, and trees
+    min_align_count - Minimum number of sequences in a family to trigger alignments, modeling, and trees [4]
+min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [2]
 ''
 EOS
 
@@ -653,20 +654,21 @@ run_add_extra() {
     hash_to_rows_by_1st_col.awk 18_syn_pan_aug_extra.hsh.tsv > 18_syn_pan_aug_extra.clust.tsv
 
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    echo "    Fasta file:" "${protein_files[@]}" "${protein_files_extra_constr[@]}" "${protein_files_extra_free[@]}"
-    if [ -d 19_pan_aug_leftover_merged_cds ]; then rm -rf 19_pan_aug_leftover_merged_cds; fi
-    mkdir -p 19_pan_aug_leftover_merged_cds
+    echo "  The directory and multifasta file are called 19_pan_aug_leftover_merged_cds (abbreviated 19_palmc)"
+    echo "    Fasta file:" "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}"
+    if [ -d 19_palmc ]; then rm -rf 19_palmc; fi
+    mkdir -p 19_palmc
     get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
-      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_cds
+      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_palmc
   
-    echo "  Merge files in 19_pan_aug_leftover_merged_cds, prefixing IDs with panID__"
-    find 19_pan_aug_leftover_merged_cds -maxdepth 1 -mindepth 1 |
+    echo "  Merge files in 19_palmc, prefixing IDs with panID__"
+    find 19_palmc -maxdepth 1 -mindepth 1 |
       sort |
-        xargs awk '/^>/ {printf(">%s__%s\n", substr(FILENAME,index(FILENAME,"/")+1), substr($0,2)); next} {print}' > 19_pan_aug_leftover_merged_cds.fna
+        xargs awk '/^>/ {printf(">%s__%s\n", substr(FILENAME,index(FILENAME,"/")+1), substr($0,2)); next} {print}' > 19_palmc.fna
 
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
-    cp 07_pan_fasta_cds.fna 19_pan_aug_leftover_merged_cds.fna
+    cp 07_pan_fasta_cds.fna 19_palmc.fna
     cp 12_syn_pan_aug.clust.tsv 18_syn_pan_aug_extra.clust.tsv
     cp 12_syn_pan_aug.hsh.tsv 18_syn_pan_aug_extra.hsh.tsv
   fi
@@ -684,24 +686,25 @@ run_pick_exemplars() {
   done
 
   echo "  Get protein sequences into pan-gene sets, corresponding with 18_syn_pan_aug_extra.clust.tsv"
-  if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot; fi
-  mkdir -p 19_pan_aug_leftover_merged_prot
+  echo "  The directory and multifasta file are called 19_pan_aug_leftover_merged_prot (abbreviated 19_palmp)"
+  if [ -d 19_palmp ]; then rm -rf 19_palmp; fi
+  mkdir -p 19_palmp
   get_fasta_from_family_file.pl 20_pan_fasta_prot.faa \
-              -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
+              -fam 18_syn_pan_aug_extra.clust.tsv -out 19_palmp
 
-  echo "  Get all protein sequences from files in 19_pan_aug_leftover_merged_prot"
-  find 19_pan_aug_leftover_merged_prot -maxdepth 1 -mindepth 1 |
+  echo "  Get all protein sequences from files in 19_palmp"
+  find 19_palmp -maxdepth 1 -mindepth 1 |
     sort |
-      xargs awk '/^>/ {printf(">%s__%s\n", substr(FILENAME,index(FILENAME,"/")+1), substr($0,2)); next} {print}' > 19_pan_aug_leftover_merged_prot.faa
+      xargs awk '/^>/ {printf(">%s__%s\n", substr(FILENAME,index(FILENAME,"/")+1), substr($0,2)); next} {print}' > 19_palmp.faa
 
   echo "  Pick a representative sequence for each pangene set - as a sequence with the median length for that set."
   echo "    == first proteins:"
   pick_family_rep.pl -nostop -prefer "$preferred_annot" \
-    -out 21_pan_fasta_clust_rep_prot.faa < 19_pan_aug_leftover_merged_prot.faa
+    -out 21_pan_fasta_clust_rep_prot.faa < 19_palmp.faa
 
   echo "    == then CDS sequences, corresponding with 21_pan_fasta_clust_rep_prot.faa"
   awk '$1~/^>/ {print substr($1,2)}' 21_pan_fasta_clust_rep_prot.faa > lists/lis.21_pan_fasta_clust_rep
-  get_fasta_subset.pl -in 19_pan_aug_leftover_merged_cds.fna -list lists/lis.21_pan_fasta_clust_rep \
+  get_fasta_subset.pl -in 19_palmc.fna -list lists/lis.21_pan_fasta_clust_rep \
                     -clobber -out 21_pan_fasta_clust_rep_cds.fna
 
   perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_cds.fna
@@ -890,152 +893,12 @@ run_order_and_name() {
 }
 
 ##########
-run_align_cds() {
-  cd "${WORK_DIR}" || exit
-
-  echo "== Align CDS sequences =="
-
-  # If not already present, retrieve sequences for each family, preparatory to aligning them
-  if [[ -d 19_pan_aug_leftover_merged_cds ]]; then
-    : # do nothing; the directory and file(s) exist
-  else
-    mkdir -p 19_pan_aug_leftover_merged_cds
-    echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
-      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_cds
-  fi
-
-  echo; echo "== Align nucleotide sequence for each gene family =="
-  mkdir -p 20_aligns_cds
-  for filepath in 19_pan_aug_leftover_merged_cds/*; do
-    file=$(basename "$filepath");
-    echo "  Computing alignment, using program famsa, for file $file"
-    famsa -t 2 19_pan_aug_leftover_merged_cds/"$file" 20_aligns_cds/"$file" 1>/dev/null &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-}
-
-##########
-run_align_protein() {
-  cd "${WORK_DIR}" || exit
-
-  echo "== Align protein sequences =="
-
-  # If not already present, retrieve sequences for each family, preparatory to aligning them
-  if [[ -d 19_pan_aug_leftover_merged_prot ]]; then
-    : # do nothing; the directory and file(s) exist
-  else
-    mkdir -p 19_pan_aug_leftover_merged_prot
-    echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    get_fasta_from_family_file.pl "${protein_files[@]}" "${protein_files_extra_constr[@]}" "${protein_files_extra_free[@]}" \
-      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
-  fi
-
-  echo; echo "== Move small families to the side =="
-  mkdir -p 19_pan_aug_leftover_merged_small
-  # Below, "count" is the number of unique sequences in the alignment.
-  for filepath in 19_pan_aug_leftover_merged_prot/*; do
-    file=$(basename "$filepath")
-    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
-    if [[ $count -lt $min_align_count ]]; then
-      echo "Set aside small family $file";
-      mv "$filepath" 19_pan_aug_leftover_merged_small/
-    fi;
-  done
-
-  echo; echo "== Align protein sequence for the each gene family =="
-  mkdir -p 20_aligns_prot
-  for filepath in 19_pan_aug_leftover_merged_prot/*; do
-    file=$(basename "$filepath");
-    echo "  Computing alignment, using program famsa, for file $file"
-    famsa -t 2 19_pan_aug_leftover_merged_prot/"$file" 20_aligns_prot/"$file" 1>/dev/null &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-}
-
-##########
-run_model_and_trim() {
-  echo; echo "== Build HMMs =="
-  cd "${WORK_DIR}" || exit
-  mkdir -p 21_hmm
-  for filepath in 20_aligns_cds/*; do
-    file=$(basename "$filepath");
-    hmmbuild -n "$file" 21_hmm/"$file" "$filepath" 1>/dev/null &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-
-  echo; echo "== Realign to HMMs =="
-  mkdir -p 22_hmmalign
-  for filepath in 21_hmm/*; do
-    file=$(basename "$filepath");
-    printf "%f " "$file"
-    hmmalign --trim --outformat A2M -o 22_hmmalign/"$file" 21_hmm/"$file" 19_pan_aug_leftover_merged_cds/"$file" &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-  echo
-
-  echo; echo "== Trim HMM alignments to match-states =="
-  mkdir -p 23_hmmalign_trim1
-  for filepath in 22_hmmalign/*; do
-    file=$(basename "$filepath");
-    printf "%s " "$file"
-    perl -ne 'if ($_ =~ />/) {print $_} else {$line = $_; $line =~ s/[a-z]//g; print $line}' "$filepath" |
-      sed '/^$/d' > 23_hmmalign_trim1/"$file" &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-  echo
-
-  echo; echo "== Filter alignments prior to tree calculation =="
-  mkdir -p 23_hmmalign_trim2 23_hmmalign_trim2_log
-  min_depth=3
-  min_pct_depth=20
-  min_pct_aligned=20
-  for filepath in 23_hmmalign_trim1/*; do
-    file=$(basename "$filepath")
-    printf "%f " "$file"
-    filter_align.pl -in "$filepath" -out 23_hmmalign_trim2/"$file" -log 23_hmmalign_trim2_log/"$file" \
-                    -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-  echo
-}
-
-##########
-run_xfr_aligns_trees() {
-  echo; echo "Copy alignment and tree results into output directory"
-
-  full_out_dir="${out_dir}"
-
-  cd "${submit_dir}" || exit
-
-  if [ ! -d "$full_out_dir" ]; then
-      echo "creating output directory \"${full_out_dir}/\""
-      mkdir -p "$full_out_dir"
-  fi
-
-  for dir in 20_aligns_cds 20_aligns_prot 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
-    if [ -d "${WORK_DIR}"/$dir ]; then
-      echo "Copying directory $dir to output directory"
-      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
-    else
-      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
-    fi
-  done
-}
-
-##########
 run_calc_chr_pairs() {
   cd "${WORK_DIR}" || exit
   echo "Generate a report of observed chromosome pairs"
 
   echo "  Identify gene pairs, using mmseqs --easy_cluster"
-    mmseqs easy-cluster 19_pan_aug_leftover_merged_cds.fna 24_pan_fasta_clust 03_mmseqs_tmp \
+    mmseqs easy-cluster 19_palmc.fna 24_pan_fasta_clust 03_mmseqs_tmp \
     --min-seq-id "$clust_iden" -c "$clust_cov" --cov-mode 0 --cluster-reassign 1>/dev/null
 
   echo "   Extract chromosome-chromosome correspondences"
@@ -1273,7 +1136,7 @@ run_clean() {
   echo "  work_dir: $PWD"
   if [ -d MMTEMP ]; then rm -rf MMTEMP/*; 
   fi
-  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_pan_aug_leftover_merged_prot \
+  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_palmp \
     22_syn_pan_aug_extra_pctl${pctl_low}; do
     if [ -d "$dir" ]; then echo "  Removing directory $dir"; rm -rf "$dir" &
     fi
@@ -1296,7 +1159,8 @@ pandagma_conf_params='clust_iden clust_cov extra_iden mcl_inflation
 
 # The steps align_cds, align_protein, model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
 export commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra \
-         pick_exemplars filter_to_pctile tabularize order_and_name  calc_chr_pairs summarize"
+         pick_exemplars filter_to_pctile tabularize order_and_name \
+         align model_and_trim calc_trees xfr_aligns_trees calc_chr_pairs summarize"
 
 export dependencies='mmseqs dagchainer mcl cons famsa hmmalign hmmbuild run_DAG_chainer.pl'
 

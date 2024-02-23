@@ -59,6 +59,8 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         \"([^.]+\.[^.]+)\..+\"
                           for two dot-separated fields, e.g. vigan.Shumari
                         or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
+    min_align_count - Minimum number of sequences in a family to trigger alignments, modeling, and trees [4]
+min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [2]
 
 File sets (arrays):
       protein_files

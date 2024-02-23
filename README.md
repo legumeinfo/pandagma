@@ -236,7 +236,8 @@ Variables in the config file for the **pangene workflow**, `pandagma pan`:
                         This is used for picking representative IDs+sequence from an orthogroup, when
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
-    min_align_count - Minimum number of sequences in a family to trigger alignments, modeling, and trees
+    min_align_count - Minimum number of sequences in a family to trigger alignments, modeling, and trees [4]
+min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [2]
 ```
 
 Variables in the config file for the **family workflow**, `pandagma fam`:
@@ -263,7 +264,8 @@ ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
                         This is used for picking representative IDs+sequence from an orthogroup, when
                         this annotation is among those with the median length for the orthogroup.
                         Otherwise, one is selected at random from those with median length.
-    min_align_count - Minimum number of sequences in a family to trigger alignments, modeling, and trees
+    min_align_count - Minimum number of sequences in a family to trigger alignments, modeling, and trees [4]
+min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [2]
 ```
 
 ## Example run for the pangene workflow <a name="pangene_example"></a>
