@@ -896,10 +896,11 @@ pandagma_conf_params='clust_iden clust_cov extra_iden mcl_inflation strict_synt
 ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff max_pair_ks 
 consen_prefix annot_str_regex'
 
-export commandlist="ingest mmseqs filter dagchainer \
-             ks_calc ks_filter \
+# The steps align_cds, align_protein, model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
+# Those steps (functions) are in pandagma-common.sh
+export commandlist="ingest mmseqs filter dagchainer ks_calc ks_filter \
              mcl consense cluster_rest add_extra tabularize \
-             align model_and_trim calc_trees xfr_aligns_trees summarize"
+             align_protein model_and_trim calc_trees xfr_aligns_trees summarize"
 
 export dependencies='dagchainer mcl cons famsa run_DAG_chainer.pl'
 

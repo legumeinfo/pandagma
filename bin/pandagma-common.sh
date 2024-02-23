@@ -72,14 +72,14 @@ run_align_cds() {
 
   echo; echo "== Move small families to the side =="
   mkdir -p 19_palmc_small
-  # Below, count_seqs = number of unique sequences in the alignment; count_annots = # of unique annotation groups.
+  # Below, count_seqs = number of sequences in the alignment; count_annots = number of unique annotation groups.
   min_annots_in_align=2 # require at least this many distinct annotation groups in an alignment to retain it.
   for filepath in 19_palmc/*; do
     file=$(basename "$filepath")
-    count_seqs=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
+    count_seqs=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | wc -l);
     count_annots=$( perl -lane 'BEGIN{$REX=qr($ENV{"ANN_REX"})}; if($F[0]=~/$REX/){ print $1 }' $filepath | sort -u | wc -l)
     if [[ $count_seqs -lt $min_align_count ]] || [[ $count_annots -lt $min_annots_in_align ]]; then
-      echo "Set aside small family $file; $count_seqs sequences, $count_annots annotations";
+      echo "Set aside small family $file; $count_seqs sequences, $count_annots distinct annotations";
       mv "$filepath" 19_palmc_small/
     fi;
   done
@@ -130,7 +130,7 @@ run_align_protein() {
   mkdir -p 20_aligns_prot
   for filepath in 19_palmp/*; do
     file=$(basename "$filepath");
-    echo "  Computing alignment, using program famsa, for file $file"
+    # echo "  Computing alignment, using program famsa, for file $file"
     famsa -t 2 19_palmp/"$file" 20_aligns_prot/"$file" 1>/dev/null &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
@@ -142,7 +142,7 @@ run_model_and_trim() {
   echo; echo "== Build HMMs =="
   cd "${WORK_DIR}" || exit
   mkdir -p 21_hmm
-  for filepath in 20_aligns_cds/*; do
+  for filepath in 20_aligns_prot/*; do
     file=$(basename "$filepath");
     hmmbuild -n "$file" 21_hmm/"$file" "$filepath" 1>/dev/null &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
@@ -153,8 +153,8 @@ run_model_and_trim() {
   mkdir -p 22_hmmalign
   for filepath in 21_hmm/*; do
     file=$(basename "$filepath");
-    printf "%f " "$file"
-    hmmalign --trim --outformat A2M -o 22_hmmalign/"$file" 21_hmm/"$file" 19_palmc/"$file" &
+    # printf "%s " "$file"
+    hmmalign --trim --outformat A2M -o 22_hmmalign/"$file" 21_hmm/"$file" 19_palmp/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -164,7 +164,7 @@ run_model_and_trim() {
   mkdir -p 23_hmmalign_trim1
   for filepath in 22_hmmalign/*; do
     file=$(basename "$filepath");
-    printf "%s " "$file"
+    # printf "%s " "$file"
     perl -ne 'if ($_ =~ />/) {print $_} else {$line = $_; $line =~ s/[a-z]//g; print $line}' "$filepath" |
       sed '/^$/d' > 23_hmmalign_trim1/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
@@ -179,7 +179,7 @@ run_model_and_trim() {
   min_pct_aligned=20
   for filepath in 23_hmmalign_trim1/*; do
     file=$(basename "$filepath")
-    printf "%f " "$file"
+    # printf "%s " "$file"
     filter_align.pl -in "$filepath" -out 23_hmmalign_trim2/"$file" -log 23_hmmalign_trim2_log/"$file" \
                     -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
@@ -198,20 +198,6 @@ run_calc_trees() {
   cd "${WORK_DIR}"
 
   mkdir -p "${dir_prefix}4_trees"
-
-  echo; echo "== Move small (<4) and very low-entropy families (sequences are all identical) to the side =="
-  mkdir -p "${dir_prefix}3_pan_aug_small_or_identical"
-  # Below, count_seqs = number of unique sequences in the alignment; count_annots = # of unique annotation groups.
-  min_annots_in_align=2 # require at least this many distinct annotation groups in an alignment to retain it.
-  for filepath in "${dir_prefix}3_hmmalign_trim2"/*; do
-    file=$(basename "$filepath")
-    count_seqs=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
-    count_annots=$( perl -lane 'BEGIN{$REX=qr($ENV{"ANN_REX"})}; if($F[0]=~/$REX/){ print $1 }' $filepath | sort -u | wc -l)
-    if [[ $count_seqs -lt $min_align_count ]] || [[ $count_annots -lt $min_annots_in_align ]]; then
-      echo "Set aside small or low-entropy family $file; $count_seqs sequences, $count_annots annotations";
-      mv "$filepath" "${dir_prefix}3_pan_aug_small_or_identical"/
-    fi;
-  done
 
   # By default, FastTreeMP uses all available threads.
   # It is more efficient to run more jobs on one core each by setting an environment variable.
