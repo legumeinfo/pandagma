@@ -299,6 +299,7 @@ run_mmseqs() {
 run_filter() {
   echo; echo "From mmseqs cluster output, split out the following fields: molecule, gene, start, stop."
   cd "${WORK_DIR}" || exit
+  if [ -d 04_dag ]; then rm -rf 04_dag; fi
   mkdir -p 04_dag
   if [[ -v expected_chr_matches ]]; then  # filter based on list of expected chromosome pairings if provided
     echo "Filtering on chromosome patterns defined in expected_chr_matches"
