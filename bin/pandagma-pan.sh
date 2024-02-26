@@ -405,7 +405,9 @@ run_consense() {
   get_fasta_from_family_file.pl "${cds_files[@]}" -fam 06_syn_pan.clust.tsv -out 07_pan_fasta
 
   echo "  Merge fasta files in 07_pan_fasta, prefixing IDs with panID"
-  merge_files_to_pan_fasta.awk 07_pan_fasta/* > 07_pan_fasta_cds.fna
+  pushd 07_pan_fasta
+    merge_files_to_pan_fasta.awk * > ../07_pan_fasta_cds.fna
+    popd
 
   echo "  Pick a representative seq. for each orthogroup - as a sequence with the median length for that OG."
   echo "  < 07_pan_fasta_cds.fna pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_cds.fna"
@@ -415,7 +417,9 @@ run_consense() {
   cat_or_zcat "${cds_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
 
   echo "  Get sorted list of all clustered genes"
-  awk '$1~/^>/ {print $1}' 07_pan_fasta/* | sed 's/>//' | sort > lists/09_all_clustered_genes
+  pushd 07_pan_fasta
+    awk '$1~/^>/ {print $1}' * | sed 's/>//' | sort > ../lists/09_all_clustered_genes
+    popd
 
   echo "  Get list of genes not in clusters"
   comm -13 lists/09_all_clustered_genes lists/09_all_genes > lists/09_genes_not_in_clusters
@@ -474,9 +478,11 @@ run_consense() {
 
   echo "  Make augmented cluster sets. Uniqify on the back end, converting from mcl clust format to hsh (clust_ID gene)."
   cat /dev/null > 12_syn_pan_aug_pre.hsh.tsv
-  augment_cluster_sets.awk leftovers_dir=11_pan_leftovers 07_pan_fasta/* |
-    perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' |
-    sort -k1,1 -k2,2 | uniq > 12_syn_pan_aug_pre.hsh.tsv 
+  pushd 07_pan_fasta
+    augment_cluster_sets.awk leftovers_dir=../11_pan_leftovers * |
+      perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' |
+      sort -k1,1 -k2,2 | uniq > ../12_syn_pan_aug_pre.hsh.tsv 
+    popd
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
   hash_to_rows_by_1st_col.awk < 12_syn_pan_aug_pre.hsh.tsv > 12_syn_pan_aug_pre.clust.tsv
@@ -551,7 +557,9 @@ run_add_extra() {
   get_fasta_from_family_file.pl "${cds_files[@]}" -fam 12_syn_pan_aug.clust.tsv -out 13_pan_aug_fasta
   
   echo "  Merge fasta files in 13_pan_aug_fasta, prefixing IDs with panID__"
-  merge_files_to_pan_fasta.awk 13_pan_aug_fasta/* > 13_pan_aug_fasta.fna
+  pushd 13_pan_aug_fasta
+    merge_files_to_pan_fasta.awk * > ../13_pan_aug_fasta.fna
+    popd
 
   echo "  Store the panID - geneID in a hash to be retrieved later, after filtering by chromosome"
   awk '$1~/^>/ {print substr($1,2)}' 13_pan_aug_fasta.fna | 
@@ -646,9 +654,11 @@ run_add_extra() {
        -fam 14_syn_pan_extra.clust.tsv -out 16_pan_leftovers_extra/
   
     echo "  Make augmented cluster sets. Uniqify on the back end, converting from mcl clust format to hsh (clust_ID gene)."
-    augment_cluster_sets.awk leftovers_dir=16_pan_leftovers_extra 13_pan_aug_fasta/* |
-      perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' |
-      sort -k1,1 -k2,2 | uniq > 18_syn_pan_aug_extra.hsh.tsv 
+    pushd 13_pan_aug_fasta
+      augment_cluster_sets.awk leftovers_dir=../16_pan_leftovers_extra * |
+        perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' |
+        sort -k1,1 -k2,2 | uniq > ../18_syn_pan_aug_extra.hsh.tsv 
+      popd
 
     echo "  Reshape from hash to mcl output format (clustered IDs on one line)"
     hash_to_rows_by_1st_col.awk 18_syn_pan_aug_extra.hsh.tsv > 18_syn_pan_aug_extra.clust.tsv
