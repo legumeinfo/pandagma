@@ -107,6 +107,9 @@ glyma.Wm82.gnm4.ann1.T8TQ.protein_primary.faa.gz \
 glyma.Wm82.gnm5.ann1.J7HW.cds.fna.gz \
 glyma.Wm82.gnm5.ann1.J7HW.gene_models_main.bed.gz \
 glyma.Wm82.gnm5.ann1.J7HW.protein.faa.gz \
+glyma.Wm82.gnm6.ann1.PKSW.cds_primary.fna.gz \
+glyma.Wm82.gnm6.ann1.PKSW.gene_models_main.bed.gz \
+glyma.Wm82.gnm6.ann1.PKSW.protein_primary.faa.gz \
 glyma.Wm82_IGA1008.gnm1.ann1.FGN6.cds.fna.gz \
 glyma.Wm82_IGA1008.gnm1.ann1.FGN6.gene_models_main.bed.gz \
 glyma.Wm82_IGA1008.gnm1.ann1.FGN6.protein.faa.gz \
