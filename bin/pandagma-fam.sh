@@ -447,7 +447,7 @@ run_ks_calc() {
       echo "# $filebase" 
       echo "# Normalized relative to Ks peak inferred at bin $ks_bin, with amplitude $ks_amplitude_pct" 
       awk 'NF==7 && $7<=3 {print $7}' "$ks_path" | histogram.pl -z -n -s "$ks_binsize" | 
-        histplot.pl -d "$ks_amplitude_pct" 
+        histplot.pl -d "$ks_amplitude_pct" | cut -b1-150
       echo "" 
     } >> stats/ks_histplots.tsv
   done
