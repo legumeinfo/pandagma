@@ -892,9 +892,10 @@ run_clean() {
 ########################################
 # Main program
 
-pandagma_conf_params='clust_iden clust_cov extra_iden mcl_inflation strict_synt 
-ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff max_pair_ks 
-consen_prefix annot_str_regex'
+pandagma_conf_params='clust_iden clust_cov extra_iden mcl_inflation strict_synt
+ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff
+max_pair_ks min_align_count min_annots_in_align
+consen_prefix annot_str_regex preferred_annot expected_quotas'
 
 # The steps align_cds, align_protein, model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
 # Those steps (functions) are in pandagma-common.sh
