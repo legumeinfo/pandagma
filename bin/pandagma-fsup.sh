@@ -63,8 +63,9 @@ Variables in pandagma config file (Set the config with the CONF environment vari
 min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [2]
 
 File sets (arrays):
-      protein_files
+   annotation_files
           cds_files
+      protein_files
 EOS
 
 ########################################
@@ -79,6 +80,8 @@ canonicalize_paths() {
   fi
 
   cd "${DATA_DIR}" || exit
+
+  export ANN_REX=${annot_str_regex}
 
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
   mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
@@ -436,7 +439,6 @@ pandagma_conf_params='consen_iden clust_cov consen_method annot_str_regex'
 export commandlist="ingest fam_consen search_families realign_and_trim calc_trees summarize"
 
 export dependencies='hmmscan famsa'
-export ANN_REX=${annot_str_regex}
 
 declare out_dir version consen_iden clust_cov consen_method annot_str_regex
 
