@@ -102,6 +102,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
          clust_iden - Minimum identity threshold for mmseqs clustering [0.40]
           clust_cov - Minimum coverage for mmseqs clustering [0.40]
          extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [0.30]
+      TE_match_iden - Minimum identity threshold for excluding match to transposable element file - for "TESearch"
       mcl_inflation - Inflation parameter, for Markov clustering [1.6]
         strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs [1]
                         The alternative (0) is to use all homologous pairs that satisfy expected_quotas
@@ -110,18 +111,14 @@ Variables in pandagma config file (Set the config with the CONF environment vari
          ks_binsize - For calculating and displaying histograms. [0.05]
 ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
         max_pair_ks - Fallback value for excluding gene pairs, if a ks_peaks.tsv file is not provided. [4.0]
-    min_align_count - Minimum number of sequences to trigger alignments, modeling, and trees [4]
-min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [2]
-
       consen_prefix - Prefix to use in orthogroup names
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
                         \"([^.]+\.[^.]+)\..+\"
                           for two dot-separated fields, e.g. vigan.Shumari
                         or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
-    preferred_annot - String to match and select an annotation set, from a gene ID.
-                        This is used for picking representative IDs+sequence from an orthogroup, when
-                        this annotation is among those with the median length for the orthogroup.
-                        Otherwise, one is selected at random from those with median length.
+    min_align_count - Minimum number of sequences to trigger alignments, modeling, and trees [4]
+min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [2]
+
     expected_quotas - (Optional) array of seqid prefixes & expected number of
                         paralogs for the species identified by the prefix; e.g.:
                         expected_quotas=(glyma 4 medtr 2)
@@ -701,12 +698,9 @@ run_add_extra() {
       -fam 18_syn_pan_aug_extra.clust.tsv -out 19_palmp
 
     echo "  Merge fasta files from 19_palmp, prefixing IDs with panID__"
-    merge_files_to_pan_fasta.awk 19_palmp/* > 19_palmp.faa
-    #for path in 19_palmp/*; do
-    #  pan_file=`basename $path`
-    #  cat $path | awk -v panID=$pan_file ' $1~/^>/ {print ">" panID "__" substr($0,2) }
-    #                    $1!~/^>/ {print $1} ' >> 19_palmp.faa
-    #done
+    pushd 19_palmp
+      merge_files_to_pan_fasta.awk 19_palmp/* > ../19_palmp.faa
+      popd
 
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
@@ -773,14 +767,12 @@ run_summarize() {
   fi
 
   # Copy directory of final fasta files - abbreviated 19_palmp but copied to 19_pan_aug_leftover_merged_prot
-  for dir in 19_palmp; do
-    if [ -d "${WORK_DIR}"/19_palmp ]; then
-      echo "Copying directory $dir to output directory"
-      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/19_pan_aug_leftover_merged_prot/
-    else 
-      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
-    fi
-  done
+  if [ -d "${WORK_DIR}"/19_palmp ]; then
+    echo "Copying directory $dir to output directory"
+    cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/19_pan_aug_leftover_merged_prot
+  else 
+    echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
+  fi
 
   # 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees are transferred with -s xfr_aligns_trees
 
@@ -892,10 +884,9 @@ run_clean() {
 ########################################
 # Main program
 
-pandagma_conf_params='clust_iden clust_cov extra_iden mcl_inflation strict_synt
-ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff
-max_pair_ks min_align_count min_annots_in_align
-consen_prefix annot_str_regex preferred_annot expected_quotas'
+pandagma_conf_params='clust_iden clust_cov extra_iden TE_match_iden mcl_inflation strict_synt 
+ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff max_pair_ks consen_prefix 
+annot_str_regex min_align_count min_annots_in_align'
 
 # The steps align_cds, align_protein, model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
 # Those steps (functions) are in pandagma-common.sh
