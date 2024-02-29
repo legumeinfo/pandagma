@@ -350,14 +350,7 @@ run_summarize() {
     fi
   done
 
-  for dir in 35_sup_in_fams_prot 43_hmmalign_trim2 44_trees; do
-    if [ -d "${WORK_DIR}"/$dir ]; then
-      echo "Copying directory $dir to output directory"
-      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
-    else 
-      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
-    fi
-  done
+  # Directories 35_sup_in_fams_prot 43_hmmalign_trim2 44_trees are transferred in xfr_aligns_trees (in pandagma-common.sh)
 
   end_time=$(date)
 
@@ -435,8 +428,7 @@ run_summarize() {
 pandagma_conf_params='consen_iden clust_cov consen_method annot_str_regex'
 
 # Run all specified steps.
-# The steps calc_trees and xfr_aligns_trees may be run separately.
-# Those steps (functions) are in pandagma-common.sh
+# Those steps. Steps realign_and_trim calc_trees xfr_aligns_trees are in pandagma-common.sh
 export commandlist="ingest fam_consen search_families realign_and_trim calc_trees xfr_aligns_trees summarize"
 
 export dependencies='hmmscan famsa'
