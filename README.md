@@ -185,7 +185,8 @@ Subcommands for the **pangene** workflow, `pandagma pan`, in order they are usua
 Subcommands for the **gene family** workflow, `pandagma fam`, in order they are usually run:
 
 ```
-  Run these first (if using ks_calc)
+  Run these first (if using the ks_peaks.tsv file; otherwise, run all main steps and 
+  ks filtering will be done using parameters ks_block_wgd_cutoff and max_pair_ks)
                 all - All of the steps below, except for ks_filter and clean
                         (Or equivalently: omit the -s flag; \"all\" is default).
              ingest - Prepare the assembly and annotation files for analysis.
@@ -195,7 +196,7 @@ Subcommands for the **gene family** workflow, `pandagma fam`, in order they are 
             ks_calc - Calculation of Ks values on gene pairs from DAGchainer output.
 
   Evaluate the stats/ks_histplots.tsv and stats/ks_peaks_auto.tsv files and
-  put ks_peaks.tsv into the work directory, then run the following commands:
+  put ks_peaks.tsv into the \${WORK_DIR}/stats directory, then run the following commands:
           ks_filter - Filtering based on provided ks_peaks.tsv file (assumes prior ks_calc step)
                 mcl - Derive clusters, with Markov clustering.
            consense - Calculate a consensus sequences from each pan-gene set,
