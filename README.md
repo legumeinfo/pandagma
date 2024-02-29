@@ -374,7 +374,7 @@ ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
     along with the other Ks results (histograms) in the work_pandagma/stats subdirectory.
     The `ks_peaks_auto.tsv` file can be examined and used to create a file named `ks_peaks.tsv`
     with changes relative to `ks_peaks_auto.tsv` if necessary to reflect known or suspected WGD histories. 
-    If stats/ks_histplots.tsv is not provided, then Ks filtering will be done using values provided
+    If stats/ks_peaks.tsv is not provided, then Ks filtering will be done using values provided
     in the config file for ks_block_wgd_cutoff and max_pair_ks.
 
 4. Run steps `ks_filter` through `summarize`.
