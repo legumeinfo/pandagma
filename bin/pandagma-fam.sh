@@ -837,15 +837,6 @@ run_summarize() {
     echo "Couldn't find file manifests/MANIFEST_output_fam.yml"
   fi
 
-  for dir in 19_pan_aug_leftover_merged_prot 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
-    if [ -d "${WORK_DIR}"/$dir ]; then
-      echo "Copying directory $dir to output directory"
-      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
-    else 
-      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
-    fi
-  done
-
   printf "Run of program %s, version %s\n" "$scriptname" "$version" > "${stats_file}"
 
   end_time=$(date)

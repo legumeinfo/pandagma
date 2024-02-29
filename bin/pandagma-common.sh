@@ -230,7 +230,7 @@ run_xfr_aligns_trees() {
   fi
 
   if [[ "$scriptname" =~ "pandagma pan" ]] || [[ "$scriptname" =~ "pandagma fam" ]]; then
-    for dir in 20_align* 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
+    for dir in 19_pan_aug_leftover_merged_prot 20_align* 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
       if [ -d "${WORK_DIR}/$dir" ]; then
         echo "Copying directory $dir to output directory"
         cp -r "${WORK_DIR}/$dir" "${full_out_dir}"/
