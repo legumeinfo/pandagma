@@ -41,10 +41,10 @@ Subcommands (in order they are usually run):
                 all - All of the steps below
                         (Or equivalently: omit the -s flag; \"all\" is default).
              ingest - Prepare the assembly and annotation files for analysis.
-         fam_consen - 
-    search_families - 
-   realign_and_trim - 
-         calc_trees - 
+         fam_consen - Generate a consensus sequence for each family.
+    search_families - Search provided annotation sets (protein) against family consensus sequences.
+   realign_and_trim - Build HMMs and trim the alignments, preparatory to calculating trees.
+         calc_trees - Calculate gene trees.
           summarize - Move results into output directory, and report summary statistics.
 EOS
 
@@ -280,7 +280,6 @@ run_tabularize() {
     rm tmp.table_header
 }
 
-
 ##########
 run_realign_and_trim() {
   echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
@@ -294,7 +293,7 @@ run_realign_and_trim() {
   mkdir -p 42_hmmalign
   for filepath in 35_sup_in_fams_prot/*; do 
     file=$(basename "$filepath");
-    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/"$file" "{fam_dir}/21_hmm/$file" 35_sup_in_fams_prot/"$file" &
+    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/"$file" "${fam_dir}/21_hmm/$file" 35_sup_in_fams_prot/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -435,8 +434,10 @@ run_summarize() {
 
 pandagma_conf_params='consen_iden clust_cov consen_method annot_str_regex'
 
-# Run all specified steps 
-export commandlist="ingest fam_consen search_families realign_and_trim calc_trees summarize"
+# Run all specified steps.
+# The steps calc_trees and xfr_aligns_trees may be run separately.
+# Those steps (functions) are in pandagma-common.sh
+export commandlist="ingest fam_consen search_families realign_and_trim calc_trees xfr_aligns_trees summarize"
 
 export dependencies='hmmscan famsa'
 
