@@ -370,8 +370,8 @@ ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
    remaining steps (see **8** below).
 
     An intermediate output file, `stats/ks_peaks_auto.tsv`, is written to the work directory
-    This should be examined for biological plausibility (look at Ks peak values in column 3),
-    along with the other Ks results (histograms) in the work_pandagma/stats subdirectory.
+    This should be examined for biological plausibility, along with the other 
+    Ks results (histograms) in the work_pandagma/stats subdirectory.
     The `ks_peaks_auto.tsv` file can be examined and used to create a file named `ks_peaks.tsv`
     with changes relative to `ks_peaks_auto.tsv` if necessary to reflect known or suspected WGD histories. 
     If stats/ks_peaks.tsv is not provided, then Ks filtering will be done using values provided
