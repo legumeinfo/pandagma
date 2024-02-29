@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2023-02-23"
+version="2023-02-29"
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -51,7 +51,6 @@ calc_seq_stats () {
             printf(" %4d  %4d  %4d  %4d  %7.1f  %4s\n", ct, min, $1, N50, ave, ANN);
           }'
 }
-
 
 ##########
 run_align_cds() {
@@ -223,7 +222,6 @@ run_xfr_aligns_trees() {
   echo; echo "Copy alignment and tree results into output directory"
 
   full_out_dir="${out_dir}"
-
   cd "${submit_dir}" || exit
 
   if [ ! -d "$full_out_dir" ]; then
@@ -231,14 +229,31 @@ run_xfr_aligns_trees() {
       mkdir -p "$full_out_dir"
   fi
 
-  for dir in 20_align* 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
-    if [ -d "${WORK_DIR}"/$dir ]; then
-      echo "Copying directory $dir to output directory"
-      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
-    else
-      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
-    fi
-  done
+  if [[ "$scriptname" =~ "pandagma pan" ]] || [[ "$scriptname" =~ "pandagma fam" ]]; then
+    for dir in 20_align* 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
+      if [ -d "${WORK_DIR}/$dir" ]; then
+        echo "Copying directory $dir to output directory"
+        cp -r "${WORK_DIR}/$dir" "${full_out_dir}"/
+      else
+        echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
+      fi
+    done
+  elif [[ "$scriptname" =~ "pandagma fsup" ]]; then
+    for dir in 35_sup_in_fams_prot 42_hmmalign 43_hmmalign_trim2 44_trees; do
+      if [ -d "${WORK_DIR}/$dir" ]; then
+        echo "Copying directory $dir to output directory"
+        cp -r "${WORK_DIR}/$dir" "${full_out_dir}"/
+      else
+        echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
+      fi
+    done
+  else 
+    echo "Exiting, as $scriptname is not one of pan, fam, or fsup"
+    exit 1
+  fi
+
+  # Remove zero-length files in output directory
+    find "${full_out_dir}" -size 0 -print -delete
 }
 
 main_pan_fam() {
