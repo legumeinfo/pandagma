@@ -124,7 +124,7 @@ run_ingest() {
     # calc basic sequence stats
     annot_name=$(basename 02_fasta_prot/"$file_base" | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
     echo "  CHECK: report annot_name to stats file? [$annot_name]"
-    printf "  Added with hmmsearch:  " >> stats/tmp.fasta_seqstats_sup
+    printf "  Added with $consen_method:  " >> stats/tmp.fasta_seqstats_sup
     cat_or_zcat "${protein_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats_sup
   done
 
