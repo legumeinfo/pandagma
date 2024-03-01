@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2023-01-28"
+version="2023-02-29"
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -52,29 +52,151 @@ calc_seq_stats () {
           }'
 }
 
+##########
+run_align_cds() {
+  cd "${WORK_DIR}" || exit
+
+  echo "== Align CDS sequences =="
+
+  # If not already present, retrieve sequences for each family, preparatory to aligning them
+  # 19_pan_aug_leftover_merged_cds
+  if [[ -d 19_palmc ]]; then
+    : # do nothing; the directory and file(s) exist
+  else
+    mkdir -p 19_palmc
+    echo "  For each pan-gene set, retrieve sequences into a multifasta file."
+    get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
+      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_palmc
+  fi
+
+  echo; echo "== Move small families to the side =="
+  mkdir -p 19_palmc_small
+  # Below, count_seqs = number of sequences in the alignment; count_annots = number of unique annotation groups.
+  min_annots_in_align=2 # require at least this many distinct annotation groups in an alignment to retain it.
+  for filepath in 19_palmc/*; do
+    file=$(basename "$filepath")
+    count_seqs=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | wc -l);
+    count_annots=$( perl -lane 'BEGIN{$REX=qr($ENV{"ANN_REX"})}; if($F[0]=~/$REX/){ print $1 }' $filepath | sort -u | wc -l)
+    if [[ $count_seqs -lt $min_align_count ]] || [[ $count_annots -lt $min_annots_in_align ]]; then
+      echo "Set aside small family $file; $count_seqs sequences, $count_annots distinct annotations";
+      mv "$filepath" 19_palmc_small/
+    fi;
+  done
+
+  echo; echo "== Align nucleotide sequence for each gene family =="
+  mkdir -p 20_aligns_cds
+  for filepath in 19_palmc/*; do
+    file=$(basename "$filepath");
+    echo "  Computing alignment, using program famsa, for file $file"
+    famsa -t 2 19_palmc/"$file" 20_aligns_cds/"$file" 1>/dev/null &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+}
+
+##########
+run_align_protein() {
+  cd "${WORK_DIR}" || exit
+
+  echo "== Align protein sequences =="
+
+  # If not already present, retrieve sequences for each family, preparatory to aligning them
+  if [[ -d 19_palmp ]]; then
+    : # do nothing; the directory and file(s) exist
+  else
+    mkdir -p 19_palmp
+    echo "  For each pan-gene set, retrieve sequences into a multifasta file."
+    get_fasta_from_family_file.pl "${protein_files[@]}" "${protein_files_extra[@]}" \
+      "${protein_files_extra_constr[@]}" "${protein_files_extra_free[@]}" \
+      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_palmp
+  fi
+
+  echo; echo "== Move small families to the side =="
+  mkdir -p 19_palmp_small
+  # Below, count_seqs = number of unique sequences in the alignment; count_annots = # of unique annotation groups.
+  min_annots_in_align=2 # require at least this many distinct annotation groups in an alignment to retain it.
+  for filepath in 19_palmp/*; do
+    file=$(basename "$filepath")
+    count_seqs=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
+    count_annots=$( perl -lane 'BEGIN{$REX=qr($ENV{"ANN_REX"})}; if($F[0]=~/$REX/){ print $1 }' $filepath | sort -u | wc -l)
+    if [[ $count_seqs -lt $min_align_count ]] || [[ $count_annots -lt $min_annots_in_align ]]; then
+      echo "Set aside small family $file; $count_seqs sequences, $count_annots annotations";
+      mv "$filepath" 19_palmp_small/
+    fi;
+  done
+
+  echo; echo "== Align protein sequence for the each gene family =="
+  mkdir -p 20_aligns_prot
+  for filepath in 19_palmp/*; do
+    file=$(basename "$filepath");
+    # echo "  Computing alignment, using program famsa, for file $file"
+    famsa -t 2 19_palmp/"$file" 20_aligns_prot/"$file" 1>/dev/null &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+}
+
+##########
+run_model_and_trim() {
+  echo; echo "== Build HMMs =="
+  cd "${WORK_DIR}" || exit
+  mkdir -p 21_hmm
+  for filepath in 20_aligns_prot/*; do
+    file=$(basename "$filepath");
+    hmmbuild -n "$file" 21_hmm/"$file" "$filepath" 1>/dev/null &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+
+  echo; echo "== Realign to HMMs =="
+  mkdir -p 22_hmmalign
+  for filepath in 21_hmm/*; do
+    file=$(basename "$filepath");
+    # printf "%s " "$file"
+    hmmalign --trim --outformat A2M -o 22_hmmalign/"$file" 21_hmm/"$file" 19_palmp/"$file" &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+  echo
+
+  echo; echo "== Trim HMM alignments to match-states =="
+  mkdir -p 23_hmmalign_trim1
+  for filepath in 22_hmmalign/*; do
+    file=$(basename "$filepath");
+    # printf "%s " "$file"
+    perl -ne 'if ($_ =~ />/) {print $_} else {$line = $_; $line =~ s/[a-z]//g; print $line}' "$filepath" |
+      sed '/^$/d' > 23_hmmalign_trim1/"$file" &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+  echo
+
+  echo; echo "== Filter alignments prior to tree calculation =="
+  mkdir -p 23_hmmalign_trim2 23_hmmalign_trim2_log
+  min_depth=3
+  min_pct_depth=20
+  min_pct_aligned=20
+  for filepath in 23_hmmalign_trim1/*; do
+    file=$(basename "$filepath")
+    # printf "%s " "$file"
+    filter_align.pl -in "$filepath" -out 23_hmmalign_trim2/"$file" -log 23_hmmalign_trim2_log/"$file" \
+                    -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
+    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+  done
+  wait
+  echo
+}
+
 run_calc_trees() {
   case $scriptname in
-    'pandagma pan') fasttree_opts='-nt'; dir_prefix=2 ;;
-    'pandagma fam') fasttree_opts=''; dir_prefix=2 ;;
-    'pandagma fsup') fasttree_opts=''; dir_prefix=4
+    'pandagma pan')  dir_prefix=2 ;;
+    'pandagma fam')  dir_prefix=2 ;;
+    'pandagma fsup') dir_prefix=4
   esac
   echo; echo "== Calculate trees =="
   cd "${WORK_DIR}"
 
   mkdir -p "${dir_prefix}4_trees"
-
-  echo; echo "== Move small (<4) and very low-entropy families (sequences are all identical) to the side =="
-  mkdir -p "${dir_prefix}3_pan_aug_small_or_identical"
-  min_seq_count=4
-  # Below, "count" is the number of unique sequences in the alignment.
-  for filepath in "${dir_prefix}3_hmmalign_trim2"/*; do
-    file=$(basename "$filepath")
-    count=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
-    if [[ $count -lt $min_seq_count ]]; then
-      echo "Set aside small or low-entropy family $file";
-      mv "$filepath" "${dir_prefix}3_pan_aug_small_or_identical"/
-    fi;
-  done
 
   # By default, FastTreeMP uses all available threads.
   # It is more efficient to run more jobs on one core each by setting an environment variable.
@@ -83,11 +205,55 @@ run_calc_trees() {
   for filepath in "${dir_prefix}3_hmmalign_trim2"/*; do
     file=$(basename "$filepath")
     echo "  Calculating tree for $file"
-    fasttree "${fasttree_opts}" -quiet "$filepath" > "${dir_prefix}4_trees/$file" &
+    if [[ "$scriptname" =~ "pandagma pan" ]]; then  # pan; calculate from nucleotide alignments
+      echo "fasttree -nt -quiet $filepath > ${dir_prefix}4_trees/$file"
+      fasttree -quiet -nt "$filepath" > "${dir_prefix}4_trees/$file"
+    else # fam or fsup; calculate from protein alignments
+      echo "fasttree -quiet $filepath > ${dir_prefix}4_trees/$file"
+      fasttree -quiet "$filepath" > "${dir_prefix}4_trees/$file" &
+    fi
     # allow to execute up to $NPROC concurrent asynchronous processes
     if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
   done
   wait
+}
+
+run_xfr_aligns_trees() {
+  echo; echo "Copy alignment and tree results into output directory"
+
+  full_out_dir="${out_dir}"
+  cd "${submit_dir}" || exit
+
+  if [ ! -d "$full_out_dir" ]; then
+      echo "creating output directory \"${full_out_dir}/\""
+      mkdir -p "$full_out_dir"
+  fi
+
+  if [[ "$scriptname" =~ "pandagma pan" ]] || [[ "$scriptname" =~ "pandagma fam" ]]; then
+    for dir in 19_pan_aug_leftover_merged_prot 20_align* 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
+      if [ -d "${WORK_DIR}/$dir" ]; then
+        echo "Copying directory $dir to output directory"
+        cp -r "${WORK_DIR}/$dir" "${full_out_dir}"/
+      else
+        echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
+      fi
+    done
+  elif [[ "$scriptname" =~ "pandagma fsup" ]]; then
+    for dir in 35_sup_in_fams_prot 42_hmmalign 43_hmmalign_trim2 44_trees; do
+      if [ -d "${WORK_DIR}/$dir" ]; then
+        echo "Copying directory $dir to output directory"
+        cp -r "${WORK_DIR}/$dir" "${full_out_dir}"/
+      else
+        echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
+      fi
+    done
+  else 
+    echo "Exiting, as $scriptname is not one of pan, fam, or fsup"
+    exit 1
+  fi
+
+  # Remove zero-length files in output directory
+    find "${full_out_dir}" -size 0 -print -delete
 }
 
 main_pan_fam() {
@@ -134,7 +300,7 @@ main_pan_fam() {
   export fam_dir
 
   case ${step} in 
-    all|summarize|xfr_aligns_trees) : "${out_dir:=out_pandagma}" ;; # default to ./pandagma_out 
+    all|summarize|xfr_aligns_trees) : "${out_dir:=out_pandagma}" ;; # default to ./out_pandagma 
     *) if [ "${out_dir:-}" ]; then
          printf '\noption -o OUT_DIR not applicable to step %s\n' "$step" >&2
          exit 1

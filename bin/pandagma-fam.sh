@@ -837,15 +837,6 @@ run_summarize() {
     echo "Couldn't find file manifests/MANIFEST_output_fam.yml"
   fi
 
-  for dir in 19_pan_aug_leftover_merged_prot 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
-    if [ -d "${WORK_DIR}"/$dir ]; then
-      echo "Copying directory $dir to output directory"
-      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
-    else 
-      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
-    fi
-  done
-
   printf "Run of program %s, version %s\n" "$scriptname" "$version" > "${stats_file}"
 
   end_time=$(date)
@@ -897,14 +888,21 @@ run_summarize() {
 
   echo "  Print counts per accession"
   if [ -f "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv ]; then
-    printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n"
-    printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n" 
-    transpose.pl "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv | 
-      perl -lane 'next if ($.<=3); 
-        $ct=0; $sum=0; $nulls=0; $OGs=0;
-        for $i (@F[1..(@F-1)]){ $OGs++; if ($i>0){$ct++; $sum+=$i} if ($i==0){$nulls++} }; 
-        printf("  %d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
-      >> "${stats_file}"
+    {
+      printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n"
+      printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n"
+    } >> "${stats_file}"
+    {
+      transpose.pl "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv |
+        perl -lane 'next if ($.<=3);
+          $ct=0; $sum=0; $nulls=0; $OGs=0;
+          for $i (@F[1..(@F-1)]){
+            $OGs++;
+            if ($i>0){$ct++; $sum+=$i}
+            if ($i==0){$nulls++}
+          };
+          printf("  %d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])'
+    } >> "${stats_file}"
   fi
 
   echo "  Print histograms"

@@ -41,10 +41,10 @@ Subcommands (in order they are usually run):
                 all - All of the steps below
                         (Or equivalently: omit the -s flag; \"all\" is default).
              ingest - Prepare the assembly and annotation files for analysis.
-         fam_consen - 
-    search_families - 
-   realign_and_trim - 
-         calc_trees - 
+         fam_consen - Generate a consensus sequence for each family.
+    search_families - Search provided annotation sets (protein) against family consensus sequences.
+   realign_and_trim - Build HMMs and trim the alignments, preparatory to calculating trees.
+         calc_trees - Calculate gene trees.
           summarize - Move results into output directory, and report summary statistics.
 EOS
 
@@ -59,10 +59,13 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         \"([^.]+\.[^.]+)\..+\"
                           for two dot-separated fields, e.g. vigan.Shumari
                         or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
+    min_align_count - Minimum number of sequences in a family to trigger alignments, modeling, and trees [4]
+min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [2]
 
 File sets (arrays):
-      protein_files
+   annotation_files
           cds_files
+      protein_files
 EOS
 
 ########################################
@@ -77,6 +80,8 @@ canonicalize_paths() {
   fi
 
   cd "${DATA_DIR}" || exit
+
+  export ANN_REX=${annot_str_regex}
 
   mapfile -t cds_files < <(realpath --canonicalize-existing "${cds_files[@]}")
   mapfile -t protein_files < <(realpath --canonicalize-existing "${protein_files[@]}")
@@ -119,7 +124,7 @@ run_ingest() {
     # calc basic sequence stats
     annot_name=$(basename 02_fasta_prot/"$file_base" | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
     echo "  CHECK: report annot_name to stats file? [$annot_name]"
-    printf "  Added with hmmsearch:  " >> stats/tmp.fasta_seqstats_sup
+    printf "  Added with $consen_method:  " >> stats/tmp.fasta_seqstats_sup
     cat_or_zcat "${protein_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats_sup
   done
 
@@ -275,7 +280,6 @@ run_tabularize() {
     rm tmp.table_header
 }
 
-
 ##########
 run_realign_and_trim() {
   echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
@@ -289,7 +293,7 @@ run_realign_and_trim() {
   mkdir -p 42_hmmalign
   for filepath in 35_sup_in_fams_prot/*; do 
     file=$(basename "$filepath");
-    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/"$file" "{fam_dir}/21_hmm/$file" 35_sup_in_fams_prot/"$file" &
+    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/"$file" "${fam_dir}/21_hmm/$file" 35_sup_in_fams_prot/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -346,14 +350,7 @@ run_summarize() {
     fi
   done
 
-  for dir in 35_sup_in_fams_prot 43_hmmalign_trim2 44_trees; do
-    if [ -d "${WORK_DIR}"/$dir ]; then
-      echo "Copying directory $dir to output directory"
-      cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/
-    else 
-      echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
-    fi
-  done
+  # Directories 35_sup_in_fams_prot 43_hmmalign_trim2 44_trees are transferred in xfr_aligns_trees (in pandagma-common.sh)
 
   end_time=$(date)
 
@@ -430,11 +427,11 @@ run_summarize() {
 
 pandagma_conf_params='consen_iden clust_cov consen_method annot_str_regex'
 
-# Run all specified steps 
-export commandlist="ingest fam_consen search_families realign_and_trim calc_trees summarize"
+# Run all specified steps.
+# Those steps. Steps realign_and_trim calc_trees xfr_aligns_trees are in pandagma-common.sh
+export commandlist="ingest fam_consen search_families realign_and_trim calc_trees xfr_aligns_trees summarize"
 
 export dependencies='hmmscan famsa'
-export ANN_REX=${annot_str_regex}
 
 declare out_dir version consen_iden clust_cov consen_method annot_str_regex
 

@@ -49,7 +49,8 @@ which calc_ks_from_dag.pl
 
 ##########
 # Optional alignment and tree-construction steps
-#pandagma pan -c $CONFIG -s align
+#pandagma pan -c $CONFIG -s align_cds
+#pandagma pan -c $CONFIG -s align_protein
 #pandagma pan -c $CONFIG -s model_and_trim
 #pandagma pan -c $CONFIG -s calc_trees
 pandagma pan -c $CONFIG -s xfr_aligns_trees

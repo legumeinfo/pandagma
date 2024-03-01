@@ -8,11 +8,13 @@ readonly DATAFILE=${1}
 
 # adjust URL for collections that are located in the annex
 case ${DATAFILE} in
+  acacr.Acra3RX.gnm1.ann1.6C0V.*|\
   arahy.Tifrunner.gnm1.ann2.TN8K.*|\
   arath.Col0.gnm9.ann11.KH24.*|\
   bauva.BV-YZ2020.gnm2.ann1.RJ1G.*|\
   chafa.ISC494698.gnm1.ann1.G7XW.*|\
   dalod.SKLTGB.gnm1.ann1.R67B.*|\
+  phach.longxuteng.gnm1.ann1.KGX9.*|\
   prupe.Lovell.gnm2.ann1.S2ZZ.*|\
   quisa.S10.gnm1.ann1.RQ4J.*|\
   sento.Myeongyun.gnm1.ann1.5WXB.*|\
@@ -30,6 +32,7 @@ collection_type=annotations
 
 case ${genspa} in
   [A-Z]*) genus=${genspa} species=GENUS collection_type=pangenes collection=${1%.*.*.*} ;;
+  acacr) genus=Acacia species=crassicarpa ;;
   aesev) genus=Aeschynomene species=evenia ;;
   aradu) genus=Arachis species=duranensis ;;
   arahy) genus=Arachis species=hypogaea ;;
@@ -52,6 +55,7 @@ case ${genspa} in
   glyso) genus=Glycine species=soja ;;
   glyst) genus=Glycine species=stenophita ;;
   glysy) genus=Glycine species=syndetika ;;
+  labpu) genus=Lablab species=purpureus ;;
   legume) genus=LEGUMES species=Fabaceae ;;
   lencu) genus=Lens species=culinaris ;;
   lotja) genus=Lotus species=japonicus ;;
@@ -59,6 +63,7 @@ case ${genspa} in
   medsa) genus=Medicago species=sativa ;;
   medtr) genus=Medicago species=truncatula ;;
   phaac) genus=Phaseolus species=acutifolius ;;
+  phach) genus=Phanera species=championii ;;
   phalu) genus=Phaseolus species=lunatus ;;
   phavu) genus=Phaseolus species=vulgaris ;;
   pissa) genus=Pisum species=sativum ;;
@@ -87,7 +92,5 @@ fi
 if [[ "$collection" == *"XinJiangDaYe"* ]]; then
   collection="XinJiangDaYe.gnm1.ann1.RKB9"
 fi
-
-#echo "${DATASTORE}/${genus}/${species}/${collection_type}/${collection}/${DATAFILE}"
 
 curl --no-progress-meter --fail "${DATASTORE}/${genus}/${species}/${collection_type}/${collection}/${DATAFILE}"
