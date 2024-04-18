@@ -42,11 +42,13 @@ case ${genspa} in
   bauva) genus=Bauhinia species=variegata ;;
   cajca) genus=Cajanus species=cajan ;;
   cerca) genus=Cercis species=canadensis ;;
+  cerch) genus=Cercis species=chinensis ;;
   chafa) genus=Chamaecrista species=fasciculata ;;
   cicar) genus=Cicer species=arietinum ;;
   cicec) genus=Cicer species=echinospermum ;;
   cicre) genus=Cicer species=reticulatum ;;
   dalod) genus=Dalbergia species=odorifera ;;
+  faial) genus=Faidherbia species=albida ;;
   glycy) genus=Glycine species=cyrtoloba ;;
   glyd3) genus=Glycine species=D3-tomentella ;;
   glydo) genus=Glycine species=dolichocarpa ;;
@@ -58,12 +60,15 @@ case ${genspa} in
   labpu) genus=Lablab species=purpureus ;;
   legume) genus=LEGUMES species=Fabaceae ;;
   lencu) genus=Lens species=culinaris ;;
+  lener) genus=Lens species=ervoides ;;
   lotja) genus=Lotus species=japonicus ;;
   lupal) genus=Lupinus species=albus ;;
+  lupan) genus=Lupinus species=angustifolius ;;
   medsa) genus=Medicago species=sativa ;;
   medtr) genus=Medicago species=truncatula ;;
   phaac) genus=Phaseolus species=acutifolius ;;
   phach) genus=Phanera species=championii ;;
+  phaco) genus=Phaseolus species=coccineus ;;
   phalu) genus=Phaseolus species=lunatus ;;
   phavu) genus=Phaseolus species=vulgaris ;;
   pissa) genus=Pisum species=sativum ;;
@@ -72,6 +77,7 @@ case ${genspa} in
   sento) genus=Senna species=tora ;;
   singl) genus=Sindora species=glabra ;;
   tripr) genus=Trifolium species=pratense ;;
+  trisu) genus=Trifolium species=subterraneum ;;
   vicfa) genus=Vicia species=faba ;;
   vigan) genus=Vigna species=angularis ;;
   vigra) genus=Vigna species=radiata ;;
