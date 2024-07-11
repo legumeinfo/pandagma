@@ -17,5 +17,10 @@
 23_syn_pan_pctl25_posn_prot.faa: Protein pan-gene sequence, omitting pan-genes
   smaller than 25% of the mode, with derived pan-gene IDs corresponding with
   consensus chromosome and ordinal position.
-stats.Glycine_18_35.txt: Descriptive statistics about program parameters, input
+20_aligns_cds: Directory of alignments (if align is run)
+21_hmm: Directory of Hidden Markov Models of all alignments (if model_and_trim is run)
+22_hmmalign: Directory of alignments of family files back to the HMMs (if model_and_trim is run)
+23_hmmalign_trim2: Directory of alignments, trimmed of non-match states (if model_and_trim is run)
+24_trees: Directory of phylogenetic trees (if calc_trees is run)
+stats.txt: Descriptive statistics about program parameters, input
   sequences, and pan-gene products.
