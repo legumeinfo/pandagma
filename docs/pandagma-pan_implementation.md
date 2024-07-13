@@ -169,7 +169,7 @@ handled (whether by reference or alignment method) with the order_and_name subco
 
 For the “reference” method, the ordering of the pangenes is determined relative to the
 specified "preferred annotation". A pangene that contains a gene from the preferred
-annotation takes its chromosome ordinal position from a sorting of the genes in the
+annotation takes its chromosome and ordinal position from a sorting of the genes in the
 preferred annotation (or from the first gene in the case of local paralogs within a
 pangene). A subsequent gap-filling step (described below) places the remaining pangenes,
 when possible, relative to the ordered reference-based pangenes.
@@ -192,9 +192,9 @@ order-in-annotation, start, end, orientation. Then, for each annotation, the pep
 strings are concatenated into a peptide-sequence “pseudo-chromosome.” A typical such
 encoded “chromosomal” sequence tends to be about 10k residues. Then, each such
 chromosome-representing sequence from all annotation sets are aligned in protein space, to
-generate a protein multiple sequence alignment. Finally, each sequence is from these
+generate a protein multiple sequence alignment. Finally, each sequence from these
 alignments is decoded to recover the gene-id, annotation-name, chromosome,
-order-in-annotation, start, end, orientation. The result is a table that provides a
+order-in-annotation, start, end, and orientation. The result is a table that provides a
 provisional ordering of most of the pangenes.
 
 Finally, for both the reference and alignment ordering methods, some pangenes may not have
@@ -214,8 +214,9 @@ This implementation is not a formal HMM, but is similar in concept, as the algor
 evaluates sequential data (a vector of signed integers that represents the “before” states
 and “after” states for all genes in a chromosome relative to an unplaced gene) and
 identifies a state-transition point in a that vector. The gene with unknown position is
-placed at that transition point. The gap-filling step is among the most time-consuming
-part of the pangene workflow, so has been parallelized using Parallel::ForkManager.
+placed at the transition between the negative and the positive elements in the vector. The
+gap-filling step is among the most time-consuming part of the pangene workflow, so has
+been parallelized using Parallel::ForkManager.
 
 The gapfilling process may still leave some genes unplaced. Those genes are reported as
 such, without ordinal position.
