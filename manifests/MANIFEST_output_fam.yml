@@ -15,9 +15,15 @@
 18_syn_pan_aug_extra.counts.tsv: Matrix of counts of genes per annotation set for each gene family.
 18_syn_pan_aug_extra.hsh.tsv: Gene family file, in a two-column hash format, with
   the set ID in the first column and genes in the second.
-18_syn_pan_aug_extra.table.tsv: Tabular format of all gene families, in columns by species. Multiple paralogs 
+18_syn_pan_aug_extra.table.tsv: Tabular format of all gene families, in columns by species. Multiple paralogs
   from a species in a gene family are comma-separated within the column of the species.
-19_palm: (short for pan_aug_leftover_merged) - directory of fasta files for all families corresponding with 18_syn_pan_aug_extra.clust.tsv
-stats.family_4_3.txt: Descriptive statistics about program parameters, input
+19_pan_aug_leftover_merged_prot: Directory of fasta files for all families 
+  corresponding with 18_syn_pan_aug_extra.clust.tsv
+20_aligns_prot: Directory of alignments (if align is run)
+21_hmm: Directory of Hidden Markov Models of all alignments (if model_and_trim is run)
+22_hmmalign: Directory of alignments of family files back to the HMMs (if model_and_trim is run)
+23_hmmalign_trim2: Directory of alignments, trimmed of non-match states (if model_and_trim is run)
+24_trees: Directory of phylogenetic trees (if calc_trees is run)
+stats.txt: Descriptive statistics about program parameters, input
   sequences, and Gene family products.
 
