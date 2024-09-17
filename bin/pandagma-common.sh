@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2023-02-29"
+version="2023-09-08"
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -72,7 +72,7 @@ run_align_cds() {
   echo; echo "== Move small families to the side =="
   mkdir -p 19_palmc_small
   # Below, count_seqs = number of sequences in the alignment; count_annots = number of unique annotation groups.
-  min_annots_in_align=2 # require at least this many distinct annotation groups in an alignment to retain it.
+  # min_annots_in_align: require at least this many distinct annotation groups in an alignment to retain it.
   for filepath in 19_palmc/*; do
     file=$(basename "$filepath")
     count_seqs=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | wc -l);
@@ -114,7 +114,7 @@ run_align_protein() {
   echo; echo "== Move small families to the side =="
   mkdir -p 19_palmp_small
   # Below, count_seqs = number of unique sequences in the alignment; count_annots = # of unique annotation groups.
-  min_annots_in_align=2 # require at least this many distinct annotation groups in an alignment to retain it.
+  # min_annots_in_align: require at least this many distinct annotation groups in an alignment to retain it.
   for filepath in 19_palmp/*; do
     file=$(basename "$filepath")
     count_seqs=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
@@ -138,8 +138,9 @@ run_align_protein() {
 
 ##########
 run_model_and_trim() {
-  echo; echo "== Build HMMs =="
   cd "${WORK_DIR}" || exit
+
+  echo; echo "== Build HMMs =="
   mkdir -p 21_hmm
   for filepath in 20_aligns_prot/*; do
     file=$(basename "$filepath");
