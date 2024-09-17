@@ -62,18 +62,25 @@ my @aln_cols;
 my @aln_col_scores;
 my $seq_count;
 my %seen_col; # to record if this $aln_col_scores[] has been initialized
-foreach my $seqobj ( $aln->each_seq() ) {
-  my $col_idx = 0;
-  $seq_count++;
-  foreach my $char ( split("", $seqobj->seq()) ) {
-    if ($seen_col{$col_idx}){} # otherwise initialize this $aln_col_scores[$col_idx]
-    else {$seen_col{$col_idx}++; $aln_col_scores[$col_idx] = 0} 
-    $char =~ s/X/-/; # Replace X character with gap character (dash)
-    $aln_cols[$col_idx] .= $char;
-    $aln_col_scores[$col_idx]++ unless ($char =~ /-|N/i);
-    $col_idx++;
+
+eval {
+  foreach my $seqobj ( $aln->each_seq() ) {
+    my $col_idx = 0;
+    $seq_count++;
+    foreach my $char ( split("", $seqobj->seq()) ) {
+      if ($seen_col{$col_idx}){} # otherwise initialize this $aln_col_scores[$col_idx]
+      else {$seen_col{$col_idx}++; $aln_col_scores[$col_idx] = 0} 
+      $char =~ s/X/-/; # Replace X character with gap character (dash)
+      $aln_cols[$col_idx] .= $char;
+      $aln_col_scores[$col_idx]++ unless ($char =~ /-|N/i);
+      $col_idx++;
+    }
+  } 
+  if ($@) { # Report trapped error
+    print "Trapped error in filter_align.pl, input file $in_align\n";
+    die "$@";
   }
-}
+};
 
 # Skip columns that have too many gap characters
 my $gapchar = $aln->gap_char();
@@ -182,3 +189,4 @@ picked up this script on-line somewhere, ca. 2010
 23-01-22 sc Remove columns that have no information (are all the same residue or base)
 23-10-09 sc Test if seq_len is defined and >0
 23-11-15 sc Handle case of missing sequence
+24-09-10 sc Trap and report error when traversing $seqobj->seq()
