@@ -322,6 +322,11 @@ run_realign_and_trim() {
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
+
+  # Remove any zero-length alignments
+  find 43_hmmalign_trim2 -size 0c | xargs -I{} echo "  Remove zero-length file " {} >&2
+  find 43_hmmalign_trim2 -size 0c -delete
+
 }
 
 ##########

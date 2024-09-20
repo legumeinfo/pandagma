@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2023-09-08"
+version="2023-09-20"
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -186,6 +186,10 @@ run_model_and_trim() {
   done
   wait
   echo
+
+  # Remove any zero-length alignments
+  find 43_hmmalign_trim2 -size 0c | xargs -I{} echo "  Remove zero-length file " {} >&2
+  find 43_hmmalign_trim2 -size 0c -delete
 }
 
 run_calc_trees() {
