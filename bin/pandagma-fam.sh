@@ -117,8 +117,8 @@ ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
                         \"([^.]+\.[^.]+)\..+\"
                           for two dot-separated fields, e.g. vigan.Shumari
                         or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
-    min_align_count - Minimum number of sequences to trigger alignments, modeling, and trees [4]
-min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [2]
+    min_align_count - Minimum number of sequences to trigger alignments, modeling, and trees [3]
+min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [1]
 
     expected_quotas - (Optional) array of seqid prefixes & expected number of
                         paralogs for the species identified by the prefix; e.g.:
