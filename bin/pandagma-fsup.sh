@@ -210,7 +210,8 @@ run_search_families() {
 
   SEQTYPE=1 # 3=nuc; 1=pep
 
-  if [ "$consen_method" == "hmmemit" ] || [ "$consen_method" == "cons" ]; then
+  if [ "$consen_method" == "hmmemit" ] || 
+     [ "$consen_method" == "cons" ]; then
     for filepath in 02_fasta_prot_sup/*; do 
       base=$(basename "$filepath" ."$faa")
       echo "  Search $base.$faa against family hmmemit consensus sequences"
@@ -250,7 +251,7 @@ run_search_families() {
 
   else
     echo "Unrecognized consen_method: $consen_method."
-    echo "Expected values are \"hmmemit\" or \"cons\"."
+    echo "Expected values are \"hmmemit\", \"cons\", or \"align_sample\"."
     exit 1
   fi
 
@@ -315,11 +316,17 @@ run_realign_and_trim() {
   min_pct_aligned=20
   for filepath in 43_hmmalign_trim1/*; do 
     file=$(basename "$filepath")
+    # printf "%s " "$file"
     filter_align.pl -in "$filepath" -out 43_hmmalign_trim2/"$file" -log 43_hmmalign_trim2_log/"$file" \
                     -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
+
+  # Remove any zero-length alignments
+  find 43_hmmalign_trim2 -size 0c | xargs -I{} echo "  Remove zero-length file " {} >&2
+  find 43_hmmalign_trim2 -size 0c -delete
+
 }
 
 ##########

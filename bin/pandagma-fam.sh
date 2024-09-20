@@ -103,6 +103,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
          clust_iden - Minimum identity threshold for mmseqs clustering [0.40]
           clust_cov - Minimum coverage for mmseqs clustering [0.40]
          extra_iden - Minimum identity threshold for mmseqs addition of \"extra\" annotations [0.30]
+      TE_match_iden - Minimum identity threshold for excluding match to transposable element file - for "TESearch"
       mcl_inflation - Inflation parameter, for Markov clustering [1.6]
         strict_synt - For clustering of the \"main\" annotations, use only syntenic pairs [1]
                         The alternative (0) is to use all homologous pairs that satisfy expected_quotas
@@ -111,16 +112,14 @@ Variables in pandagma config file (Set the config with the CONF environment vari
          ks_binsize - For calculating and displaying histograms. [0.05]
 ks_block_wgd_cutoff - Fallback, if a ks_peaks.tsv file is not provided. [1.75]
         max_pair_ks - Fallback value for excluding gene pairs, if a ks_peaks.tsv file is not provided. [4.0]
-
       consen_prefix - Prefix to use in orthogroup names
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
                         \"([^.]+\.[^.]+)\..+\"
                           for two dot-separated fields, e.g. vigan.Shumari
                         or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
-    preferred_annot - String to match and select an annotation set, from a gene ID.
-                        This is used for picking representative IDs+sequence from an orthogroup, when
-                        this annotation is among those with the median length for the orthogroup.
-                        Otherwise, one is selected at random from those with median length.
+    min_align_count - Minimum number of sequences to trigger alignments, modeling, and trees [3]
+min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [1]
+
     expected_quotas - (Optional) array of seqid prefixes & expected number of
                         paralogs for the species identified by the prefix; e.g.:
                         expected_quotas=(glyma 4 medtr 2)
@@ -446,7 +445,7 @@ run_ks_calc() {
       echo "# $filebase" 
       echo "# Normalized relative to Ks peak inferred at bin $ks_bin, with amplitude $ks_amplitude_pct" 
       awk 'NF==7 && $7<=3 {print $7}' "$ks_path" | histogram.pl -z -n -s "$ks_binsize" | 
-        histplot.pl -d "$ks_amplitude_pct" 
+        histplot.pl -d "$ks_amplitude_pct" | cut -b1-150
       echo "" 
     } >> stats/ks_histplots.tsv
   done
@@ -461,6 +460,7 @@ run_ks_filter() {
   echo;
 
   cd "${WORK_DIR}" || exit
+
   if [ -f stats/ks_peaks.tsv ]; then  # filter based on list of Ks values
     echo "Filtering on quotas from expected_quotas and ks_pair_cutoff values provided in ks_peaks.tsv"
     if [ -d 05_kaksout_ks_filtered ]; then rm -rf 05_kaksout_ks_filtered ; fi
@@ -688,19 +688,21 @@ run_add_extra() {
     perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 18_syn_pan_aug_extra.clust.tsv \
       > 18_syn_pan_aug_extra.hsh.tsv
 
-    echo "  For each family set, retrieve sequences into a multifasta file."
+    echo "  For each family set, retrieve sequences into a multifasta file 19_pan_aug_leftover_merged_prot (abbreviated 19_palmp)"
     printf "    Fasta file: %s %s\n" "${protein_files[@]}" "${protein_files_extra[@]}"
-    if [ -d 19_pan_aug_leftover_merged_prot ]; then rm -rf 19_pan_aug_leftover_merged_prot ; fi
-    mkdir -p 19_pan_aug_leftover_merged_prot
+    if [ -d 19_palmp ]; then rm -rf 19_palmp ; fi
+    mkdir -p 19_palmp
     get_fasta_from_family_file.pl "${protein_files[@]}" "${protein_files_extra[@]}" \
-      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
+      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_palmp
 
-    echo "  Merge fasta files from 19_pan_aug_leftover_merged_prot, prefixing IDs with panID__"
-    merge_files_to_pan_fasta.awk 19_pan_aug_leftover_merged_prot/* > 19_pan_aug_leftover_merged_prot.faa
+    echo "  Merge fasta files from 19_palmp, prefixing IDs with panID__"
+    pushd 19_palmp
+      merge_files_to_pan_fasta.awk 19_palmp/* > ../19_palmp.faa
+      popd
 
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
-    cp 07_pan_fasta_prot.faa 19_pan_aug_leftover_merged_prot.faa
+    cp 07_pan_fasta_prot.faa 19_palmp.faa
     cp 12_syn_pan_aug.clust.tsv 18_syn_pan_aug_extra.clust.tsv
     cp 12_syn_pan_aug.hsh.tsv 18_syn_pan_aug_extra.hsh.tsv
   fi
@@ -722,81 +724,6 @@ run_tabularize() {
 
     rm tmp.18_syn_pan_aug_extra.clust.tsv
     rm tmp.table_header
-}
-
-##########
-run_align() {
-  echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
-  cd "${WORK_DIR}" || exit
-  if [[ -d 19_pan_aug_leftover_merged_prot ]] && [[ -f 19_pan_aug_leftover_merged_prot/${consen_prefix}00001 ]]; then
-    : # do nothing; the directory and file(s) exist
-  else 
-    mkdir -p 19_pan_aug_leftover_merged_prot
-    echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    get_fasta_from_family_file.pl "${protein_files[@]}" "${protein_files_extra[@]}" \
-      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_pan_aug_leftover_merged_prot
-  fi
-
-  echo; echo "== Align the gene families =="
-  mkdir -p 20_aligns
-  for filepath in 19_pan_aug_leftover_merged_prot/*; do 
-    file=$(basename "$filepath");
-    echo "  Computing alignment, using program famsa, for file $file"
-    famsa -t 2 19_pan_aug_leftover_merged_prot/"$file" 20_aligns/"$file" 1>/dev/null &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-}
-
-##########
-run_model_and_trim() {
-  echo; echo "== Build HMMs =="
-  cd "${WORK_DIR}" || exit
-  mkdir -p 21_hmm
-  for filepath in 20_aligns/*; do 
-    file=$(basename "$filepath");
-    hmmbuild -n "$file" 21_hmm/"$file" "$filepath" 1>/dev/null &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-
-  echo; echo "== Realign to HMMs =="
-  mkdir -p 22_hmmalign
-  for filepath in 21_hmm/*; do
-    file=$(basename "$filepath");
-    printf "%s " "$file"
-    hmmalign --trim --outformat A2M --amino -o 22_hmmalign/"$file" 21_hmm/"$file" 19_pan_aug_leftover_merged_prot/"$file" &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-  echo
-
-  echo; echo "== Trim HMM alignments to match-states =="
-  mkdir -p 23_hmmalign_trim1
-  for filepath in 22_hmmalign/*; do 
-    file=$(basename "$filepath");
-    printf "%s " "$file"
-    < "$filepath" perl -ne 'if ($_ =~ />/) {print $_} else {$line = $_; $line =~ s/[a-z]//g; print $line}' |
-      sed '/^$/d' > 23_hmmalign_trim1/"$file" &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-  echo
-
-  echo; echo "== Filter alignments prior to tree calculation =="
-  mkdir -p 23_hmmalign_trim2 23_hmmalign_trim2_log
-  min_depth=3
-  min_pct_depth=20
-  min_pct_aligned=20
-  for filepath in 23_hmmalign_trim1/*; do
-    file=$(basename "$filepath")
-    printf "%s " "$file"
-    filter_align.pl -in "$filepath" -out 23_hmmalign_trim2/"$file" -log 23_hmmalign_trim2_log/"$file" \
-                    -depth $min_depth -pct_depth $min_pct_depth -min_pct_aligned $min_pct_aligned &
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-  echo
 }
 
 ##########
@@ -836,6 +763,16 @@ run_summarize() {
   else
     echo "Couldn't find file manifests/MANIFEST_output_fam.yml"
   fi
+
+  # Copy directory of final fasta files - abbreviated 19_palmp but copied to 19_pan_aug_leftover_merged_prot
+  if [ -d "${WORK_DIR}"/19_palmp ]; then
+    echo "Copying directory $dir to output directory"
+    cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/19_pan_aug_leftover_merged_prot
+  else 
+    echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
+  fi
+
+  # 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees are transferred with -s xfr_aligns_trees
 
   printf "Run of program %s, version %s\n" "$scriptname" "$version" > "${stats_file}"
 
@@ -932,7 +869,7 @@ run_clean() {
   echo "  work_dir: $PWD"
   if [ -d MMTEMP ]; then rm -rf MMTEMP/*; 
   fi
-  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_pan_aug_leftover_merged_prot; do
+  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_palmp; do
     if [ -d $dir ]; then echo "  Removing directory $dir"; rm -rf $dir &
     fi
   done
@@ -948,14 +885,14 @@ run_clean() {
 ########################################
 # Main program
 
-pandagma_conf_params='clust_iden clust_cov extra_iden mcl_inflation strict_synt 
-ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff max_pair_ks 
-consen_prefix annot_str_regex'
+pandagma_conf_params='clust_iden clust_cov extra_iden TE_match_iden mcl_inflation strict_synt 
+ks_low_cutoff ks_hi_cutoff ks_binsize ks_block_wgd_cutoff max_pair_ks consen_prefix 
+annot_str_regex min_align_count min_annots_in_align'
 
-export commandlist="ingest mmseqs filter dagchainer \
-             ks_calc ks_filter \
-             mcl consense cluster_rest add_extra tabularize \
-             align model_and_trim calc_trees summarize"
+# The steps  align_protein, model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
+# Those steps (functions) are in pandagma-common.sh
+export commandlist="ingest mmseqs filter dagchainer ks_calc ks_filter \
+             mcl consense cluster_rest add_extra tabularize summarize"
 
 export dependencies='dagchainer mcl cons famsa run_DAG_chainer.pl'
 

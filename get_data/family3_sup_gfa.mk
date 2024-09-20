@@ -164,9 +164,6 @@ glyma.Wenfeng7_IGA1001.gnm1.ann1.ZK5W.protein.faa.gz \
 glyma.Wm82_IGA1008.gnm1.ann1.FGN6.cds.fna.gz \
 glyma.Wm82_IGA1008.gnm1.ann1.FGN6.gene_models_main.bed.gz \
 glyma.Wm82_IGA1008.gnm1.ann1.FGN6.protein.faa.gz \
-glyma.Wm82_ISU01.gnm2.ann1.FGFB.cds_primary.fna.gz \
-glyma.Wm82_ISU01.gnm2.ann1.FGFB.gene_models_main.bed.gz \
-glyma.Wm82_ISU01.gnm2.ann1.FGFB.protein_primary.faa.gz \
 glyma.Wm82_NJAU.gnm1.ann1.KM71.cds_primary.fna.gz \
 glyma.Wm82_NJAU.gnm1.ann1.KM71.gene_models_main.bed.gz \
 glyma.Wm82_NJAU.gnm1.ann1.KM71.protein_primary.faa.gz \
@@ -425,3 +422,4 @@ vitvi.PN40024.gnm2.ann1.V31M.protein_primary.faa.gz \
 legume.TE_lib_2024.rpt.6WVT.fna.gz 
 
 include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))/common.mk
+

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-version="2023-02-29"
+version="2023-09-20"
+
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -72,7 +73,7 @@ run_align_cds() {
   echo; echo "== Move small families to the side =="
   mkdir -p 19_palmc_small
   # Below, count_seqs = number of sequences in the alignment; count_annots = number of unique annotation groups.
-  min_annots_in_align=2 # require at least this many distinct annotation groups in an alignment to retain it.
+  # min_annots_in_align: require at least this many distinct annotation groups in an alignment to retain it.
   for filepath in 19_palmc/*; do
     file=$(basename "$filepath")
     count_seqs=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | wc -l);
@@ -114,7 +115,7 @@ run_align_protein() {
   echo; echo "== Move small families to the side =="
   mkdir -p 19_palmp_small
   # Below, count_seqs = number of unique sequences in the alignment; count_annots = # of unique annotation groups.
-  min_annots_in_align=2 # require at least this many distinct annotation groups in an alignment to retain it.
+  # min_annots_in_align: require at least this many distinct annotation groups in an alignment to retain it.
   for filepath in 19_palmp/*; do
     file=$(basename "$filepath")
     count_seqs=$(awk '$1!~/>/ {print FILENAME "\t" $1}' "$filepath" | sort -u | wc -l);
@@ -138,8 +139,10 @@ run_align_protein() {
 
 ##########
 run_model_and_trim() {
-  echo; echo "== Build HMMs =="
   cd "${WORK_DIR}" || exit
+  
+  echo; echo "== Build HMMs =="
+
   mkdir -p 21_hmm
   for filepath in 20_aligns_prot/*; do
     file=$(basename "$filepath");
@@ -185,6 +188,10 @@ run_model_and_trim() {
   done
   wait
   echo
+
+  # Remove any zero-length alignments
+  find 43_hmmalign_trim2 -size 0c | xargs -I{} echo "  Remove zero-length file " {} >&2
+  find 43_hmmalign_trim2 -size 0c -delete
 }
 
 run_calc_trees() {
@@ -230,7 +237,8 @@ run_xfr_aligns_trees() {
   fi
 
   if [[ "$scriptname" =~ "pandagma pan" ]] || [[ "$scriptname" =~ "pandagma fam" ]]; then
-    for dir in 19_pan_aug_leftover_merged_prot 20_align* 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
+    for dir in 20_align* 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
+
       if [ -d "${WORK_DIR}/$dir" ]; then
         echo "Copying directory $dir to output directory"
         cp -r "${WORK_DIR}/$dir" "${full_out_dir}"/
