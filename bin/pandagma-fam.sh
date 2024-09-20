@@ -39,7 +39,8 @@ Primary protein sequences and annotation (GFF3 or BED) files must be listed in t
 config file, in the arrays annotation_files and protein_files. See example files.
 
 Subcommands (in order they are usually run):
-  Run these first (if using ks_calc)
+  Run these first (if using the ks_peaks.tsv file; otherwise, run all main steps and
+  ks filtering will be done using parameters ks_block_wgd_cutoff and max_pair_ks)
                 all - All of the steps below, except for ks_filter, clean
                         (Or equivalently: omit the -s flag; \"all\" is default).
              ingest - Prepare the assembly and annotation files for analysis.
@@ -49,7 +50,7 @@ Subcommands (in order they are usually run):
             ks_calc - Calculation of Ks values on gene pairs from DAGchainer output.
 
   Evaluate the stats/ks_histplots.tsv and stats/ks_peaks_auto.tsv files and
-  put ks_peaks.tsv into the original data directory, then run the following commands:
+  put ks_peaks.tsv into the \${WORK_DIR}/stats directory, then run the following commands:
           ks_filter - Filtering based on provided ks_peaks.tsv file (assumes prior ks_calc step)
                 mcl - Derive clusters, with Markov clustering.
            consense - Calculate a consensus sequences from each pan-gene set, 
@@ -452,55 +453,45 @@ run_ks_calc() {
 
 ##########
 run_ks_filter() {
-  echo; echo "From optional provided ks_peaks.tsv file and from processed DAGChainer output, (with gene-pair and "
-  echo       "block-median Ks values added by calc_ks_from_dag.pl), filter on block-median Ks values."
+  echo; 
+  echo "From optional provided ${WORK_DIR}/stats/ks_peaks.tsv file and from processed DAGChainer output,i "
+  echo "(with gene-pair and block-median Ks values added by calc_ks_from_dag.pl), filter on "
+  echo "block-median Ks values, and combine the homology data into a file with gene pairs to be clustered."
+  echo;
 
   cd "${WORK_DIR}" || exit
-  if [ -d 05_kaksout_ks_filtered ]; then rm -rf 05_kaksout_ks_filtered ; fi
-  mkdir -p 05_kaksout_ks_filtered
-  if [[ -f stats/ks_peaks.tsv ]]; then  # filter based on list of Ks values
-    echo "Filtering on quotas from expected_quotas and ks_pair_cutoff values provided in stats/ks_peaks.tsv"
+
+  if [ -f stats/ks_peaks.tsv ]; then  # filter based on list of Ks values
+    echo "Filtering on quotas from expected_quotas and ks_pair_cutoff values provided in ks_peaks.tsv"
+    if [ -d 05_kaksout_ks_filtered ]; then rm -rf 05_kaksout_ks_filtered ; fi
+    mkdir -p 05_kaksout_ks_filtered
     ks_peaks=stats/ks_peaks.tsv
     for ks_path in 05_kaksout/*.rptout; do
       outfilebase=$(basename "$ks_path" .rptout)
       echo "  Filtering $ks_path based on expected block-median Ks values"
       < "${ks_path}" filter_mmseqs_by_ks.pl \
-          -ks_peaks ${ks_peaks} -annot_regex "$annot_str_regex" -max_pair_ks "$max_pair_ks" |
+          -ks_peak "${ks_peaks}" -annot_regex "$annot_str_regex" -max_pair_ks "$max_pair_ks" |
         awk 'NF==7' > 05_kaksout_ks_filtered/"${outfilebase}".rptout 
     done
-  else   # don't filter, since ks_peaks.tsv file isn't provided
-    echo "No ks_peaks.tsv file was provided. It is recommended to review the provisional stats/ks_peaks_auto.tsv"
+    cat 05_kaksout_ks_filtered/*.rptout | awk 'NF==7 {print $1 "\t" $2}' | sort -u > 05_filtered_pairs.tsv
+  else # ks_peaks.tsv file isn't provided. Warn but proceed with a single Ks value: ks_hi_cutoff
+    echo "INFO: No ks_peaks.tsv file was provided. It is recommended to review the provisional stats/ks_peaks_auto.tsv"
     echo "and stats/ks_histplots.tsv files and provide a file stats/ks_peaks.tsv -- either simply copying"
     echo "ks_peaks_auto.tsv to ks_peaks.tsv if the reported Ks peak values (column 3) are acceptable,"
     echo "or revising those values based on interpretation of stats/ks_histplots.tsv."
     echo "If stats/ks_histplots.tsv is not provided, then Ks filtering will be done using values provided"
-    echo "in the config file for ks_block_wgd_cutoff and max_pair_ks."
-  fi
-}
+    echo "in the config file for ks_block_wgd_cutoff and max_pair_ks."; echo
 
-##########
-run_mcl() {
-  # Calculate clusters using Markov clustering
-  cd "${WORK_DIR}" || exit
-  mkdir -p lists
-
-  printf "\nPreparatory to clustering, combine the homology data into a file with gene pairs to be clustered.\n"
-
-  files=$(shopt -s nullglob dotglob; echo 05_kaksout_ks_filtered/*)
-  if [ -d 05_kaksout_ks_filtered ] && (( ${#files} )); then # From step ks_filter; supersedes all other conditions
-    cat 05_kaksout_ks_filtered/*.rptout | awk 'NF==7 {print $1 "\t" $2}' | sort -u > 05_filtered_pairs.tsv
-  else
     if [ "$strict_synt" -eq 1 ]; then
       # https://stackoverflow.com/questions/3601515/how-to-check-if-a-variable-is-set-in-bash
-      # https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_06_02
       if [ -z ${ks_block_wgd_cutoff+x} ] || [ -z ${max_pair_ks+x} ] || 
           [ ! -d "${WORK_DIR}/05_kaksout" ] && [ ! "$(ls -A 05_kaksout/*.rptout)" ]; then
-        echo "## One or both of ks_block_wgd_cutoff and max_pair_ks are unset or 05_kaksout doesn't exist; no Ks filtering will be done.";
-        echo "## Combine the DAGChainer synteny pairs into a file to be clustered."
+        echo "Variables ks_block_wgd_cutoff and/or max_pair_ks are unset or 05_kaksout doesn't exist; no Ks filtering will be done.";
+        echo "Combine the DAGChainer synteny pairs into a file to be clustered."
         cat 04_dag/*.aligncoords | awk '$1!~/^#/ {print $2 "\t" $6}' | awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
       else 
-        echo "## The ks_block_wgd_cutoff is set to '$ks_block_wgd_cutoff' and max_pair_ks is set to '$max_pair_ks'";
-        echo "## Combine the DAGChainer synteny pairs, with additional filtering by pairwise and block Ks thresholds, into a file to be clustered."
+        echo "The ks_block_wgd_cutoff is set to '$ks_block_wgd_cutoff' and max_pair_ks is set to '$max_pair_ks'";
+        echo "Combine DAGChainer synteny pairs, filtering by pairwise and block Ks thresholds, into a file to be clustered."
         # Combine the synteny pairs into a file to be clustered
         cat 05_kaksout/*.rptout | 
           awk -v PAIR_CUTOFF="$max_pair_ks" -v BLOCK_CUTOFF="$ks_block_wgd_cutoff" '
@@ -513,6 +504,12 @@ run_mcl() {
         awk 'NF==2' | sort -u > 05_filtered_pairs.tsv
     fi
   fi
+}
+
+##########
+run_mcl() {
+  # Calculate clusters using Markov clustering
+  cd "${WORK_DIR}" || exit
 
   printf "\nDo Markov clustering with inflation parameter %f and %d threads\n" "$mcl_inflation" "$NPROC"
   echo "MCL COMMAND: mcl 05_filtered_pairs.tsv -I $mcl_inflation -te ${NPROC} --abc -o tmp.syn_pan.clust.tsv"
@@ -525,6 +522,7 @@ run_mcl() {
   rm tmp.syn_pan.clust.tsv
 
   echo "  Move singleton and doubleton clusters into a list of leftovers"
+  mkdir -p lists
   awk 'NF==2 {print $2} NF==3 {print $2; print $3}' 06_syn_pan.clust.tsv > lists/lis.06_syn_pan_1s_2s
   awk 'NF>3 {print $0}' 06_syn_pan.clust.tsv > 06_syn_pan_ge3.clust.tsv
 
@@ -826,19 +824,22 @@ run_summarize() {
         { printf "  %i\t%i\t%2.1f\t%s\n", $2, $4, 100*($4/$2), $1 }'  >> "${stats_file}"
 
   echo "  Print counts per accession"
-  {
-    printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n"
-    printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n" 
-  } >> "${stats_file}"
   if [ -f "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv ]; then
     {
-    transpose.pl "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv | 
-      perl -lane 'next if ($.<=3); 
-        $ct=0; $sum=0; $nulls=0; $OGs=0;
-        for $i (@F[1..(@F-1)]){ $OGs++; if ($i>0){$ct++; $sum+=$i} if ($i==0){$nulls++} }; 
-        printf("  %d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
-      >> "${stats_file}"
-    }
+      printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n"
+      printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n"
+    } >> "${stats_file}"
+    {
+      transpose.pl "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv |
+        perl -lane 'next if ($.<=3);
+          $ct=0; $sum=0; $nulls=0; $OGs=0;
+          for $i (@F[1..(@F-1)]){
+            $OGs++;
+            if ($i>0){$ct++; $sum+=$i}
+            if ($i==0){$nulls++}
+          };
+          printf("  %d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])'
+    } >> "${stats_file}"
   fi
 
   echo "  Print histograms"

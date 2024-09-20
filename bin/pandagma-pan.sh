@@ -1105,18 +1105,19 @@ run_summarize() {
   echo "  Print counts per accession"
   if [ -f "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv ]; then
     {
-    printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" 
-    printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n" 
-    transpose.pl "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv | 
-      perl -lane 'next if ($.<=3); 
-        $ct=0; $sum=0; $nulls=0; $OGs=0;
-        for $i (@F[1..(@F-1)]){
-          $OGs++;
-          if ($i>0){$ct++; $sum+=$i}
-          if ($i==0){$nulls++}
-        }; 
-        printf("  %d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])' \
-        
+      printf "\n== For all annotation sets, counts of genes-in-orthogroups and counts of orthogroups-with-genes:\n" 
+      printf "  gns-in-OGs  OGs-w-gns  OGs-w-gns/gns  pct-non-null-OGs  pct-null-OGs  annot-set\n" 
+    } >> "${stats_file}"
+    {
+      transpose.pl "${full_out_dir}"/18_syn_pan_aug_extra.counts.tsv | 
+        perl -lane 'next if ($.<=3); 
+          $ct=0; $sum=0; $nulls=0; $OGs=0;
+          for $i (@F[1..(@F-1)]){
+            $OGs++;
+            if ($i>0){$ct++; $sum+=$i}
+            if ($i==0){$nulls++}
+          }; 
+          printf("  %d\t%d\t%.2f\t%.2f\t%.2f\t%s\n", $sum, $ct, 100*$ct/$sum, 100*($OGs-$nulls)/$OGs, 100*$nulls/$OGs, $F[0])'
     } >> "${stats_file}"
   fi
 

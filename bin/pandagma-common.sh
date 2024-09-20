@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 version="2023-09-20"
+
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
 trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
@@ -139,8 +140,9 @@ run_align_protein() {
 ##########
 run_model_and_trim() {
   cd "${WORK_DIR}" || exit
-
+  
   echo; echo "== Build HMMs =="
+
   mkdir -p 21_hmm
   for filepath in 20_aligns_prot/*; do
     file=$(basename "$filepath");
@@ -236,6 +238,7 @@ run_xfr_aligns_trees() {
 
   if [[ "$scriptname" =~ "pandagma pan" ]] || [[ "$scriptname" =~ "pandagma fam" ]]; then
     for dir in 20_align* 21_hmm 22_hmmalign 23_hmmalign_trim2 24_trees; do
+
       if [ -d "${WORK_DIR}/$dir" ]; then
         echo "Copying directory $dir to output directory"
         cp -r "${WORK_DIR}/$dir" "${full_out_dir}"/
