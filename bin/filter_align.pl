@@ -132,47 +132,54 @@ foreach my $col ( @no_gap_cols ) {
 
 # replace the old sequences strings with the new ones
 my $i=0;
-foreach my $seqobj ( $aln->each_seq ) {
-  $seqobj->seq($seq_strs[$i++]);
-  my $display_id = $seqobj->display_id();
-  my $sequence = $seqobj->seq();
-  if (!defined($sequence)){
-    warn "WARNING -- In $in_align, No sequence found for $display_id; skipping\n";
-    next;
-  }
-  my $desc = $seqobj->desc();
-  my $seq_len = length($sequence);
-  if (!defined $seq_len || $seq_len == 0){
-    warn "Got a sequence with no length for alignment $in_align, ID $display_id\n";
-    next;
-  }
-  else {
-    my $ct_dashes += () = $sequence =~ /-/g;
-    my $ct_residues = $seq_len - $ct_dashes;
-    my $pct_aligned_residues = int(10000*$ct_residues/$seq_len)/100;
-    if ($verbose) { print "$min_pct_aligned\t$ct_residues\t$ct_dashes\t$pct_aligned_residues\n"; }
-    if ($pct_aligned_residues < $min_pct_aligned) {
-      if (defined $log) {
-        print $LOG_FH "For alignment $in_align, cutting $display_id: only " .
-          "$ct_residues/$seq_len = $pct_aligned_residues% of $min_pct_aligned% " .
-          "required after trimming to align depth $depth and percent depth $pct_depth\n";
-      }
-      else {
-        print "For alignment $in_align, cutting $display_id: only " .
-          "$ct_residues/$seq_len = $pct_aligned_residues% of $min_pct_aligned% " .  
-          "required after trimming to align depth $depth and percent depth $pct_depth\n";
-      }
+eval {
+  foreach my $seqobj ( $aln->each_seq ) {
+    $seqobj->seq($seq_strs[$i++]);
+    my $display_id = $seqobj->display_id();
+    my $sequence = $seqobj->seq();
+    if (!defined($sequence)){
+      warn "WARNING -- In $in_align, No sequence found for $display_id; skipping\n";
+      next;
+    }
+  
+    my $desc = $seqobj->desc();
+    my $seq_len = length($sequence);
+    if (!defined $seq_len || $seq_len == 0){
+      warn "Got a sequence with no length for alignment $in_align, ID $display_id\n";
+      next;
     }
     else {
-      if (defined $desc) {
-        print $OUT_FH ">$display_id $desc\n$sequence\n";
+      my $ct_dashes += () = $sequence =~ /-/g;
+      my $ct_residues = $seq_len - $ct_dashes;
+      my $pct_aligned_residues = int(10000*$ct_residues/$seq_len)/100;
+      if ($verbose) { print "$min_pct_aligned\t$ct_residues\t$ct_dashes\t$pct_aligned_residues\n"; }
+      if ($pct_aligned_residues < $min_pct_aligned) {
+        if (defined $log) {
+          print $LOG_FH "For alignment $in_align, cutting $display_id: only " .
+            "$ct_residues/$seq_len = $pct_aligned_residues% of $min_pct_aligned% " .
+            "required after trimming to align depth $depth and percent depth $pct_depth\n";
+        }
+        else {
+          print "For alignment $in_align, cutting $display_id: only " .
+            "$ct_residues/$seq_len = $pct_aligned_residues% of $min_pct_aligned% " .  
+            "required after trimming to align depth $depth and percent depth $pct_depth\n";
+        }
       }
       else {
-        print $OUT_FH ">$display_id\n$sequence\n";
+        if (defined $desc) {
+          print $OUT_FH ">$display_id $desc\n$sequence\n";
+        }
+        else {
+          print $OUT_FH ">$display_id\n$sequence\n";
+        }
       }
     }
   }
-}
+  if ($@) { # Report trapped error
+    print "Trapped error in filter_align.pl, input file $in_align\n";
+    die "$@";
+  }
+};
 
 __END__
 VERSIONS
@@ -189,4 +196,4 @@ picked up this script on-line somewhere, ca. 2010
 23-01-22 sc Remove columns that have no information (are all the same residue or base)
 23-10-09 sc Test if seq_len is defined and >0
 23-11-15 sc Handle case of missing sequence
-24-09-10 sc Trap and report error when traversing $seqobj->seq()
+24-09-19 sc Trap and report error when traversing $seqobj->seq()
