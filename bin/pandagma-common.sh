@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2023-09-20"
+version="2025-01-04"
 
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
@@ -60,7 +60,7 @@ run_align_cds() {
   echo "== Align CDS sequences =="
 
   # If not already present, retrieve sequences for each family, preparatory to aligning them
-  # 19_pan_aug_leftover_merged_cds
+  # into 19_palmc (formerly 19_pan_aug_leftover_merged_cds)
   if [[ -d 19_palmc ]]; then
     : # do nothing; the directory and file(s) exist
   else
@@ -102,6 +102,7 @@ run_align_protein() {
   echo "== Align protein sequences =="
 
   # If not already present, retrieve sequences for each family, preparatory to aligning them
+  # into 19_palmp (formerly 19_pan_aug_leftover_merged_prot)
   if [[ -d 19_palmp ]]; then
     : # do nothing; the directory and file(s) exist
   else
