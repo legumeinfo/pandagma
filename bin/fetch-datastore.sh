@@ -13,11 +13,13 @@ case ${DATAFILE} in
   arath.Col0.gnm9.ann11.KH24.*|\
   bauva.BV-YZ2020.gnm2.ann1.RJ1G.*|\
   dalod.SKLTGB.gnm1.ann1.R67B.*|\
+  paran.WU01x14.gnm1.ann1.4KM0.*|\
   phach.longxuteng.gnm1.ann1.KGX9.*|\
   prupe.Lovell.gnm2.ann1.S2ZZ.*|\
   quisa.S10.gnm1.ann1.RQ4J.*|\
   sento.Myeongyun.gnm1.ann1.5WXB.*|\
   singl.CAF01.gnm1.ann1.WFKC.*|\
+  treor.RG33x02.gnm1.ann1.BP51.*|\
   vitvi.PN40024.gnm2.ann1.V31M.*)
     DATASTORE=${DATASTORE}/annex
 esac
@@ -65,6 +67,7 @@ case ${genspa} in
   lupan) genus=Lupinus species=angustifolius ;;
   medsa) genus=Medicago species=sativa ;;
   medtr) genus=Medicago species=truncatula ;;
+  paran) genus=Parasponia species=andersonii;;
   phaac) genus=Phaseolus species=acutifolius ;;
   phach) genus=Phanera species=championii ;;
   phaco) genus=Phaseolus species=coccineus ;;
@@ -75,6 +78,7 @@ case ${genspa} in
   quisa) genus=Quillaja species=saponaria ;;
   sento) genus=Senna species=tora ;;
   singl) genus=Sindora species=glabra ;;
+  treor) genus=Trema species=orientale;;
   tripr) genus=Trifolium species=pratense ;;
   trisu) genus=Trifolium species=subterraneum ;;
   vicfa) genus=Vicia species=faba ;;
