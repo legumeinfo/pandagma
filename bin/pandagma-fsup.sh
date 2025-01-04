@@ -16,11 +16,15 @@ Place annotation sets (CDS and protein) into pangene or gene family sets, using 
 to compare the indicated annotations against HMMs calculated in a prior run of pandagma-pan or pandagma-fam.
 
 Usage:
-  $scriptname -c CONFIG_FILE [options]
+  $scriptname -c CONFIG_FILE -f FAM_DIR [options]
 
   Required:
            -c (path to the config file)
-           -f FAM_DIR (path to directory from previous \"pandagma fam\ -o FAM_DIR\" run)
+           -f FAM_DIR ... full/absolute directory path, to directory containing either 
+                (1) HMMs in 21_hmm/ , for  consen_method hmmemit (specified in the config file), or
+                (2) aligned sequences in 23_hmmalign_trim2/ , for consen_method cons or align_sample 
+              These directories are produced during a previous \"pandagma fam\ -o FAM_DIR\" run),
+              or may be generated separately by the user.
 
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
            -w (working directory, for temporary and intermediate files [default: './work_pandagma'].)
@@ -55,6 +59,9 @@ Variables in pandagma config file (Set the config with the CONF environment vari
           clust_cov - Minimum alignment coverage [0.40]
       consen_method - Method for placing sequences into pangenes. One of:
                         hmmemit cons align_sample [align_sample]
+                      NOTE: for consen_method hmmemit, provide directory 21_hmm/
+                            for consen_method hmmemit and align_sample, provide directory 23_hmmalign_trim2/
+                         ... within the specified FAM_DIR
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
                         \"([^.]+\.[^.]+)\..+\"
                           for two dot-separated fields, e.g. vigan.Shumari
@@ -75,7 +82,7 @@ canonicalize_paths() {
   echo "Entering canonicalize_paths."
 
   if ! [[ -v fam_dir ]]; then
-    echo "pandagma fsup -f FAM_DIR not specified" >&2
+    echo "pandagma fsup -f fam_dir not specified" >&2
     exit 1
   fi
 
@@ -152,14 +159,19 @@ run_fam_consen() {
   cd "${WORK_DIR}" || exit
 
   if [ "$consen_method" == "hmmemit" ]; then
+    if [ ! -d "$fam_dir/21_hmm" ]; then 
+      echo "For consen_method hmmemit, the directory 21_hmm/ must exist (containing HMMs),"
+      echo "within the specified -f fam_dir (provided with full/absolute path)."
+      echo "The specified fam_dir was: $fam_dir"
+      exit 1
+    fi
+
     if [ -d 21_hmmemit ]; then rm -rf 21_hmmemit; fi
     mkdir -p 21_hmmemit
   
-    MINL=0.25 # show consensus as 'any' (X/N) unless >= this fraction
-    MINU=0.5  # show consensus as upper case if >= this fraction
     for filepath in "${fam_dir}"/21_hmm/* ; do
       base=$(basename "$filepath")
-      hmmemit -C --minl $MINL --minu $MINU -o 21_hmmemit/"$base" "$filepath" &
+      hmmemit -c -o 21_hmmemit/"$base" "$filepath" &
       if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
     done
     wait
@@ -167,6 +179,14 @@ run_fam_consen() {
     cat 21_hmmemit/* | perl -pe 's/-consensus//' > 30_consen.faa
 
   elif [ "$consen_method" == "cons" ]; then
+    if [ ! -d "$fam_dir/23_hmmalign_trim2" ]; then 
+      echo "For consen_method cons, the directory 23_hmmalign_trim2/ must exist" 
+      echo "(containing alignments with major insertions removed)"
+      echo "within the specified -f fam_dir (provided with full/absolute path)."
+      echo "The specified fam_dir was: $fam_dir"
+      exit 1
+    fi
+
     if [ -d 30_hmmalign_cons ]; then rm -rf 30_hmmalign_cons; fi
     mkdir -p 30_hmmalign_cons
   
@@ -180,6 +200,12 @@ run_fam_consen() {
     cat 30_hmmalign_cons/* > 30_consen.faa
 
   elif [ "$consen_method" == "align_sample" ]; then
+    if [ ! -d "$fam_dir/23_hmmalign_trim2" ]; then 
+      echo "For consen_method cons align_sample, the directory 23_hmmalign_trim2/ must exist" 
+      echo "(containing alignments with major insertions removed), within the work directory."
+      echo "The specified fam_dir was: $fam_dir"
+      exit 1
+    fi
 
     enough_seqs=10  # Don't search against more than this number of sequences in a family
     echo "  Prepare to search against a random sampling of $enough_seqs sequences from each family"
