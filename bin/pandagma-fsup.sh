@@ -311,12 +311,15 @@ run_tabularize() {
 run_realign_and_trim() {
   echo; echo "== Retrieve sequences for each family, preparatory to aligning them =="
   cd "${WORK_DIR}" || exit
+
+  if [ -d 35_sup_in_fams_prot ]; then rm -rf 35_sup_in_fams_prot; fi
   mkdir -p 35_sup_in_fams_prot
   echo "  For each pan-gene set, retrieve sequences into a multifasta file."
   get_fasta_from_family_file.pl "${protein_files[@]}" \
     -fam 34_sup_vs_fam_consen.clust.tsv -out 35_sup_in_fams_prot
 
   echo; echo "== Realign to HMMs =="
+  if [ -d 42_hmmalign ]; then rm -rf 42_hmmalign; fi
   mkdir -p 42_hmmalign
   for filepath in 35_sup_in_fams_prot/*; do 
     file=$(basename "$filepath");
@@ -326,6 +329,7 @@ run_realign_and_trim() {
   wait
 
   echo; echo "== Trim HMM alignments to match-states =="
+  if [ -d 43_hmmalign_trim1 ]; then rm -rf 43_hmmalign_trim1; fi
   mkdir -p 43_hmmalign_trim1
   for filepath in 42_hmmalign/*; do 
     file=$(basename "$filepath");
@@ -336,6 +340,7 @@ run_realign_and_trim() {
   wait
 
   echo; echo "== Filter alignments prior to tree calculation =="
+  if [ -d 43_hmmalign_trim2 ]; then rm -rf 43_hmmalign_trim2; fi
   mkdir -p 43_hmmalign_trim2 43_hmmalign_trim2_log
   min_depth=3
   min_pct_depth=20
@@ -352,7 +357,6 @@ run_realign_and_trim() {
   # Remove any zero-length alignments
   find 43_hmmalign_trim2 -size 0c | xargs -I{} echo "  Remove zero-length file " {} >&2
   find 43_hmmalign_trim2 -size 0c -delete
-
 }
 
 ##########
