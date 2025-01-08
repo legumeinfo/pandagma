@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2025-01-04"
+version="2025-01-08"
 
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
@@ -292,12 +292,12 @@ main_pan_fam() {
     case $opt in
       c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
       d) optarg_data_dir=$(realpath -e "$OPTARG"); echo "Data dir: $optarg_data_dir" ;;
-      w) optarg_work_dir=$OPTARG; echo "Work dir: $optarg_work_dir" ;;
+      w) optarg_work_dir=$(realpath -e "$OPTARG"); echo "Work dir: $optarg_work_dir" ;;
       s) step=$OPTARG; echo "step(s): $step" ;;
       n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
       O) optarg_order_method=$OPTARG; echo "order method: $optarg_order_method" ;;
       o) out_dir=$OPTARG; echo "out_dir: $out_dir" ;;
-      f) fam_dir=$(realpath --canonicalize-existing "$OPTARG") ;;
+      f) fam_dir=$(realpath -e "$OPTARG") ; echo "Fam dir: $fam_dir" ;;
       r) retain="yes" ;;
       v) version ;;
       h) echo >&2 "$HELP_DOC" && exit 0 ;;
