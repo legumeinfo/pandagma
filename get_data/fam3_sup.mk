@@ -41,6 +41,9 @@ lupal.Amiga.gnm1.ann1.3GKS.protein.faa.gz \
 medtr.A17_HM341.gnm4.ann2.G3ZY.cds_primary.fna.gz \
 medtr.A17_HM341.gnm4.ann2.G3ZY.gene_models_main.bed.gz \
 medtr.A17_HM341.gnm4.ann2.G3ZY.protein_primary.faa.gz \
+paran.WU01x14.gnm1.ann1.4KM0.gene_models_main.bed.gz \
+paran.WU01x14.gnm1.ann1.4KM0.cds_primary.fna.gz \
+paran.WU01x14.gnm1.ann1.4KM0.protein_primary.faa.gz \
 phach.longxuteng.gnm1.ann1.KGX9.cds_primary.fna.gz \
 phach.longxuteng.gnm1.ann1.KGX9.gene_models_main.bed.gz \
 phach.longxuteng.gnm1.ann1.KGX9.protein_primary.faa.gz \
@@ -65,6 +68,9 @@ sento.Myeongyun.gnm1.ann1.5WXB.protein.faa.gz \
 singl.CAF01.gnm1.ann1.WFKC.cds.fna.gz \
 singl.CAF01.gnm1.ann1.WFKC.gene_models_main.bed.gz \
 singl.CAF01.gnm1.ann1.WFKC.protein.faa.gz \
+treor.RG33x02.gnm1.ann1.BP51.gene_models_main.bed.gz \
+treor.RG33x02.gnm1.ann1.BP51.cds_primary.fna.gz \
+treor.RG33x02.gnm1.ann1.BP51.protein_primary.faa.gz \
 tripr.MilvusB.gnm2.ann1.DFgp.cds_primary.fna.gz \
 tripr.MilvusB.gnm2.ann1.DFgp.gene_models_main.bed.gz \
 tripr.MilvusB.gnm2.ann1.DFgp.protein_primary.faa.gz \
