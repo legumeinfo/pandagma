@@ -161,7 +161,7 @@ run_fam_consen() {
   cd "${WORK_DIR}" || exit
 
   if [ "$consen_method" == "hmmemit" ]; then
-    if [ ! -d "$fam_dir/hmm_dir" ]; then 
+    if [ ! -d "${fam_dir}/${hmm_dir}" ]; then 
       echo "For consen_method hmmemit, the directory hmm_dir/ must exist (containing HMMs),"
       echo "within the specified -f fam_dir."
       echo "The specified fam_dir and hmm_dir were: $fam_dir and $hmm_dir"
@@ -171,7 +171,7 @@ run_fam_consen() {
     if [ -d 21_hmmemit ]; then rm -rf 21_hmmemit; fi
     mkdir -p 21_hmmemit
   
-    for filepath in "${fam_dir}/${hmm_dir}"* ; do
+    for filepath in "${fam_dir}/${hmm_dir}"/* ; do
       base=$(basename "$filepath")
       hmmemit -c -o 21_hmmemit/"$base" "$filepath" &
       if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
