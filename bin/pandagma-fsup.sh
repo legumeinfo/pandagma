@@ -20,11 +20,11 @@ Usage:
 
   Required:
            -c (path to the config file)
-           -f FAM_DIR ... full/absolute directory path, to directory containing either 
-                (1) HMMs in 21_hmm/ , for  consen_method hmmemit (specified in the config file), or
-                (2) aligned sequences in 23_hmmalign_trim2/ , for consen_method cons or align_sample 
-              These directories are produced during a previous \"pandagma fam\ -o FAM_DIR\" run),
-              or may be generated separately by the user.
+           -f FAM_DIR ... name of directory containing either 
+                (1) HMMs, for  consen_method hmmemit, specified with hmm_dir in the config file; or
+                (2) trimmed alignments, specified with hmm_trim_dir in the config file, 
+              for consen_method cons or align_sample.  These directories are produced during 
+              a previous \"pandagma fam\ -o FAM_DIR\" run), or may be generated separately by the user.
 
   Options: -s (subcommand to run. If \"all\" or omitted, all steps will be run; otherwise, run specified step)
            -w (working directory, for temporary and intermediate files [default: './work_pandagma'].)
@@ -59,15 +59,17 @@ Variables in pandagma config file (Set the config with the CONF environment vari
           clust_cov - Minimum alignment coverage [0.40]
       consen_method - Method for placing sequences into pangenes. One of:
                         hmmemit cons align_sample [align_sample]
-                      NOTE: for consen_method hmmemit, provide directory 21_hmm/
-                            for consen_method hmmemit and align_sample, provide directory 23_hmmalign_trim2/
+                      NOTE: for consen_method hmmemit, specify and provide directory hmm_dir, or
+                            for consen_method hmmemit and align_sample, specify and provide directory hmm_trim_dir
                          ... within the specified FAM_DIR
     annot_str_regex - Regular expression for capturing annotation name from gene ID, e.g. 
                         \"([^.]+\.[^.]+)\..+\"
                           for two dot-separated fields, e.g. vigan.Shumari
                         or \"(\D+\d+\D+)\d+.+\" for Zea assembly+annot string, e.g. Zm00032ab
     min_align_count - Minimum number of sequences in a family to trigger alignments, modeling, and trees [4]
-min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [2]
+min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [1]
+            hmm_dir - Directory within specified -f FAM_DIR that contains family HMMs [21_hmm]
+     align_trim_dir - Directory within specified -f FAM_DIR that contains indel-trimmed alignments [23_hmmalign_trim2]
 
 File sets (arrays):
    annotation_files
@@ -159,17 +161,17 @@ run_fam_consen() {
   cd "${WORK_DIR}" || exit
 
   if [ "$consen_method" == "hmmemit" ]; then
-    if [ ! -d "$fam_dir/21_hmm" ]; then 
-      echo "For consen_method hmmemit, the directory 21_hmm/ must exist (containing HMMs),"
-      echo "within the specified -f fam_dir (provided with full/absolute path)."
-      echo "The specified fam_dir was: $fam_dir"
+    if [ ! -d "$fam_dir/hmm_dir" ]; then 
+      echo "For consen_method hmmemit, the directory hmm_dir/ must exist (containing HMMs),"
+      echo "within the specified -f fam_dir."
+      echo "The specified fam_dir and hmm_dir were: $fam_dir and $hmm_dir"
       exit 1
     fi
 
     if [ -d 21_hmmemit ]; then rm -rf 21_hmmemit; fi
     mkdir -p 21_hmmemit
   
-    for filepath in "${fam_dir}"/21_hmm/* ; do
+    for filepath in "${fam_dir}/${hmm_dir}"* ; do
       base=$(basename "$filepath")
       hmmemit -c -o 21_hmmemit/"$base" "$filepath" &
       if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
@@ -179,18 +181,18 @@ run_fam_consen() {
     cat 21_hmmemit/* | perl -pe 's/-consensus//' > 30_consen.faa
 
   elif [ "$consen_method" == "cons" ]; then
-    if [ ! -d "$fam_dir/23_hmmalign_trim2" ]; then 
-      echo "For consen_method cons, the directory 23_hmmalign_trim2/ must exist" 
+    if [ ! -d "${fam_dir}/${align_trim_dir}" ]; then 
+      echo "For consen_method cons, the directory ${align_trim_dir} must exist" 
       echo "(containing alignments with major insertions removed)"
-      echo "within the specified -f fam_dir (provided with full/absolute path)."
-      echo "The specified fam_dir was: $fam_dir"
+      echo "within the specified -f fam_dir."
+      echo "The specified fam_dir and align_trim_dir were: ${fam_dir} and ${align_trim_dir}"
       exit 1
     fi
 
     if [ -d 30_hmmalign_cons ]; then rm -rf 30_hmmalign_cons; fi
     mkdir -p 30_hmmalign_cons
   
-    for filepath in "${fam_dir}"/23_hmmalign_trim2/* ; do
+    for filepath in "${fam_dir}/${align_trim_dir}"/* ; do
       base=$(basename "$filepath")
       cons -sequence "$filepath" -outseq 30_hmmalign_cons/"$base" -name "$base" &
       if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
@@ -200,10 +202,11 @@ run_fam_consen() {
     cat 30_hmmalign_cons/* > 30_consen.faa
 
   elif [ "$consen_method" == "align_sample" ]; then
-    if [ ! -d "$fam_dir/23_hmmalign_trim2" ]; then 
-      echo "For consen_method cons align_sample, the directory 23_hmmalign_trim2/ must exist" 
-      echo "(containing alignments with major insertions removed), within the work directory."
-      echo "The specified fam_dir was: $fam_dir"
+    if [ ! -d "${fam_dir}/${align_trim_dir}" ]; then 
+      echo "For consen_method cons, the directory ${align_trim_dir} must exist" 
+      echo "(containing alignments with major insertions removed)"
+      echo "within the specified -f fam_dir."
+      echo "The specified fam_dir and align_trim_dir were: ${fam_dir} and ${align_trim_dir}"
       exit 1
     fi
 
@@ -213,7 +216,7 @@ run_fam_consen() {
 
     cat /dev/null > 23_hmmalign_trim2.fam_ID.faa
 
-    for filepath in "${fam_dir}"/23_hmmalign_trim2/*; do
+    for filepath in "${fam_dir}/${align_trim_dir}"/*; do
       base=$(basename "$filepath")
       fasta_to_table.awk "$filepath" | shuf |
         awk -v FAM="$base" -v MAX=$enough_seqs 'ct<MAX {print ">" FAM "__" $1; print $2; ct++}' >> 23_hmmalign_trim2.fam_ID.faa
@@ -323,7 +326,7 @@ run_realign_and_trim() {
   mkdir -p 42_hmmalign
   for filepath in 35_sup_in_fams_prot/*; do 
     file=$(basename "$filepath");
-    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/"$file" "${fam_dir}/21_hmm/$file" 35_sup_in_fams_prot/"$file" &
+    hmmalign --trim --outformat A2M --amino -o 42_hmmalign/"$file" "${fam_dir}/${hmm_dir}/$file" 35_sup_in_fams_prot/"$file" &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
@@ -462,7 +465,8 @@ run_summarize() {
 ########################################
 # Main program
 
-pandagma_conf_params='consen_iden clust_cov consen_method annot_str_regex'
+pandagma_conf_params='consen_iden clust_cov TE_match_iden consen_method annot_str_regex
+min_align_count min_annots_in_align hmm_dir align_trim_dir'
 
 # Run all specified steps.
 # Those steps. Steps realign_and_trim calc_trees xfr_aligns_trees are in pandagma-common.sh
