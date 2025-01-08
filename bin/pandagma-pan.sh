@@ -115,7 +115,7 @@ Variables in pandagma config file (Set the config with the CONF environment vari
                         Otherwise, one is selected at random from those with median length.
        order_method - Method to determine consensus panID order. reference or alignment [default reference]
     min_align_count - Minimum number of sequences in a family to trigger alignments, modeling, and trees [4]
-min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [2]
+min_annots_in_align - Minimum number of distinct annotation groups in an alignment to retain it [1]
 ''
 EOS
 
