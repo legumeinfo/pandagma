@@ -29,7 +29,7 @@ which calc_ks_from_dag.pl
 
 ##########
 ## Run all main steps
-#pandagma pan -c $CONFIG
+pandagma pan -c $CONFIG
 
 ##########
 ## Run individual steps
@@ -53,7 +53,7 @@ which calc_ks_from_dag.pl
 #pandagma pan -c $CONFIG -s align_protein
 #pandagma pan -c $CONFIG -s model_and_trim
 #pandagma pan -c $CONFIG -s calc_trees
-pandagma pan -c $CONFIG -s xfr_aligns_trees
+#pandagma pan -c $CONFIG -s xfr_aligns_trees
 
 ##########
 ## Optional work-directory cleanup steps
