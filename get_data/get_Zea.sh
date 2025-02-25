@@ -176,20 +176,5 @@ echo "Re-compress files"
 echo "Check chromosome IDs"
   for file in ../data/*bed.gz; do echo $file; zcat $file | cut -f1 | awk '$1!~/ctg|scaf/' | sort | uniq -c; echo; done
 
-cat <<DATA > ../data/expected_chr_matches.tsv
-# Expected chromosome matches for Zea
-1 1
-2 2
-3 3
-4 4
-5 5
-6 6
-7 7
-8 8
-9 9
-9 10
-10 10
-DATA
-
 cd $base_dir
 
