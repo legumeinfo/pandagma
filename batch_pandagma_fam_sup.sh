@@ -27,7 +27,7 @@ echo
 
 ##########
 # Run all main steps, assuming ./out_pandagma exists from previous run of pandagma fam
-#pandagma fsup -c $CONFIG
+pandagma fsup -c $CONFIG
 
 # Below: run indicated steps.
 
@@ -39,7 +39,7 @@ echo
 #pandagma fsup -c $CONFIG -s tabularize
 #pandagma fsup -c $CONFIG -s realign_and_trim
 #pandagma fsup -c $CONFIG -s calc_trees
-pandagma fsup -c $CONFIG -s summarize
+#pandagma fsup -c $CONFIG -s summarize
 
 date   # print timestamp
 
