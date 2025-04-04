@@ -443,7 +443,7 @@ run_consense() {
                      07_pan_fasta_cds.fna \
                      10_place_leftovers/unclust.x.07_pan_fasta.m8 \
                      03_mmseqs_tmp \
-                     --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null 
+                     --search-type "${SEQTYPE}" --cov-mode 0 -c "${clust_cov}" 1>/dev/null 
 
   echo "  Filter unclust.x.07_pan_fasta.m8 by clust_iden and report: panID, qry_gene, sbj_gene"
   top_line.awk 10_place_leftovers/unclust.x.07_pan_fasta.m8 |
@@ -585,7 +585,7 @@ run_add_extra() {
       echo "Extra: 02_fasta_nuc/$file_base"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       mmseqs easy-search "02_fasta_nuc/$file_base" 13_pan_aug_fasta_posn.fna 13_extra_out_constr_dir/"${file_base}".x.all_cons.m8 \
-                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null
+                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 0 -c "${clust_cov}" 1>/dev/null
     done
 
     for file in "${cds_files_extra_free[@]}"; do
@@ -593,7 +593,7 @@ run_add_extra() {
       echo "Extra: 02_fasta_nuc/$file_base"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       mmseqs easy-search "02_fasta_nuc/$file_base" 13_pan_aug_fasta_posn.fna 13_extra_out_free_dir/"${file_base}".x.all_cons.m8 \
-                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null
+                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 0 -c "${clust_cov}" 1>/dev/null
     done
 
     if [[ -v expected_chr_matches ]]; then  # filter based on list of expected chromosome pairings if provided
