@@ -206,7 +206,8 @@ run_search_families() {
   for filepath in 33_mmseqs_fam_match/*.m8; do
     base=$(basename "$filepath")
     < "$filepath" perl -pe 's/^(\S+)\t([^_]+)__\S+/$1\t$2/' | 
-      sort -k1,1 -k12nr,12nr | calc_avg_bitscore_per_fam_hit.awk | top_line.awk > 33_mmseqs_fam_match/"$base".top &
+      sort -k1,1 -k2,2 | calc_avg_bitscore_per_fam_hit.awk | 
+      sort -k1,1 -k12nr,12nr | top_line.awk > 33_mmseqs_fam_match/"$base".top &
     if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
   done
   wait
