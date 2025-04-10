@@ -122,23 +122,19 @@ run_ingest() {
   echo "Run started at: $start_time" > stats/tmp.timing
 
   echo "  Pull the protein files locally"
-  cat /dev/null > 02_all_main_prot_sup.faa # Collect all starting protein sequences, for later comparisons
   for (( file_num = 0; file_num < ${#protein_files[@]} ; file_num++ )); do
     file_base=$(basename "${protein_files[file_num]%.*}")
-    zcat "${protein_files[file_num]}" >> 02_all_main_prot_sup.faa # Collect original seqs for later comparisons
     zcat "${protein_files[file_num]}" > 02_fasta_prot_sup/"$file_base"
     # calc basic sequence stats
     annot_name=$(basename 02_fasta_prot/"$file_base" | perl -pe '$ann_rex=qr($ENV{"ANN_REX"}); s/$ann_rex/$1/' )
     echo "  CHECK: report annot_name to stats file? [$annot_name]"
-    printf "  Added with $consen_method:  " >> stats/tmp.fasta_seqstats_sup
+    printf "  Added to gene families:  " >> stats/tmp.fasta_seqstats_sup
     cat_or_zcat "${protein_files[file_num]}" | calc_seq_stats >> stats/tmp.fasta_seqstats_sup
   done
 
   echo "  Pull the CDS files locally"
-  cat /dev/null > 02_all_main_cds_sup.fna # Collect all starting cds sequences, for later comparisons
   for (( file_num = 0; file_num < ${#cds_files[@]} ; file_num++ )); do
     file_base=$(basename "${cds_files[file_num]%.*}")
-    zcat "${cds_files[file_num]}" >> 02_all_main_cds_sup.fna # Collect original seqs for later comparisons
     zcat "${cds_files[file_num]}" > 02_fasta_nuc_sup/"$file_base"
   done
 
@@ -191,8 +187,8 @@ run_search_families() {
   for filepath in 02_fasta_prot_sup/*; do 
     base=$(basename "$filepath" ."$faa")
     echo "  Search $base.$faa against a sampling of sequences in family alignments in 19_palmp to determine best family match"
-    echo "mmseqs easy-search $filepath 19_palmp.sample.faa 33_mmseqs_fam_match/$base.x.19_palmp.fam_ID.m8 \\"
-    echo "  33_mmseqs_tmp --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} 1>/dev/null"
+    echo "  mmseqs easy-search $filepath 19_palmp.sample.faa 33_mmseqs_fam_match/$base.x.19_palmp.fam_ID.m8 \\"
+    echo "    33_mmseqs_tmp --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} 1>/dev/null"
     mmseqs easy-search "$filepath" \
                        19_palmp.sample.faa \
                        33_mmseqs_fam_match/"$base".x.19_palmp.fam_ID.m8 \
@@ -212,23 +208,20 @@ run_search_families() {
   done
   wait
 
-  # For debugging (to check for unusual matches to long chimeric sequences), report numbers of matches to each family for each sequence
-  # In the regex below, the targets look like GeneFamID__GeneID  ... and the __GeneID is discarded (leaving 12 columns)
-  for filepath in 33_mmseqs_fam_match/*.m8; do
-    base=$(basename "$filepath")
-    < "$filepath" perl -pe 's/^(\S+)\t([^_]+)__\S+/$1\t$2/' | cut -f1,2 | sort -k1,1 -k2,2 |
-      uniq -c | awk -v OFS="\t" -v IDEN="${consen_iden}" '$3>=IDEN {print $2, $3, $1}' | 
-      sort -k1,1 -k3nr,3nr > 33_mmseqs_fam_match/"$base".ct_placements_by_fam
-    if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
-  done
-  wait
-
   echo "== Place sequences into families based on top protein match, using the consen_iden threshold of $consen_iden."
-
   cat 33_mmseqs_fam_match/*.m8.top |
     awk -v IDEN="${consen_iden}" '$3>=IDEN {print $2 "\t" $1}' |
     sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 34_sup_vs_fam_consen.clust.tsv
 
+  echo "== Derive gene family assignment (gfa) files"
+  for file in 33_mmseqs_fam_match/*.m8.top; do 
+    base=`basename $file .x.19_palmp.fam_ID.m8.top`; 
+    echo $base; 
+    cat $file | 
+      awk -v OFS="\t" 'BEGIN{print "#gene", "family", "protein", "e-value", "score", "best_domain_score", "pct_coverage"} 
+                         {print $1, $2, $1, $11, $12, ".", $3*100}' |
+        cat > 33_mmseqs_fam_match/$base.gfa.tsv
+  done
 }
 
 ##########
@@ -405,7 +398,7 @@ run_summarize() {
 ########################################
 # Main program
 
-pandagma_conf_params='consen_iden clust_cov TE_match_iden consen_method annot_str_regex
+pandagma_conf_params='consen_iden clust_cov TE_match_iden annot_str_regex
 min_align_count min_annots_in_align prot_fam_dir'
 
 # Run all specified steps.
@@ -414,6 +407,6 @@ export commandlist="ingest fam_consen search_families realign_and_trim calc_tree
 
 export dependencies='hmmscan famsa'
 
-declare out_dir version consen_iden clust_cov consen_method annot_str_regex
+declare out_dir version consen_iden clust_cov annot_str_regex
 
 main_pan_fam "$@"
