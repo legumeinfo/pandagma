@@ -186,7 +186,7 @@ run_search_families() {
 
   for filepath in 02_fasta_prot_sup/*; do 
     base=$(basename "$filepath" ."$faa")
-    echo "  Search $base.$faa against a sampling of sequences in family alignments in 19_palmp to determine best family match"
+    echo "  Search $base.$faa against a sampling of sequences in families in 19_palmp to determine best family match"
     echo "  mmseqs easy-search $filepath 19_palmp.sample.faa 33_mmseqs_fam_match/$base.x.19_palmp.fam_ID.m8 \\"
     echo "    33_mmseqs_tmp --search-type ${SEQTYPE} --cov-mode 0 -c ${clust_cov} 1>/dev/null"
     mmseqs easy-search "$filepath" \
