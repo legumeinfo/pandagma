@@ -571,7 +571,7 @@ run_consense() {
                      07_pan_fasta_prot.faa \
                      10_unclust.x.07_pan_fasta.m8 \
                      03_mmseqs_tmp \
-                     --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null 
+                     --search-type "${SEQTYPE}" --cov-mode 0 -c "${clust_cov}" 1>/dev/null 
 
   echo "  Place unclustered genes into their respective pan-gene sets, based on top mmsearch hits."
   echo "  Use the \"main set\" $clust_iden threshold."
@@ -660,7 +660,7 @@ run_add_extra() {
       echo "Extra: $fasta_file"
       MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
       mmseqs easy-search "${filepath}" 13_pan_aug_fasta.faa 13_extra_out_dir/"${fasta_file}".x.all_cons.m8 \
-                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 5 -c "${clust_cov}" 1>/dev/null & # background
+                   "$MMTEMP" --search-type "${SEQTYPE}" --cov-mode 0 -c "${clust_cov}" 1>/dev/null & # background
 
       if [[ $(jobs -r -p | wc -l) -ge ${MMSEQSTHREADS} ]]; then wait -n; fi
     done

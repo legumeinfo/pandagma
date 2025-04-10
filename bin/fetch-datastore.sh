@@ -9,12 +9,20 @@ readonly DATAFILE=${1}
 # adjust URL for collections that are located in the annex
 case ${DATAFILE} in
   acacr.Acra3RX.gnm1.ann1.6C0V.*|\
+  apiam.LA2127.gnm1_hap2.ann1.NT2R.*|\
+  apiam.LA2127.gnm1.ann1.QKWH.*|\
+  apipr.MO19963523.gnm1_hap2.ann1.PB8C.*|\
+  apipr.MO19963523.gnm1.ann1.P2VZ.*|\
   arahy.Tifrunner.gnm1.ann2.TN8K.*|\
   arath.Col0.gnm9.ann11.KH24.*|\
   bauva.BV-YZ2020.gnm2.ann1.RJ1G.*|\
+  cerca.ISC453364.gnm1.ann1.HZJM.*|\
   dalod.SKLTGB.gnm1.ann1.R67B.*|\
+  glyma.Wm82_ISU01.gnm2.ann1.FGFB.*|\
   paran.WU01x14.gnm1.ann1.4KM0.*|\
+  phach.longxuteng.gnm1.ann1_hap2.KGX9.*|\
   phach.longxuteng.gnm1.ann1.KGX9.*|\
+  pissa.ZW6.gnm1.ann1.TKZX.*|\
   prupe.Lovell.gnm2.ann1.S2ZZ.*|\
   quisa.S10.gnm1.ann1.RQ4J.*|\
   sento.Myeongyun.gnm1.ann1.5WXB.*|\
@@ -35,6 +43,8 @@ case ${genspa} in
   [A-Z]*) genus=${genspa} species=GENUS collection_type=pangenes collection=${1%.*.*.*} ;;
   acacr) genus=Acacia species=crassicarpa ;;
   aesev) genus=Aeschynomene species=evenia ;;
+  apiam) genus=Apios species=americana ;;
+  apipr) genus=Apios species=priceana ;;
   aradu) genus=Arachis species=duranensis ;;
   arahy) genus=Arachis species=hypogaea ;;
   araip) genus=Arachis species=ipaensis ;;
@@ -48,6 +58,7 @@ case ${genspa} in
   cicar) genus=Cicer species=arietinum ;;
   cicec) genus=Cicer species=echinospermum ;;
   cicre) genus=Cicer species=reticulatum ;;
+  cucsa) genus=Cucumis species=sativus ;;
   dalod) genus=Dalbergia species=odorifera ;;
   faial) genus=Faidherbia species=albida ;;
   glycy) genus=Glycine species=cyrtoloba ;;
@@ -78,10 +89,12 @@ case ${genspa} in
   quisa) genus=Quillaja species=saponaria ;;
   sento) genus=Senna species=tora ;;
   singl) genus=Sindora species=glabra ;;
+  solly) genus=Solanum species=lycopersicum ;;
   treor) genus=Trema species=orientale;;
   tripr) genus=Trifolium species=pratense ;;
   trisu) genus=Trifolium species=subterraneum ;;
   vicfa) genus=Vicia species=faba ;;
+  vicvi) genus=Vicia species=villosa ;;
   vigan) genus=Vigna species=angularis ;;
   vigra) genus=Vigna species=radiata ;;
   vigun) genus=Vigna species=unguiculata ;;
