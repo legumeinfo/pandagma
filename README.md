@@ -1,7 +1,7 @@
 # pandagma
 Pandagma is a collection of tools for calculating pangene sets and gene families. 
 
-Authors: Steven Cannon, Hyunoh Lee, Nathan Weeks, Joel Berendzen, 2020-2024.
+Authors: Steven Cannon, Hyunoh Lee, Nathan Weeks, Joel Berendzen, 2020-2025.
 
 ### Overview
 
@@ -126,7 +126,10 @@ Several additional optional worflows are available:
     pangenes and gene families.
 * `pandagma pupdate` - to compare and generate a mapping between two pangene sets.
 * `pandagma fsup` - to "supplement" or add species/annotations into gene families calculated previously. 
-    The selected new annotation sets are compared against HMMs calculated as part of a prior full run of pandagma-fam.sh.
+    The selected new annotation sets are compared against results of a prior full run of pandagma-fam.sh, using one of
+    two methods: align_sample to compare new proteomes against a sample of protein sequences from multifasta files, OR
+    hmmsearch, to compare against a hmmpress-ed hmm database of compressed-and-indexed HMMs.
+    Of the two methods, hmmsearch is generally more accurate than hmm_sample (aligns more sequences), but takes longer.
 
 Additionally, a large number of utilities are available in the bin directory.
 In general, each of these has full usage information, accessible with `program_name -h`
@@ -491,7 +494,7 @@ min_annots_in_align - Minimum number of distinct annotation groups in an alignme
     and then lists annotation files and fasta files.
 
     The best way to start a config file for a new run is to copy and modify an existing config file in the repository.
-    As of mid-2024, sample config files are provided for six gene family runs, and for four family "supplement" (`pandagma fsup`) runs.
+    As of mid-2025, sample config files are provided for six gene family runs, and for four family "supplement" (`pandagma fsup`) runs.
     These config files give typical parameters, and contain comments where needed about parameter choices.
     Also see parameter descriptions above for both workflows.
 
