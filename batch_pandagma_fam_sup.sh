@@ -21,8 +21,8 @@ echo "Config: $CONFIG"
 
 export PATH=$PATH:$PDGPATH:$PDGPATH/bin
 echo "PATH: $PATH"
-printf "Testing path: hash_into_fasta_id.pl is "; 
-  which hash_into_fasta_id.pl
+printf "Testing path: get_fasta_from_family_file.pl is "; 
+  which get_fasta_from_family_file.pl
 echo
 
 ##########
@@ -34,7 +34,6 @@ pandagma fsup -c $CONFIG
 ##########
 # Run individual steps; equivalent to pandagma fsup -c $CONFIG
 #pandagma fsup -c $CONFIG -s ingest
-#pandagma fsup -c $CONFIG -s fam_consen
 #pandagma fsup -c $CONFIG -s search_families
 #pandagma fsup -c $CONFIG -s tabularize
 #pandagma fsup -c $CONFIG -s realign_and_trim

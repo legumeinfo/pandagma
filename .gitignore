@@ -1,7 +1,7 @@
 # Ignore the following
-/data/
-/data_extra/
-out*
-BAK*
+/data*/
+/out*/
+/BAK*/
+/work*/
 nohup*
-code_table/pan_to_peptide.tsv
+/code_table/pan_to_peptide.tsv
