@@ -239,18 +239,26 @@ run_search_families() {
       base=$(echo "$file" | perl -pe 's/(.+)\.\w+/$1/') # strips suffix like .protein_primary or .protein
       hmmdb_name=$(basename "$hmmdb_path")
       awk -v OFS="\t" '$1!~/^#/ {print $1, $3, $1, $5, $6}' "$filepath" |
-        sort -k1,1 -k4nr,4nr | top_line.awk |
+        sort -k1,1 -k5nr,5nr | top_line.awk |
           strip_spliceform.pl > 33_fam_match/"${base}"."${hmmdb_name}".gfa.tsv &
        # allow to execute up to $NPROC in parallel
        if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
     done
     wait
+  
+    echo "== Place sequences into families based on top protein match to HMM, using the E-value threshold of $evalue."
+    cat 33_fam_match/*.gfa.tsv |
+      awk -v EVAL="${evalue}" '$4<=EVAL {print $2 "\t" $1}' |
+      sort -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 34_sup_vs_fam_consen.clust.tsv
 
   else 
     echo "Unrecognized search_method: $search_method."
     echo "Expected values are \"align_sample\ or \"hmmsearch\"."
     exit 1
   fi
+
+  echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
+  perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' 34_sup_vs_fam_consen.clust.tsv > 34_sup_vs_fam_consen.hsh.tsv
 }
 
 ##########
@@ -427,15 +435,15 @@ run_summarize() {
 ########################################
 # Main program
 
-pandagma_conf_params='consen_iden clust_cov TE_match_iden annot_str_regex evalue search_method hmmdb_path hmmdir
-min_align_count min_annots_in_align prot_fam_dir'
+pandagma_conf_params='consen_iden clust_cov TE_match_iden annot_str_regex min_align_count min_annots_in_align 
+evalue search_method hmmdb_path prot_fam_dir hmm_dir' 
 
 # Run all specified steps.
 # Those steps. Steps realign_and_trim calc_trees xfr_aligns_trees are in pandagma-common.sh
 export commandlist="ingest search_families realign_and_trim calc_trees xfr_aligns_trees summarize"
 
 export dependencies='hmmsearch famsa'
-NPROC=$( ( command -v nproc > /dev/null && nproc ) || getconf _NPROCESSORS_ONLN)
+NPROC=$( command -v nproc > /dev/null && nproc )
 if [[ $NPROC -lt 1 ]]; then NPROC=1; fi
 export NPROC=${NPROC:-1}
 
