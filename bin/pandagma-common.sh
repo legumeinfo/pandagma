@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2025-04-10"
+version="2025-05-30"
 
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
