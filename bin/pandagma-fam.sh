@@ -544,7 +544,9 @@ run_consense() {
   get_fasta_from_family_file.pl "${protein_files[@]}" -fam 06_syn_pan_ge3.clust.tsv -out 07_pan_fasta
 
   echo "  Merge fasta files in 07_pan_fasta, prefixing them with panID__"
-  merge_files_to_pan_fasta.awk 07_pan_fasta/* > 07_pan_fasta_prot.faa
+  pushd 07_pan_fasta
+    merge_files_to_pan_fasta.awk * > ../07_pan_fasta_prot.faa
+    popd
 
   echo "  Get sorted list of all genes, from the original fasta files"
   cat_or_zcat "${protein_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
@@ -645,7 +647,9 @@ run_add_extra() {
   get_fasta_from_family_file.pl "${protein_files[@]}" -fam 12_syn_pan_aug.clust.tsv -out 13_pan_aug_fasta
   
   echo "Merge fasta files in 13_pan_aug_fasta, prefixing IDs with panID__"
-  merge_files_to_pan_fasta.awk 13_pan_aug_fasta/* > 13_pan_aug_fasta.faa
+  pushd 13_pan_aug_fasta
+    merge_files_to_pan_fasta.awk * > ../13_pan_aug_fasta.faa
+    popd
 
   if [[ -v protein_files_extra ]]
   then # handle the "extra" annotation files
@@ -697,7 +701,7 @@ run_add_extra() {
 
     echo "  Merge fasta files from 19_palmp, prefixing IDs with panID__"
     pushd 19_palmp
-      merge_files_to_pan_fasta.awk 19_palmp/* > ../19_palmp.faa
+      merge_files_to_pan_fasta.awk * > ../19_palmp.faa
       popd
 
   else  
@@ -766,8 +770,8 @@ run_summarize() {
 
   # Copy directory of final fasta files - abbreviated 19_palmp but copied to 19_pan_aug_leftover_merged_prot
   if [ -d "${WORK_DIR}"/19_palmp ]; then
-    echo "Copying directory $dir to output directory"
-    cp -r "${WORK_DIR}"/$dir "${full_out_dir}"/19_pan_aug_leftover_merged_prot
+    echo "Copying directory 19_palmp to output directory"
+    cp -r "${WORK_DIR}"/19_palmp "${full_out_dir}"/19_pan_aug_leftover_merged_prot
   else 
     echo "Warning: couldn't find dir ${WORK_DIR}/$dir; skipping"
   fi

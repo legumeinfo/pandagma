@@ -9,10 +9,6 @@ readonly DATAFILE=${1}
 # adjust URL for collections that are located in the annex
 case ${DATAFILE} in
   acacr.Acra3RX.gnm1.ann1.6C0V.*|\
-  apiam.LA2127.gnm1_hap2.ann1.NT2R.*|\
-  apiam.LA2127.gnm1.ann1.QKWH.*|\
-  apipr.MO19963523.gnm1_hap2.ann1.PB8C.*|\
-  apipr.MO19963523.gnm1.ann1.P2VZ.*|\
   arahy.Tifrunner.gnm1.ann2.TN8K.*|\
   arath.Col0.gnm9.ann11.KH24.*|\
   bauva.BV-YZ2020.gnm2.ann1.RJ1G.*|\
