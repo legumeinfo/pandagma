@@ -687,8 +687,6 @@ run_add_extra() {
 }
 
 run_check_leftovers() {
-echo "NEW CODE 2025-12-29"
-
   echo "  Retrieve genes present in the original CDS files but absent from 16_syn_pan_aug_extra"
   cut -f2 16_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.16_syn_pan_aug_extra
   cat 02_all_*_cds.fna > 02_all_cds.fna
