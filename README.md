@@ -258,6 +258,7 @@ Subcommands for the **pangene** workflow, `pandagma pan`, in order they are usua
        cluster_rest - Retrieve unclustered sequences and cluster those that can be.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
+    check_leftovers - Check leftover sequences against clusters and add if possible.
          tabularize - Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv
      pick_exemplars - Pick representative sequence for each pangene
      filter_to_core - Calculate orthogroup composition and filter fasta files to core orthogroups.

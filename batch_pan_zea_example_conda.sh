@@ -51,6 +51,8 @@ pandagma pan -c $CONFIG
 #pandagma pan -c $CONFIG -s consense
 #pandagma pan -c $CONFIG -s cluster_rest
 #pandagma pan -c $CONFIG -s add_extra
+#pandagma pan -c $CONFIG -s check_leftovers
+#pandagma pan -c $CONFIG -s tabularize
 #pandagma pan -c $CONFIG -s pick_exemplars
 #pandagma pan -c $CONFIG -s filter_to_pctile
 #pandagma pan -c $CONFIG -s order_and_name

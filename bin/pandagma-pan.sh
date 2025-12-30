@@ -56,9 +56,10 @@ Subcommands (in order they are usually run):
        cluster_rest - Retrieve unclustered sequences and cluster those that can be.
           add_extra - Add other gene model sets to the primary clusters. Useful for adding
                       annotation sets that may be of lower or uncertain quality.
+    check_leftovers - Check leftover sequences against clusters and add if possible.
+         tabularize - Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv
      pick_exemplars - Pick representative sequence for each pan-gene
    filter_to_pctile - Calculate orthogroup composition and filter fasta files by selected percentiles.
-         tabularize - Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv
      order_and_name - Assign pan-gene names with consensus chromosomes and ordinal positions.
      calc_chr_pairs - Report observed chromosome pairs; useful for preparing expected_chr_matches
           summarize - Copy results into output directory, and report summary statistics.
@@ -395,8 +396,8 @@ run_mcl() {
 ##########
 run_consense() {
   echo; 
-  printf "\nStep \"consense\" will add previously unclustered"
-  printf "\nsequences into an \"augmented\" pan-gene set, by homology.\n"
+  printf "\nStep \"consense\" will add previously unclustered "
+  printf "sequences into an \"augmented\" pan-gene set, by homology.\n"
   cd "${WORK_DIR}" || exit
   if [ -d 07_pan_fasta ]; then rm -rf 07_pan_fasta; fi
   mkdir -p 07_pan_fasta lists
@@ -406,9 +407,9 @@ run_consense() {
   get_fasta_from_family_file.pl "${cds_files[@]}" -fam 06_syn_pan.clust.tsv -out 07_pan_fasta
 
   echo "  Merge fasta files in 07_pan_fasta, prefixing IDs with panID"
-  pushd 07_pan_fasta
-    merge_files_to_pan_fasta.awk * > ../07_pan_fasta_cds.fna
-    popd
+  pushd 07_pan_fasta || exit
+    merge_files_to_pan_fasta.awk ./* > ../07_pan_fasta_cds.fna
+    popd || exit
 
   echo "  Pick a representative seq. for each orthogroup - as a sequence with the median length for that OG."
   echo "  < 07_pan_fasta_cds.fna pick_family_rep.pl -prefer $preferred_annot -out 08_pan_fasta_clust_rep_cds.fna"
@@ -418,9 +419,9 @@ run_consense() {
   cat_or_zcat "${cds_files[@]}" | awk '/^>/ {print substr($1,2)}' | sort > lists/09_all_genes
 
   echo "  Get sorted list of all clustered genes"
-  pushd 07_pan_fasta
-    awk '$1~/^>/ {print $1}' * | sed 's/>//' | sort > ../lists/09_all_clustered_genes
-    popd
+  pushd 07_pan_fasta || exit
+    awk '$1~/^>/ {print $1}' ./* | sed 's/>//' | sort > ../lists/09_all_clustered_genes
+    popd || exit
 
   echo "  Get list of genes not in clusters"
   comm -13 lists/09_all_clustered_genes lists/09_all_genes > lists/09_genes_not_in_clusters
@@ -447,8 +448,8 @@ run_consense() {
 
   echo "  Filter unclust.x.07_pan_fasta.m8 by clust_iden and report: panID, qry_gene, sbj_gene"
   top_line.awk 10_place_leftovers/unclust.x.07_pan_fasta.m8 |
-    awk -v IDEN="${clust_iden}" '$3>=IDEN {print $2 "\t" $1}' | 
-    perl -pe 's/^(pan\d+)__(\S+)\t(\S)/$1\t$2\t$3/' > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj.tsv
+    awk -v IDEN="${clust_iden}" '$3>=IDEN {print $1 "\t" $2}' |
+    perl -pe 's/^(\S+)\t(pan\d+)__(\S+)/$2\t$1\t$3/' > 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj.tsv
 
   echo "  Add gene-pair information"
   hash_into_table_2cols.pl 01_posn_hsh/*hsh -table 10_place_leftovers/unclust.x.07_pan_fasta.pan_qry_sbj.tsv |
@@ -479,11 +480,11 @@ run_consense() {
 
   echo "  Make augmented cluster sets. Uniqify on the back end, converting from mcl clust format to hsh (clust_ID gene)."
   cat /dev/null > 12_syn_pan_aug_pre.hsh.tsv
-  pushd 07_pan_fasta
-    augment_cluster_sets.awk leftovers_dir=../11_pan_leftovers * |
+  pushd 07_pan_fasta || exit
+    augment_cluster_sets.awk leftovers_dir=../11_pan_leftovers ./* |
       perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' |
       sort -k1,1 -k2,2 | uniq > ../12_syn_pan_aug_pre.hsh.tsv 
-    popd
+    popd || exit
 
   echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
   hash_to_rows_by_1st_col.awk < 12_syn_pan_aug_pre.hsh.tsv > 12_syn_pan_aug_pre.clust.tsv
@@ -496,9 +497,9 @@ run_cluster_rest() {
   cd "${WORK_DIR}" || exit
 
   echo "  Retrieve genes present in the original CDS files but absent from 12_syn_pan_aug.hsh"
-  cut -f2 12_syn_pan_aug_pre.hsh.tsv | LC_ALL=C sort > lists/lis.12_syn_pan_aug_complement
+  cut -f2 12_syn_pan_aug_pre.hsh.tsv | LC_ALL=C sort > lists/lis.12_syn_pan_aug
   get_fasta_subset.pl -in 02_all_main_cds.fna -out 12_syn_pan_aug_complement.fna \
-    -lis lists/lis.12_syn_pan_aug_complement -xclude -clobber
+    -lis lists/lis.12_syn_pan_aug -xclude -clobber
 
   MMTEMP=$(mktemp -d -p 03_mmseqs_tmp)
   complmt_self_compare="12_syn_pan_aug_complement.x.12_syn_pan_aug_complement"
@@ -558,9 +559,9 @@ run_add_extra() {
   get_fasta_from_family_file.pl "${cds_files[@]}" -fam 12_syn_pan_aug.clust.tsv -out 13_pan_aug_fasta
   
   echo "  Merge fasta files in 13_pan_aug_fasta, prefixing IDs with panID__"
-  pushd 13_pan_aug_fasta
-    merge_files_to_pan_fasta.awk * > ../13_pan_aug_fasta.fna
-    popd
+  pushd 13_pan_aug_fasta || exit
+    merge_files_to_pan_fasta.awk ./* > ../13_pan_aug_fasta.fna
+    popd || exit
 
   echo "  Store the panID - geneID in a hash to be retrieved later, after filtering by chromosome"
   awk '$1~/^>/ {print substr($1,2)}' 13_pan_aug_fasta.fna | 
@@ -649,40 +650,150 @@ run_add_extra() {
     hash_to_rows_by_1st_col.awk 14_syn_pan_extra.hsh.tsv  > 14_syn_pan_extra.clust.tsv
 
     echo "  Retrieve sequences for the extra genes"
-    if [ -d 16_pan_leftovers_extra ]; then rm -rf 16_pan_leftovers_extra; fi
-    mkdir -p 16_pan_leftovers_extra
+    if [ -d 15_pan_leftovers_extra ]; then rm -rf 15_pan_leftovers_extra; fi
+    mkdir -p 15_pan_leftovers_extra
     get_fasta_from_family_file.pl "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
-       -fam 14_syn_pan_extra.clust.tsv -out 16_pan_leftovers_extra/
+       -fam 14_syn_pan_extra.clust.tsv -out 15_pan_leftovers_extra/
   
     echo "  Make augmented cluster sets. Uniqify on the back end, converting from mcl clust format to hsh (clust_ID gene)."
-    pushd 13_pan_aug_fasta
-      augment_cluster_sets.awk leftovers_dir=../16_pan_leftovers_extra * |
+    pushd 13_pan_aug_fasta || exit
+      augment_cluster_sets.awk leftovers_dir=../15_pan_leftovers_extra ./* |
         perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' |
-        sort -k1,1 -k2,2 | uniq > ../18_syn_pan_aug_extra.hsh.tsv 
-      popd
+        sort -k1,1 -k2,2 | uniq > ../16_syn_pan_aug_extra.hsh.tsv 
+      popd || exit
 
     echo "  Reshape from hash to mcl output format (clustered IDs on one line)"
-    hash_to_rows_by_1st_col.awk 18_syn_pan_aug_extra.hsh.tsv > 18_syn_pan_aug_extra.clust.tsv
+    hash_to_rows_by_1st_col.awk 16_syn_pan_aug_extra.hsh.tsv > 16_syn_pan_aug_extra.clust.tsv
 
     echo "  For each pan-gene set, retrieve sequences into a multifasta file."
-    echo "  The directory and multifasta file are called 19_pan_aug_leftover_merged_cds (abbreviated 19_palmc)"
-    echo "    Fasta file:" "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}"
-    if [ -d 19_palmc ]; then rm -rf 19_palmc; fi
-    mkdir -p 19_palmc
+    echo "  The directory and multifasta file are called 17_pan_aug_leftover_merged_cds (abbreviated 17_palmc)"
+    echo "    Fasta files:" "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}"
+    if [ -d 17_palmc ]; then rm -rf 17_palmc; fi
+    mkdir -p 17_palmc
     get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
-      -fam 18_syn_pan_aug_extra.clust.tsv -out 19_palmc
+      -fam 16_syn_pan_aug_extra.clust.tsv -out 17_palmc
   
-    echo "  Merge files in 19_palmc, prefixing IDs with panID__"
-    find 19_palmc -maxdepth 1 -mindepth 1 |
+    echo "  Merge files in 17_palmc, prefixing IDs with panID__"
+    find 17_palmc -maxdepth 1 -mindepth 1 |
       sort |
-        xargs awk '/^>/ {printf(">%s__%s\n", substr(FILENAME,index(FILENAME,"/")+1), substr($0,2)); next} {print}' > 19_palmc.fna
+        xargs awk '/^>/ {printf(">%s__%s\n", substr(FILENAME,index(FILENAME,"/")+1), substr($0,2)); next} {print}' > 17_palmc.fna
 
   else  
     echo "== No annotations were designated as \"extra\", so just promote the syn_pan_aug files as syn_pan_aug_extra. ==" 
-    cp 07_pan_fasta_cds.fna 19_palmc.fna
-    cp 12_syn_pan_aug.clust.tsv 18_syn_pan_aug_extra.clust.tsv
-    cp 12_syn_pan_aug.hsh.tsv 18_syn_pan_aug_extra.hsh.tsv
+    cp 07_pan_fasta_cds.fna 17_palmc.fna
+    cp 12_syn_pan_aug.clust.tsv 16_syn_pan_aug_extra.clust.tsv
+    cp 12_syn_pan_aug.hsh.tsv 16_syn_pan_aug_extra.hsh.tsv
   fi
+}
+
+run_check_leftovers() {
+  echo "  Retrieve genes present in the original CDS files but absent from 16_syn_pan_aug_extra"
+  cut -f2 16_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.16_syn_pan_aug_extra
+  cat 02_all_*_cds.fna > 02_all_cds.fna
+  get_fasta_subset.pl -in 02_all_cds.fna -out 16_syn_pan_aug_extra_complement.fna \
+    -lis lists/lis.16_syn_pan_aug_extra -xclude -clobber
+
+  echo "  Search non-clustered genes against genes already clustered."
+  # Check sequence type (in case this run function is called separately from the usually-prior ones)
+  someseq=$(head 17_palmc.fna | grep -v '>' | awk -v ORS="" '{print toupper($1)}')
+  SEQTYPE=$(check_seq_type "${someseq}") # 3=nuc; 1=pep
+  echo "SEQTYPE is: $SEQTYPE"
+
+  if [ -d 17_place_leftovers ]; then rm -rf 17_place_leftovers; fi
+  mkdir -p 17_place_leftovers
+  mmseqs easy-search 16_syn_pan_aug_extra_complement.fna \
+                     17_palmc.fna \
+                     17_place_leftovers/unclust.x.17_palmc.m8 \
+                     03_mmseqs_tmp \
+                     --search-type "${SEQTYPE}" --cov-mode 0 -c "${clust_cov}" 1>/dev/null 
+
+  echo "  Filter unclust.x.17_palmc.m8 by clust_iden and report: panID, qry_gene, sbj_gene"
+  top_line.awk 17_place_leftovers/unclust.x.17_palmc.m8 |
+    awk -v IDEN="${clust_iden}" '$3>=IDEN {print $1 "\t" $2}' |
+    perl -pe 's/^(\S+)\t(pan\d+)__(\S+)/$2\t$1\t$3/' > 17_place_leftovers/unclust.x.17_palmc.pan_qry_sbj.tsv
+
+  echo "  Add gene-pair information"
+  hash_into_table_2cols.pl 01_posn_hsh/*hsh -table 17_place_leftovers/unclust.x.17_palmc.pan_qry_sbj.tsv |
+    cat > 17_place_leftovers/unclust.x.17_palmc.pan_qry_sbj_posn.tsv
+
+  echo; echo "  Filter based on list of expected chromosome pairings if provided"
+  if [[ -v expected_chr_matches ]]; then  
+    echo "Filtering on chromosome patterns defined in expected_chr_matches"
+    < 17_place_leftovers/unclust.x.17_palmc.pan_qry_sbj_posn.tsv \
+      filter_mmseqs_by_chroms.pl -chr_pat <(printf '%s %s\n' "${expected_chr_matches[@]}") |
+      awk 'NF==9' |  # matches for genes with coordinates. The case of <9 can happen for seqs with UNDEF position.
+      cat > 17_place_leftovers/unclust.x.17_palmc.pan_qry_sbj_matches.tsv 
+  else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
+    echo "No expected_chr_matches variable was defined in the config file, so proceeding without chromosome-pair filtering."
+    perl -pe 's/__/\t/g; s/\t[\+-]//g' < 17_place_leftovers/unclust.x.17_palmc.pan_qry_sbj_posn.tsv |
+      awk 'NF==9' |  # matches for genes with coordinates. The case of <9 can happen for seqs with UNDEF position.
+      cat > 17_place_leftovers/unclust.x.17_palmc.pan_qry_sbj_matches.tsv
+  fi
+
+  echo "  Place unclustered genes into their respective pan-gene sets"
+  cut -f1,3 17_place_leftovers/unclust.x.17_palmc.pan_qry_sbj_matches.tsv | 
+  sort -u -k1,1 -k2,2 | hash_to_rows_by_1st_col.awk > 18_syn_pan_leftovers.clust.tsv
+
+  echo "  Retrieve sequences for the leftover genes"
+  mkdir -p 18_pan_leftovers
+  get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
+    -fam 18_syn_pan_leftovers.clust.tsv -out 18_pan_leftovers/
+
+  echo "  Make augmented cluster sets. Uniqify on the back end, converting from mcl clust format to hsh (clust_ID gene)."
+  cat /dev/null > 18_syn_pan_aug_extra.hsh.tsv
+  pushd 17_palmc || exit
+    augment_cluster_sets.awk leftovers_dir=../18_pan_leftovers ./* |
+      perl -lane 'for $i (1..scalar(@F)-1){print $F[0], "\t", $F[$i]}' |
+      sort -k1,1 -k2,2 | uniq > ../18_syn_pan_aug_extra.hsh.tsv 
+    popd || exit
+
+  echo "  Reshape from mcl output format (clustered IDs on one line) to a hash format (clust_ID gene)"
+  hash_to_rows_by_1st_col.awk < 18_syn_pan_aug_extra.hsh.tsv > 18_syn_pan_aug_extra.clust.tsv
+
+  echo "  For each pan-gene set, retrieve sequences into a multifasta file."
+  echo "  The directory and multifasta file are called 18_pan_aug_leftover_merged_cds (abbreviated 18_palmc)"
+  echo "    Fasta files:" "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}"
+  if [ -d 18_palmc ]; then rm -rf 18_palmc; fi
+  mkdir -p 18_palmc
+  get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
+    -fam 18_syn_pan_aug_extra.clust.tsv -out 18_palmc
+  
+  echo "  Merge files in 18_palmc, prefixing IDs with panID__"
+  find 18_palmc -maxdepth 1 -mindepth 1 |
+    sort |
+      xargs awk '/^>/ {printf(">%s__%s\n", substr(FILENAME,index(FILENAME,"/")+1), substr($0,2)); next} {print}' > 18_palmc.fna
+
+  echo "  Retrieve genes present in the original CDS files but absent from 18_syn_pan_aug_extra"
+  cut -f2 18_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.18_syn_pan_aug_extra
+  get_fasta_subset.pl -in 02_all_cds.fna -out 18_syn_pan_aug_extra_complement.fna \
+    -lis lists/lis.18_syn_pan_aug_extra -xclude -clobber
+}
+
+##########
+run_tabularize() {
+  echo; echo "== Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv"
+  cd "${WORK_DIR}" || exit
+
+  # Get table header 
+  pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv -annot_str_regex "$ANN_REX" > tmp.18_syn_pan_aug_extra.clust.tsv
+  head -1 tmp.18_syn_pan_aug_extra.clust.tsv > tmp.table_header
+
+  # Find column on which to sort first
+  export PR_ANN=$preferred_annot
+  sort_col=$( perl -ane 'BEGIN{use List::Util qw(first); 
+                $PA=$ENV{"PR_ANN"}}; 
+                $idx = first { $F[$_] =~ /$PA/ } 0..$#F; print ($idx+1) ' < tmp.table_header )
+
+  echo "  Field for sorting 18_syn_pan_aug_extra.table.tsv is sort_col: $sort_col"
+
+  echo "  Sort, putting header row at top, and don't print pangenes that are all NONE"
+    sort -k"$sort_col","$sort_col" -k2,2 tmp.18_syn_pan_aug_extra.clust.tsv | 
+    sed '/^$/d; /^#pangene/d' |
+    perl -lane '$ct=0; for $gn (@F){if ($gn=~/NONE/){$ct++}}; if ($ct<(scalar(@F)-1)){print $_}' |
+    cat tmp.table_header - > 18_syn_pan_aug_extra.table.tsv
+
+    rm tmp.18_syn_pan_aug_extra.clust.tsv
+    rm tmp.table_header
 }
 
 ##########
@@ -715,44 +826,11 @@ run_pick_exemplars() {
 
   echo "    == then CDS sequences, corresponding with 21_pan_fasta_clust_rep_prot.faa"
   awk '$1~/^>/ {print substr($1,2)}' 21_pan_fasta_clust_rep_prot.faa > lists/lis.21_pan_fasta_clust_rep
-  get_fasta_subset.pl -in 19_palmc.fna -list lists/lis.21_pan_fasta_clust_rep \
+  get_fasta_subset.pl -in 18_palmc.fna -list lists/lis.21_pan_fasta_clust_rep \
                     -clobber -out 21_pan_fasta_clust_rep_cds.fna
 
   perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_cds.fna
   perl -pi -e 's/__/  /' 21_pan_fasta_clust_rep_prot.faa
-
-  echo "  Retrieve genes present in the original CDS files but absent from 18_syn_pan_aug_extra"
-  cut -f2 18_syn_pan_aug_extra.hsh.tsv | LC_ALL=C sort > lists/lis.18_syn_pan_aug_extra
-  cat 02_all_*_cds.fna > 02_all_cds.fna
-  get_fasta_subset.pl -in 02_all_cds.fna -out 18_syn_pan_aug_extra_complement.fna \
-    -lis lists/lis.18_syn_pan_aug_extra -xclude -clobber
-}
-
-##########
-run_tabularize() {
-  echo; echo "== Derive a table-format version of 18_syn_pan_aug_extra.clust.tsv"
-  cd "${WORK_DIR}" || exit
-
-  # Get table header 
-  pangene_tabularize.pl -pan 18_syn_pan_aug_extra.clust.tsv -annot_str_regex "$ANN_REX" > tmp.18_syn_pan_aug_extra.clust.tsv
-  head -1 tmp.18_syn_pan_aug_extra.clust.tsv > tmp.table_header
-
-  # Find column on which to sort first
-  export PR_ANN=$preferred_annot
-  sort_col=$( perl -ane 'BEGIN{use List::Util qw(first); 
-                $PA=$ENV{"PR_ANN"}}; 
-                $idx = first { $F[$_] =~ /$PA/ } 0..$#F; print ($idx+1) ' < tmp.table_header )
-
-  echo "  Field for sorting 18_syn_pan_aug_extra.table.tsv is sort_col: $sort_col"
-
-  echo "  Sort, putting header row at top, and don't print pangenes that are all NONE"
-    sort -k"$sort_col","$sort_col" -k2,2 tmp.18_syn_pan_aug_extra.clust.tsv | 
-    sed '/^$/d; /^#pangene/d' |
-    perl -lane '$ct=0; for $gn (@F){if ($gn=~/NONE/){$ct++}}; if ($ct<(scalar(@F)-1)){print $_}' |
-    cat tmp.table_header - > 18_syn_pan_aug_extra.table.tsv
-
-    rm tmp.18_syn_pan_aug_extra.clust.tsv
-    rm tmp.table_header
 }
 
 ##########
@@ -909,7 +987,7 @@ run_calc_chr_pairs() {
   echo "Generate a report of observed chromosome pairs"
 
   echo "  Identify gene pairs, using mmseqs --easy_cluster"
-    mmseqs easy-cluster 19_palmc.fna 24_pan_fasta_clust 03_mmseqs_tmp \
+    mmseqs easy-cluster 18_palmc.fna 24_pan_fasta_clust 03_mmseqs_tmp \
     --min-seq-id "$clust_iden" -c "$clust_cov" --cov-mode 0 --cluster-reassign 1>/dev/null
 
   echo "   Extract chromosome-chromosome correspondences"
@@ -1148,7 +1226,7 @@ run_clean() {
   echo "  work_dir: $PWD"
   if [ -d MMTEMP ]; then rm -rf MMTEMP/*; 
   fi
-  for dir in 11_pan_leftovers 13_extra_out_dir 16_pan_leftovers_extra 19_palmp \
+  for dir in 11_pan_leftovers 13_extra_out_dir 15_pan_leftovers_extra 19_palmp \
     22_syn_pan_aug_extra_pctl${pctl_low}; do
     if [ -d "$dir" ]; then echo "  Removing directory $dir"; rm -rf "$dir" &
     fi
@@ -1172,7 +1250,7 @@ pandagma_conf_params='clust_iden clust_cov extra_iden mcl_inflation
 # The steps align_cds, align_protein, model_and_trim, calc_trees, and xfr_aligns_trees may be run separately.
 # Those steps (functions) are in pandagma-common.sh
 export commandlist="ingest mmseqs filter dagchainer mcl consense cluster_rest add_extra \
-         pick_exemplars filter_to_pctile tabularize order_and_name \
+         check_leftovers tabularize pick_exemplars filter_to_pctile order_and_name \
          calc_chr_pairs summarize"
 
 export dependencies='mmseqs dagchainer mcl cons famsa hmmalign hmmbuild run_DAG_chainer.pl'

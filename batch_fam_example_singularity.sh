@@ -39,6 +39,7 @@ singularity exec $IMAGE pandagma fam -c $CONFIG
 #singularity exec $IMAGE pandagma fam -c $CONFIG -s consense
 #singularity exec $IMAGE pandagma fam -c $CONFIG -s cluster_rest
 #singularity exec $IMAGE pandagma fam -c $CONFIG -s add_extra
+#singularity exec $IMAGE pandagma fam -c $CONFIG -s tabularize
 #singularity exec $IMAGE pandagma fam -c $CONFIG -s align_protein
 #singularity exec $IMAGE pandagma fam -c $CONFIG -s model_and_trim
 #singularity exec $IMAGE pandagma fam -c $CONFIG -s calc_trees
