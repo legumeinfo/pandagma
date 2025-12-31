@@ -5,7 +5,7 @@
 #     compare the two runs to find corresponding IDs, and generate another directory of 
 #     output in which IDs from the first run are used to replace IDs from the second run.
 #     The mapping of IDs is based on gene membership between the two runs, so this
-#     method should only be used for runs that have similar membership and mostly
+#     method should only be used for runs that have similar membership and most
 #     annotations in common. The intended use is to update a pangene set by addition of
 #     annotations, while keeping identifiers stable.
 #     While the large majority of panIDs should remain stable between such runs, some
@@ -19,8 +19,8 @@
 # OPERANDS
 #   Three directory names:
 #   out_dir1 -- The older pandagma-pan output directory, with IDs to be used in the update
-#   out_dir3 -- The new pandagma-pan output directory, whose IDs will be updated
-#   out_dir1 -- A directory name for the new (updated) files
+#   out_dir2 -- The new pandagma-pan output directory, whose IDs will be updated
+#   out_dir3 -- A directory name for the new (updated) files
 #
 # AUTHOR
 #     Steven Cannon <steven.cannon@usda.gov>
