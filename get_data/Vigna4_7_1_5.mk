@@ -11,6 +11,9 @@ vigra.VC1973A.gnm6.ann1.M1Qs.protein.faa.gz \
 vigra.VC1973A.gnm7.ann1.RWBG.cds.fna.gz \
 vigra.VC1973A.gnm7.ann1.RWBG.gene_models_main.bed.gz \
 vigra.VC1973A.gnm7.ann1.RWBG.protein.faa.gz \
+vigra.Weilv-9.gnm1.ann1.FPGC.cds_primary.fna.gz \
+vigra.Weilv-9.gnm1.ann1.FPGC.gene_models_main.bed.gz \
+vigra.Weilv-9.gnm1.ann1.FPGC.protein_primary.faa.gz \
 vigun.CB5-2.gnm1.ann1.0GKC.cds_primary.fna.gz \
 vigun.CB5-2.gnm1.ann1.0GKC.gene_models_main.bed.gz \
 vigun.CB5-2.gnm1.ann1.0GKC.protein_primary.faa.gz \
