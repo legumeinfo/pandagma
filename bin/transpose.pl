@@ -6,7 +6,7 @@ use warnings;
 #   transpose.pl - Given tabular data on STDIN, return transposed table on STDOUT
 #
 # SYNOPSIS
-#   cat TABLE | ./transpose.pl
+#   cat TABLE | transpose.pl
 #
 # OPERANDS
 #   Tabular data on STDIN

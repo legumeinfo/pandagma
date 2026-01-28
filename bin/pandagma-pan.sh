@@ -741,6 +741,17 @@ run_check_leftovers() {
   get_fasta_from_family_file.pl "${cds_files[@]}" "${cds_files_extra_constr[@]}" "${cds_files_extra_free[@]}" \
     -fam 18_syn_pan_leftovers.clust.tsv -out 18_pan_leftovers/
 
+  if [ ! -d 17_palmc ]; then # Directory doesn't exist - which could happen if no annotations were designated as extra
+    mkdir -p 17_palmc 17_palmc_TMP
+    cat 17_palmc.fna | fasta_to_table.awk | 
+      perl -pe 's/^(\D+\d+)__/$1\t/' | split_table_to_files.pl -out 17_palmc_TMP
+    for filepath in 17_palmc_TMP/pan*; do
+      base=$(basename "$filepath")
+      awk '{print ">" $1; print $2}' "$filepath" > "17_palmc/$base"
+    done
+    rm -rf 17_palmc_TMP
+  fi
+
   echo "  Make augmented cluster sets. Uniqify on the back end, converting from mcl clust format to hsh (clust_ID gene)."
   cat /dev/null > 18_syn_pan_aug_extra.hsh.tsv
   pushd 17_palmc || exit
