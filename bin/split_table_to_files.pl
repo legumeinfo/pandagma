@@ -1,18 +1,13 @@
 #!/usr/bin/env perl 
 
-# Program: split_table_to_files.pl
-
-# S. Cannon Jan 2008
-
 use strict;
 use warnings;
 use Getopt::Long;
 
-my ($input_table, $out_dir, $keep, $help);
+my ($out_dir, $keep, $help);
 my $field_num = 1;
 
 GetOptions (
-  "input_table=s" => \$input_table,
   "out_dir=s"     => \$out_dir,
   "field_num:i"   => \$field_num,
   "keep"          => \$keep,
@@ -20,12 +15,12 @@ GetOptions (
 );
 
 my $usage = <<EOS;
-Usage: $0  -in input_table -out out_dir  -field field_num
-  Input is a table to be split into sub-tables, with the sub-tables 
-  named by values in the sorted input table.
+Usage: cat TABLE | split_table_to_files.pl -out out_dir  [options]
+  Input is tabular data, passed via STDIN, to be split into sub-tables, 
+  with the sub-tables named by values in the sorted input table.
   
   Required:
-  -input_table  Name of input table to be split
+  [data on STDIN]
   -out_dir   Name of directory for output
 
   Optional
@@ -36,15 +31,13 @@ Usage: $0  -in input_table -out out_dir  -field field_num
   -help         Displays this info
 EOS
 
-die "\n$usage\n" unless ($input_table && $out_dir || $help);
+die "\n$usage\n" unless ($out_dir || $help);
 
 opendir (DIR, "$out_dir") or mkdir($out_dir); close DIR;
 
-open (my $IN, '<', $input_table) or die "can't open in $input_table:$!";
-
 my %seen;
 
-while (my $line = <$IN>) {
+while (my $line = <>) {
   chomp $line;  
   next if $line =~ m/^#|^$/;
   
@@ -79,4 +72,4 @@ __END__
 2008-11-06 Add chomp, in case file name is taken from last field
 2019-12-14 Add Getopt, and don't print filename in output tables
 2023-11-07 Add option -keep to allow keeping the field_name in the output files
-
+2026-01-27 Take tabular data in via STDIN rather than as a named file
