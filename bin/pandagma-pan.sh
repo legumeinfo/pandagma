@@ -966,7 +966,10 @@ run_order_and_name() {
 
   echo "  Reshape defline, and sort by position (CDS)"
   fasta_to_table.awk 22_pan_fasta_rep_pctl"${pctl_low}"_posn_cdsTMP.fna | sed 's/__/\t/g; s/ /\t/' | 
-    sort | awk '{print ">" $1, $2, $3, $4, $5; print $6}' > 23_syn_pan_pctl"${pctl_low}"_posn_cds.fna
+    sort | awk '{print ">" $1, $2, $3, $4, $5; print $6}' |
+    awk '!seen[$5]++' > 23_syn_pan_pctl"${pctl_low}"_posn_cds.fna
+    # The "!seen" filter squashes duplicates if 23_syn_pan_pctl"${pctl_low}"_posn_cds.fna has duplicate gene IDs associated with 
+    # different pan IDs, which could happen with e.g. local paralogs.
 
   echo "  Also get corresponding protein sequences for genes in lists/lis.18_syn_pan_aug_extra.pctl${pctl_low}"
   if [ ! -f 20_pan_fasta_prot.faa ]; then
@@ -975,7 +978,7 @@ run_order_and_name() {
     done
   fi
 
-  awk '$1~/^>/ {print $5}' 23_syn_pan_pctl"${pctl_low}"_posn_cds.fna > lists/lis.23_syn_pan_pctl"${pctl_low}"_posn
+  awk '$1~/^>/ {print $5}' 23_syn_pan_pctl"${pctl_low}"_posn_cds.fna | sort -u > lists/lis.23_syn_pan_pctl"${pctl_low}"_posn
   get_fasta_subset.pl -in 20_pan_fasta_prot.faa -list lists/lis.23_syn_pan_pctl"${pctl_low}"_posn \
                       -clobber -out 23_syn_pan_pctl"${pctl_low}"_posn_proteinTMP.faa
 

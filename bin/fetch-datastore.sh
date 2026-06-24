@@ -18,7 +18,8 @@ case ${DATAFILE} in
   paran.WU01x14.gnm1.ann1.4KM0.*|\
   phach.longxuteng.gnm1.ann1_hap2.KGX9.*|\
   phach.longxuteng.gnm1.ann1.KGX9.*|\
-  pissa.ZW6.gnm1.ann1.TKZX.*|\
+  pissa.Cameor.gnm2.ann1.KT6X.*|\
+  pissa.JI2822.gnm1.ann1.D0QS.*|\
   prupe.Lovell.gnm2.ann1.S2ZZ.*|\
   quisa.S10.gnm1.ann1.RQ4J.*|\
   sento.Myeongyun.gnm1.ann1.5WXB.*|\
