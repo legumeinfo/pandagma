@@ -618,12 +618,15 @@ run_add_extra() {
         done
         wait
       fi
-    else   # don't filter, since chromosome pairings aren't provided; just split lines on "__"
-      echo "WARNING: No expected_chr_matches.tsv file was provided, but annotations were indicated in the "
-      echo "file sets annotation_files_extra_constr and cds_files_extra_constr. Please check that "
-      echo "expected_chr_matches.tsv is in the data directory OR that extra annotations are in the "
-      echo "annotation_files_extra_free and cds_files_extra_free file collections."
-      exit 1;
+    else   # no expected_chr_matches provided
+      if [[ -v cds_files_extra_constr ]]; then
+        echo "ERROR: annotation_files_extra_constr were provided but no expected_chr_matches is defined."
+        echo "Constrained extra sets require expected_chr_matches; move them to *_extra_free or add the matches."
+        exit 1;
+      else
+        echo "No expected_chr_matches provided; placing extra_free annotations by homology only"
+        echo "(no chromosome-pair filtering). Proceeding."
+      fi
     fi
 
     if [[ -v cds_files_extra_free ]]; then
