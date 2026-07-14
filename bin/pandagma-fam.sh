@@ -792,8 +792,6 @@ run_summarize() {
 
   printf "\nOutput directory for this run:\t%s\n" "$full_out_dir" >> "${stats_file}"
 
-  echo "  Report orthogroup composition statistics for the three main cluster-calculation steps"
-
   echo "  Print sequence composition statistics for each annotation set"
   
   {

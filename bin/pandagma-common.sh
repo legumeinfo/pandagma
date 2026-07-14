@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2026-06-30"
+version="2026-07-14"
 
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
@@ -10,7 +10,7 @@ trap 'echo ${0##*/}:${LINENO} ERROR executing command: ${BASH_COMMAND}' ERR
 define(){ o=; while IFS=$'\n' read -r a; do o="$o$a"'
 '; done; eval "$1=\$o"; }
 
-declare scriptname annot_name fam_dir annot_str_regex dependencies commandlist
+declare scriptname annot_name annot_str_regex dependencies commandlist
 
 version() {
   echo "$scriptname" $version
@@ -287,7 +287,7 @@ main_pan_fam() {
   ##########
   # Command-line interpreter
   
-  while getopts "c:d:w:s:n:O:o:f:rvhm" opt
+  while getopts "c:d:w:s:n:O:o:rvhm" opt
   do
     case $opt in
       c) CONFIG=$OPTARG; echo "Config: $CONFIG" ;;
@@ -297,7 +297,6 @@ main_pan_fam() {
       n) NPROC=$OPTARG; echo "processors: $NPROC" ;;
       O) optarg_order_method=$OPTARG; echo "order method: $optarg_order_method" ;;
       o) out_dir=$OPTARG; echo "out_dir: $out_dir" ;;
-      f) fam_dir=$(realpath -e "$OPTARG") ; echo "Fam dir: $fam_dir" ;;
       r) retain="yes" ;;
       v) version ;;
       h) echo >&2 "$HELP_DOC" && exit 0 ;;
@@ -306,8 +305,6 @@ main_pan_fam() {
     esac
   done
   
-  export fam_dir
-
   case ${step} in 
     all|summarize|xfr_aligns_trees) : "${out_dir:=out_pandagma}" ;; # default to ./out_pandagma 
     *) if [ "${out_dir:-}" ]; then
