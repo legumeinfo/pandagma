@@ -129,7 +129,9 @@ Several additional optional worflows are available:
     The selected new annotation sets are compared against results of a prior full run of pandagma-fam.sh, using one of
     two methods: align_sample to compare new proteomes against a sample of protein sequences from multifasta files, OR
     hmmsearch, to compare against a hmmpress-ed hmm database of compressed-and-indexed HMMs.
-    Of the two methods, hmmsearch is generally more accurate than hmm_sample (aligns more sequences), but takes longer.
+    Of the two methods, hmmsearch should be a good general-purpose choice, but align_sample should give a more stable
+    result in terms of family compositions relative to the original families, as long as the annotations to be aligned 
+    are similar to those in the original families. Also, hmmscan takes considerably longer.
 
 Additionally, a large number of utilities are available in the bin directory.
 In general, each of these has full usage information, accessible with `program_name -h`
