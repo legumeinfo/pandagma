@@ -191,7 +191,8 @@ run_search_families() {
       exit 1
     fi
 
-    enough_seqs=20  # Don't search against more than this number of sequences in a family
+# TO DO: Add enough_seqs as a parameter in the config. 
+    enough_seqs=100  # Don't search against more than this number of sequences in a family
     echo "  Prepare to search against a random sampling of $enough_seqs sequences from each family"
     echo "  (or as many as available if there are fewer than $enough_seqs in the family)."
 
@@ -226,9 +227,12 @@ run_search_families() {
         sort -k1,1 -k2,2 | calc_avg_bitscore_per_fam_hit.awk | 
         sort -k1,1 -k12nr,12nr | top_line.awk > 33_fam_match/"$base".top &
       if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
+
+      # Once done with finding the top match per query, remove the large m8 files.
+      rm $filepath
     done
     wait
-  
+
     echo "== Place sequences into families based on top protein match, using the consen_iden threshold of $consen_iden."
     cat 33_fam_match/*.m8.top |
       awk -v IDEN="${consen_iden}" '$3>=IDEN {print $2 "\t" $1}' |
@@ -239,7 +243,7 @@ run_search_families() {
       base=$(basename "$file" .x.19_palmp.fam_ID.m8.top)
       echo "$base"; 
       cat "$file" | 
-        awk -v OFS="\t" 'BEGIN{print "#transcript", "family", "gene", "e-value", "score"}
+        awk -v OFS="\t" 'BEGIN{print "#gene", "family", "protein", "e-value", "score"}
                            {print $1, $2, $1, $11, $10}' |
           strip_spliceform.pl > "33_fam_match/$base.gfa.tsv"
     done
@@ -267,6 +271,9 @@ run_search_families() {
           strip_spliceform.pl > 33_fam_match/"${base}"."${hmmdb_name}".gfa.tsv &
        # allow to execute up to $NPROC in parallel
        if [[ $(jobs -r -p | wc -l) -ge ${NPROC} ]]; then wait -n; fi
+
+      # Once done with finding the top match per query, remove the large hmmsearch.tbl files.
+      rm $filepath
     done
     wait
   
@@ -352,7 +359,7 @@ run_realign_and_trim() {
   wait
 
   # Remove any zero-length alignments
-  find 43_hmmalign_trim2 -size 0c -print0 | xargs -I{} echo "  Remove zero-length file " {} >&2
+  find 43_hmmalign_trim2 -size 0c -print0 | xargs -I{} -0 echo "  Remove zero-length file " {} >&2
   find 43_hmmalign_trim2 -size 0c -delete
 }
 

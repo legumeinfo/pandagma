@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="2026-07-14"
+version="2026-08-05"
 
 set -o errexit -o errtrace -o nounset -o pipefail -o posix
 
@@ -191,7 +191,7 @@ run_model_and_trim() {
   echo
 
   # Remove any zero-length alignments
-  find 43_hmmalign_trim2 -size 0c | xargs -I{} echo "  Remove zero-length file " {} >&2
+  find 43_hmmalign_trim2 -size 0c  -print0 | xargs -I{} -0 echo "  Remove zero-length file " {} >&2
   find 43_hmmalign_trim2 -size 0c -delete
 }
 
