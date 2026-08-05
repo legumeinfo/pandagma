@@ -15,6 +15,10 @@ case ${DATAFILE} in
   cerca.ISC453364.gnm1.ann1.HZJM.*|\
   dalod.SKLTGB.gnm1.ann1.R67B.*|\
   glyma.Wm82_ISU01.gnm2.ann1.FGFB.*|\
+  lupco.98460.gnm2.ann1.DSCY.*|\
+  lupdi.PI_660697.gnm2.ann1.HBTG.*|\
+  luplu.C195.gnm1.ann1.2W7F.*|\
+  lupmu.Inti.gnm1.ann1.0FRM.*|\
   paran.WU01x14.gnm1.ann1.4KM0.*|\
   phach.longxuteng.gnm1.ann1_hap2.KGX9.*|\
   phach.longxuteng.gnm1.ann1.KGX9.*|\
@@ -43,6 +47,7 @@ case ${genspa} in
   apiam) genus=Apios species=americana ;;
   apipr) genus=Apios species=priceana ;;
   aradu) genus=Arachis species=duranensis ;;
+  araca) genus=Arachis species=cardenasii ;;
   arahy) genus=Arachis species=hypogaea ;;
   araip) genus=Arachis species=ipaensis ;;
   arast) genus=Arachis species=stenosperma ;;
@@ -73,6 +78,10 @@ case ${genspa} in
   lotja) genus=Lotus species=japonicus ;;
   lupal) genus=Lupinus species=albus ;;
   lupan) genus=Lupinus species=angustifolius ;;
+  lupco) genus=Lupinus species=cosentinii ;;
+  lupdi) genus=Lupinus species=digitatus ;;
+  luplu) genus=Lupinus species=luteus ;;
+  lupmu) genus=Lupinus species=mutabilis ;;
   medsa) genus=Medicago species=sativa ;;
   medtr) genus=Medicago species=truncatula ;;
   paran) genus=Parasponia species=andersonii;;
