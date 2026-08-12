@@ -219,17 +219,18 @@ run_search_families() {
     done
 
     # In the regex below, the targets look like GeneFamID__GeneID  ... and the __GeneID is discarded (leaving 12 columns)
-    # The purpose of calc_avg_bitscore_per_fam_hit.awk is to minimize the effects of outliers (e.g. a chimera) in a family,
-    # which could unduly attract a query sequence to it when a better "average" match is to another family.
+    # NOTE: until early August 2026, calc_avg_bitscore_per_fam_hit.awk was used at this point to minimize the effects of 
+    # outliers (e.g. a chimera) in a family, which could unduly attract a query sequence to it when a better "average" match is to another family.
+    # However, calc_avg_bitscore_per_fam_hit.awk was removed on 2026/08/06 as it also had the effect of sometimes suppressing perfect hits 
+    # between the query and the same sequence as target, whereas such an identical hit should be retained.
     for filepath in 33_fam_match/*.m8; do
       base=$(basename "$filepath")
-      < "$filepath" perl -pe 's/^(\S+)\t([^_]+)__\S+/$1\t$2/' | 
-        sort -k1,1 -k2,2 | calc_avg_bitscore_per_fam_hit.awk | 
+      < "$filepath" perl -pe 's/^(\S+)\t([^_]+)__\S+/$1\t$2/' | # sort -k1,1 -k2,2 | calc_avg_bitscore_per_fam_hit.awk | 
         sort -k1,1 -k12nr,12nr | top_line.awk > 33_fam_match/"$base".top &
       if [[ $(jobs -r -p | wc -l) -ge $((NPROC/2)) ]]; then wait -n; fi
 
       # Once done with finding the top match per query, remove the large m8 files.
-      rm $filepath
+      #rm $filepath
     done
     wait
 
